@@ -32,16 +32,46 @@ export function getGitHubScopes() {
   return ['repo', 'read:org', 'user:email']
 }
 
-export function getAppBaseUrl(request: NextRequest) {
-  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+function normalizeBaseUrl(url: string) {
+  const trimmedUrl = url.trim().replace(/\/+$/, '')
 
-  if (configuredUrl) {
-    return configuredUrl.startsWith('http')
-      ? configuredUrl.replace(/\/$/, '')
-      : `https://${configuredUrl.replace(/\/$/, '')}`
+  if (!trimmedUrl) {
+    return ''
   }
 
-  return request.nextUrl.origin
+  return trimmedUrl.startsWith('http')
+    ? trimmedUrl
+    : `https://${trimmedUrl}`
+}
+
+export function getConfiguredAppBaseUrl() {
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL ||
+    process.env.NEXTAUTH_URL
+
+  return configuredUrl ? normalizeBaseUrl(configuredUrl) : ''
+}
+
+export function getAppBaseUrl(request: NextRequest) {
+  const configuredUrl = getConfiguredAppBaseUrl()
+
+  if (configuredUrl) {
+    return configuredUrl
+  }
+
+  const requestOrigin = normalizeBaseUrl(request.nextUrl.origin)
+
+  if (requestOrigin) {
+    return requestOrigin
+  }
+
+  const vercelUrl =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL
+
+  return vercelUrl ? normalizeBaseUrl(vercelUrl) : request.nextUrl.origin
 }
 
 export function githubHeaders(accessToken?: string | null) {

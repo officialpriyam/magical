@@ -75,12 +75,12 @@ Use these project settings on Vercel:
 - Build command: `pnpm build`
 - Output directory: `.next`
 
-Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set `E2B_API_KEY`, one AI provider key, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
+Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set `E2B_API_KEY`, one AI provider key, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL=https://magicalai.iampriyam.me`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
 
 Use this GitHub OAuth callback URL:
 
 ```txt
-https://your-vercel-domain.com/api/github/callback
+https://magicalai.iampriyam.me/api/github/callback
 ```
 
 ## Environment

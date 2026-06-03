@@ -4,6 +4,7 @@ import { Duration, ms } from '@/lib/duration'
 import { Sandbox } from '@e2b/code-interpreter'
 import { kv } from '@vercel/kv'
 import { customAlphabet } from 'nanoid'
+import { getConfiguredAppBaseUrl } from '@/lib/github-server'
 
 const nanoid = customAlphabet('1234567890abcdef', 7)
 
@@ -39,10 +40,11 @@ export async function publish(
     try {
       const id = nanoid()
       await kv.set(`fragment:${id}`, url, { px: expiration })
+      const appBaseUrl = getConfiguredAppBaseUrl()
 
       return {
-        url: process.env.NEXT_PUBLIC_SITE_URL
-          ? `https://${process.env.NEXT_PUBLIC_SITE_URL}/s/${id}`
+        url: appBaseUrl
+          ? `${appBaseUrl}/s/${id}`
           : `/s/${id}`,
       }
     } catch (error) {
