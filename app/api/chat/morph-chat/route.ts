@@ -62,7 +62,10 @@ export async function POST(req: Request) {
       )
     }
 
-    const { model: _model, apiKey: _apiKey, ...modelParams } = config
+    const modelParams = { ...config }
+    delete modelParams.model
+    delete modelParams.apiKey
+    delete modelParams.baseURL
     const modelClient = getModelClient(resolvedModel, config)
 
     const contextualSystemPrompt = `You are a code editor. Generate a JSON response with exactly these fields:

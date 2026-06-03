@@ -20,6 +20,23 @@ export function isAccessDeniedError(error: any): boolean {
   return error && (error.statusCode === 403 || error.statusCode === 401)
 }
 
+export function isObjectGenerationError(error: any): boolean {
+  const errorName = error?.name || error?.constructor?.name || ''
+  const causeName = error?.cause?.name || error?.cause?.constructor?.name || ''
+  const message = `${error?.message || ''} ${error?.cause?.message || ''}`.toLowerCase()
+
+  return (
+    errorName.includes('NoObjectGeneratedError') ||
+    errorName.includes('TypeValidationError') ||
+    errorName.includes('JSONParseError') ||
+    causeName.includes('TypeValidationError') ||
+    causeName.includes('JSONParseError') ||
+    message.includes('no object generated') ||
+    message.includes('type validation failed') ||
+    message.includes('json')
+  )
+}
+
 export function handleAPIError(
   error: any,
   context?: { hasOwnApiKey?: boolean },
@@ -46,6 +63,13 @@ export function handleAPIError(
     return new Response(
       'Access denied. Please make sure your API key is valid.',
       { status: 403 },
+    )
+  }
+
+  if (isObjectGenerationError(error)) {
+    return new Response(
+      'The AI provider returned an empty or invalid code response. Try again, or choose a different model.',
+      { status: 422 },
     )
   }
 

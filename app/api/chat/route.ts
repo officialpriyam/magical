@@ -11,7 +11,7 @@ import { toPrompt } from '@/lib/prompt'
 import ratelimit from '@/lib/ratelimit'
 import { fragmentSchema as schema } from '@/lib/schema'
 import { Templates } from '@/lib/templates'
-import { streamObject, type LanguageModel, type ModelMessage } from 'ai'
+import { generateObject, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
 
@@ -71,10 +71,13 @@ export async function POST(req: Request) {
       )
     }
 
-    const { model: modelNameString, apiKey: modelApiKey, ...modelParams } = config
+    const modelParams = { ...config }
+    delete modelParams.model
+    delete modelParams.apiKey
+    delete modelParams.baseURL
     const modelClient = getModelClient(resolvedModel, config)
 
-    const stream = await streamObject({
+    const result = await generateObject({
       model: modelClient as LanguageModel,
       schema,
       system: toPrompt(template),
@@ -83,7 +86,11 @@ export async function POST(req: Request) {
       ...modelParams,
     })
 
-    return stream.toTextStreamResponse()
+    return new Response(JSON.stringify(result.object), {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+    })
   } catch (error: any) {
     return handleAPIError(error, { hasOwnApiKey: !!config.apiKey })
   }
