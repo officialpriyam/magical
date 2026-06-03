@@ -43,11 +43,13 @@ This directory contains the complete database schema for Magical AI, organized i
 
 ### Migration Files (`/migrations/`)
 
-1. **`20250929060300_create_tasks_table.sql`** - Historical tasks table creation
-2. **`20250929163414_create_save_message_function.sql`** - Message handling function
-3. **`20260603000000_ensure_workspace_files_table.sql`** - Workspace file storage for IDE and GitHub import
-4. **`20260603000200_restrict_project_chat_access.sql`** - Owner-only project, message, and fragment access
-5. **`20260603000400_restore_chat_table_privileges.sql`** - Authenticated chat table grants after RLS tightening
+1. **`20250103000000_ensure_chat_core_tables.sql`** - Core chat/project tables required by the app
+2. **`20250104000000_create_workspace_files_table.sql`** - Historical workspace file storage
+3. **`20250929060300_create_tasks_table.sql`** - Historical tasks table creation
+4. **`20250929163414_create_save_message_function.sql`** - Message handling function
+5. **`20260603000000_ensure_workspace_files_table.sql`** - Workspace file storage for IDE and GitHub import
+6. **`20260603000200_restrict_project_chat_access.sql`** - Owner-only project, message, and fragment access
+7. **`20260603000400_restore_chat_table_privileges.sql`** - Authenticated chat table grants after RLS tightening
 
 ## Loading Order
 
@@ -70,6 +72,8 @@ For a fresh database setup, load files in this order:
 \i schemas/public.sql
 
 -- 6. Apply any additional migrations
+\i migrations/20250103000000_ensure_chat_core_tables.sql
+\i migrations/20250104000000_create_workspace_files_table.sql
 \i migrations/20250929060300_create_tasks_table.sql
 \i migrations/20250929163414_create_save_message_function.sql
 \i migrations/20260603000000_ensure_workspace_files_table.sql

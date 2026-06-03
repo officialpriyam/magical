@@ -10,7 +10,7 @@ function describeProjectCreateError(error: any) {
   const message = error?.message || ''
 
   if (code === 'PGRST205' || code === '42P01' || /schema cache|relation .* does not exist|could not find the table/i.test(message)) {
-    return 'Supabase table public.projects is missing. Run the Magical AI database schema or migrations in Supabase.'
+    return 'Supabase table public.projects is missing. Run supabase/migrations/20250103000000_ensure_chat_core_tables.sql in Supabase.'
   }
 
   if (code === '42501' || /permission denied|row-level security|violates row-level security/i.test(message)) {

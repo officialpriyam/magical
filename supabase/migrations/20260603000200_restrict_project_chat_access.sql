@@ -54,7 +54,7 @@ BEGIN
     sequence_number
   ) VALUES (
     project_id_param,
-    role_param,
+    role_param::public.message_role_enum,
     content_param,
     object_data_param,
     result_data_param,

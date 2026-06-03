@@ -204,6 +204,7 @@ CREATE TABLE IF NOT EXISTS public.messages (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT messages_pkey PRIMARY KEY (id),
   CONSTRAINT messages_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE,
+  CONSTRAINT messages_project_sequence_unique UNIQUE (project_id, sequence_number),
   CONSTRAINT messages_sequence_positive CHECK (sequence_number >= 0)
 );
 
@@ -881,7 +882,7 @@ BEGIN
     sequence_number
   ) VALUES (
     project_id_param,
-    role_param,
+    role_param::public.message_role_enum,
     content_param,
     object_data_param,
     result_data_param,
