@@ -8,10 +8,16 @@ import { useEffect } from 'react'
 export function Chat({
   messages,
   isLoading,
+  isPreviewLoading = false,
+  currentFragment,
+  autoFixMessage,
   setCurrentPreview,
 }: {
   messages: Message[]
   isLoading: boolean
+  isPreviewLoading?: boolean
+  currentFragment?: DeepPartial<FragmentSchema>
+  autoFixMessage?: string
   setCurrentPreview: (preview: {
     fragment: DeepPartial<FragmentSchema> | undefined
     result: ExecutionResult | undefined
@@ -23,15 +29,14 @@ export function Chat({
     if (chatContainer) {
       chatContainer.scrollTop = chatContainer.scrollHeight
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(messages)])
+  }, [messages, isLoading, isPreviewLoading, currentFragment])
 
   return (
     <div
       id="chat-container"
       className="flex flex-col pb-12 gap-2 overflow-y-auto max-h-full"
     >
-      {messages.length === 0 && !isLoading && (
+      {messages.length === 0 && !isLoading && !isPreviewLoading && (
         <div className="flex items-center justify-center h-full text-muted-foreground text-lg font-serif">
           Start a new conversation
         </div>
@@ -83,12 +88,132 @@ export function Chat({
           )}
         </div>
       ))}
-      {isLoading && (
-        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-          <LoaderIcon strokeWidth={2} className="animate-spin w-4 h-4" />
-          <span>Generating...</span>
-        </div>
+      {(isLoading || isPreviewLoading || autoFixMessage) && (
+        <GenerationStatusCard
+          messages={messages}
+          currentFragment={currentFragment}
+          isLoading={isLoading}
+          isPreviewLoading={isPreviewLoading}
+          autoFixMessage={autoFixMessage}
+        />
       )}
     </div>
   )
+}
+
+function GenerationStatusCard({
+  messages,
+  currentFragment,
+  isLoading,
+  isPreviewLoading,
+  autoFixMessage,
+}: {
+  messages: Message[]
+  currentFragment?: DeepPartial<FragmentSchema>
+  isLoading: boolean
+  isPreviewLoading: boolean
+  autoFixMessage?: string
+}) {
+  const status = getGenerationStatus({
+    messages,
+    currentFragment,
+    isLoading,
+    isPreviewLoading,
+    autoFixMessage,
+  })
+
+  if (!status) return null
+
+  return (
+    <div className="mx-4 mt-2 w-[calc(100%-2rem)] max-w-[36rem] rounded-2xl border bg-accent/70 px-4 py-3 shadow-sm dark:bg-white/5">
+      <div className="flex items-center gap-2 text-sm font-medium text-primary">
+        <Sparkles strokeWidth={2} className="h-4 w-4 animate-pulse text-[#FF8800]" />
+        <span className="min-w-0 break-words">{status.title}</span>
+      </div>
+      <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+        <LoaderIcon strokeWidth={2} className="h-3.5 w-3.5 shrink-0 animate-spin" />
+        <span className="min-w-0 break-words">{status.detail}</span>
+      </div>
+    </div>
+  )
+}
+
+function getGenerationStatus({
+  messages,
+  currentFragment,
+  isLoading,
+  isPreviewLoading,
+  autoFixMessage,
+}: {
+  messages: Message[]
+  currentFragment?: DeepPartial<FragmentSchema>
+  isLoading: boolean
+  isPreviewLoading: boolean
+  autoFixMessage?: string
+}) {
+  const promptTarget = getPromptTarget(messages)
+  const latestObject =
+    currentFragment ||
+    [...messages].reverse().find((message) => message.object)?.object
+  const title = cleanText(latestObject?.title)
+  const filePath = cleanText(latestObject?.file_path)
+  const template = cleanText(latestObject?.template)
+  const code = cleanText(latestObject?.code)
+  const generatedTarget = filePath || title || template || promptTarget
+
+  if (autoFixMessage) {
+    return {
+      title: 'Fixing generated code',
+      detail: autoFixMessage,
+    }
+  }
+
+  if (isPreviewLoading) {
+    return {
+      title: 'Preparing live preview',
+      detail: `Launching the sandbox for ${title || promptTarget}`,
+    }
+  }
+
+  if (!isLoading) return null
+
+  if (code || filePath || title || template) {
+    return {
+      title: 'Writing project files',
+      detail: `Generating ${generatedTarget}`,
+    }
+  }
+
+  if (/landing|page|website|design|ui|hero/i.test(promptTarget)) {
+    return {
+      title: 'Exploring design directions',
+      detail: `Drafting ${promptTarget}`,
+    }
+  }
+
+  return {
+    title: 'Planning implementation',
+    detail: `Generating ${promptTarget}`,
+  }
+}
+
+function getPromptTarget(messages: Message[]) {
+  const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user')
+  const text = latestUserMessage?.content
+    .filter((content) => content.type === 'text')
+    .map((content) => content.text)
+    .join(' ')
+
+  const normalized = cleanText(text)
+    .replace(/^(make|build|create|generate|design|code|write)\s+/i, '')
+
+  if (!normalized) {
+    return 'your project'
+  }
+
+  return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized
+}
+
+function cleanText(value: unknown) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
 }

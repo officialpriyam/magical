@@ -1094,6 +1094,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               <Chat
                 messages={messages}
                 isLoading={isLoading}
+                isPreviewLoading={isPreviewLoading}
+                currentFragment={fragment}
+                autoFixMessage={autoFixMessage}
                 setCurrentPreview={setCurrentPreview}
               />
             )}

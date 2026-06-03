@@ -23,7 +23,16 @@ export async function GET(request: NextRequest) {
 
   const code = request.nextUrl.searchParams.get('code')
   const state = request.nextUrl.searchParams.get('state')
+  const oauthError = request.nextUrl.searchParams.get('error')
   const savedState = request.cookies.get('github_oauth_state')?.value
+
+  if (oauthError) {
+    const response = redirectToSettings(
+      oauthError === 'access_denied' ? 'access_denied' : 'authorization_failed',
+    )
+    response.cookies.delete('github_oauth_state')
+    return response
+  }
 
   if (!code || !state || !savedState || state !== savedState) {
     const response = redirectToSettings('invalid_state')
@@ -64,7 +73,10 @@ export async function GET(request: NextRequest) {
     const tokenData = (await tokenResponse.json()) as GitHubTokenResponse
 
     if (!tokenResponse.ok || tokenData.error || !tokenData.access_token) {
-      throw new Error(tokenData.error_description || tokenData.error || 'GitHub token exchange failed')
+      console.error('GitHub token exchange failed:', tokenData.error_description || tokenData.error)
+      const response = redirectToSettings('token_exchange_failed')
+      response.cookies.delete('github_oauth_state')
+      return response
     }
 
     const githubUserResponse = await fetch('https://api.github.com/user', {
@@ -72,18 +84,28 @@ export async function GET(request: NextRequest) {
     })
 
     if (!githubUserResponse.ok) {
-      throw new Error(`GitHub user lookup failed: ${githubUserResponse.status}`)
+      console.error('GitHub user lookup failed:', githubUserResponse.status)
+      const response = redirectToSettings('user_lookup_failed')
+      response.cookies.delete('github_oauth_state')
+      return response
     }
 
     const githubUser = await githubUserResponse.json()
 
-    await storeGitHubAccessToken({
-      userId: user.id,
-      accessToken: tokenData.access_token,
-      tokenType: tokenData.token_type,
-      scope: tokenData.scope,
-      githubUser,
-    })
+    try {
+      await storeGitHubAccessToken({
+        userId: user.id,
+        accessToken: tokenData.access_token,
+        tokenType: tokenData.token_type,
+        scope: tokenData.scope,
+        githubUser,
+      })
+    } catch (storageError) {
+      console.error('GitHub token storage failed:', storageError)
+      const response = redirectToSettings('storage_failed')
+      response.cookies.delete('github_oauth_state')
+      return response
+    }
 
     const response = redirectToSettings('connected')
     response.cookies.delete('github_oauth_state')

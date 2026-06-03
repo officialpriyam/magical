@@ -16,7 +16,7 @@ import {
   GitBranch,
   ExternalLink,
 } from 'lucide-react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/lib/auth'
 import { 
   getUserIntegrations, 
@@ -59,6 +59,7 @@ const availableIntegrations = [
 export default function IntegrationsSettings() {
   const { session } = useAuth(() => {}, () => {})
   const { toast } = useToast()
+  const handledGitHubStatusRef = useRef(false)
   
   const [integrations, setIntegrations] = useState<UserIntegration[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -120,6 +121,80 @@ export default function IntegrationsSettings() {
 
     initializeIntegrations()
   }, [session?.user?.id, loadIntegrations])
+
+  useEffect(() => {
+    if (handledGitHubStatusRef.current || typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+    const githubStatus = url.searchParams.get('github')
+
+    if (!githubStatus) return
+
+    handledGitHubStatusRef.current = true
+
+    const messages: Record<string, { title: string; description: string; variant?: 'destructive' }> = {
+      connected: {
+        title: 'GitHub connected',
+        description: 'Private repositories and generated-code saves are enabled.',
+      },
+      invalid_state: {
+        title: 'GitHub connection expired',
+        description: 'Start the GitHub connection again from this page.',
+        variant: 'destructive',
+      },
+      login_required: {
+        title: 'Sign in required',
+        description: 'Sign in to Magical AI before connecting GitHub.',
+        variant: 'destructive',
+      },
+      not_configured: {
+        title: 'GitHub OAuth is not configured',
+        description: 'Add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in Vercel.',
+        variant: 'destructive',
+      },
+      access_denied: {
+        title: 'GitHub connection cancelled',
+        description: 'Approve the GitHub OAuth request to connect your account.',
+        variant: 'destructive',
+      },
+      authorization_failed: {
+        title: 'GitHub authorization failed',
+        description: 'Start the GitHub connection again and check the OAuth app settings.',
+        variant: 'destructive',
+      },
+      token_exchange_failed: {
+        title: 'GitHub token exchange failed',
+        description: 'Check the GitHub OAuth client secret and callback URL.',
+        variant: 'destructive',
+      },
+      user_lookup_failed: {
+        title: 'GitHub account lookup failed',
+        description: 'GitHub authorized the app, but account details could not be loaded.',
+        variant: 'destructive',
+      },
+      storage_failed: {
+        title: 'Could not save GitHub connection',
+        description: 'Run the Supabase user_integrations migration, then connect again.',
+        variant: 'destructive',
+      },
+      error: {
+        title: 'GitHub connection failed',
+        description: 'Check Vercel logs for the GitHub OAuth callback.',
+        variant: 'destructive',
+      },
+    }
+
+    const message = messages[githubStatus] || messages.error
+
+    toast(message)
+
+    if (githubStatus === 'connected') {
+      void loadIntegrations()
+    }
+
+    url.searchParams.delete('github')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [loadIntegrations, toast])
 
 
   const getIntegrationStatus = useCallback((serviceId: string) => {
