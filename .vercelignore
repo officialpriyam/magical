@@ -1,0 +1,7 @@
+# Vercel Deployment - Ignore apps workspace
+
+# Apps directory (desktop app deployed separately)
+apps/
+apps/**
+
+# Only deploy Magical AI from root
