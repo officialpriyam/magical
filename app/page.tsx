@@ -179,9 +179,16 @@ export default function Home() {
           isRateLimit = errorData.type === 'rate_limit'
         } else {
           // Handle common error patterns
-          if (error.message.includes('limit') || error.message.includes('rate')) {
+          const lowerMessage = error.message.toLowerCase()
+          if (lowerMessage.includes('you have reached your request limit')) {
             isRateLimit = true
-            displayMessage = 'Rate limit exceeded. Please try again later or use your own API key.'
+            displayMessage = 'You have reached your request limit. Please try again later.'
+          } else if (lowerMessage.includes('provider') && (lowerMessage.includes('limit') || lowerMessage.includes('rate'))) {
+            isRateLimit = true
+            displayMessage = error.message
+          } else if (lowerMessage.includes('limit') || lowerMessage.includes('rate')) {
+            isRateLimit = true
+            displayMessage = error.message || 'Rate limit exceeded. Please try again later.'
           } else if (error.message.includes('API key') || error.message.includes('unauthorized')) {
             displayMessage = 'Invalid API key. Please check your API key configuration in settings.'
           } else if (error.message.includes('network') || error.message.includes('fetch')) {

@@ -95,6 +95,8 @@ The generated `.env.local` contains placeholders for all runtime keys referenced
 - PostHog analytics toggle
 - Optional ZeroBounce email validation
 
+Chat rate limiting is disabled by default. To enable it, set `RATE_LIMIT_ENABLED=true`, `RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_WINDOW`, `KV_REST_API_URL`, and `KV_REST_API_TOKEN` in Vercel. To force it off, set `RATE_LIMIT_ENABLED=false`.
+
 ## Developer
 
 Developed by priyx.

@@ -7,6 +7,10 @@ export default async function ratelimit(
   maxRequests: number,
   window: Duration,
 ) {
+  if (!key || maxRequests <= 0) {
+    return
+  }
+
   if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
     try {
       const ratelimit = new Ratelimit({

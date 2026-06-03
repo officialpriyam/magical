@@ -1,5 +1,4 @@
 import { handleAPIError, createRateLimitResponse } from '@/lib/api-errors'
-import { Duration } from '@/lib/duration'
 import {
   getModelClient,
   hasProviderCredentials,
@@ -8,28 +7,25 @@ import {
   resolveGenerationModel,
 } from '@/lib/models'
 import { applyPatch } from '@/lib/morph'
-import ratelimit from '@/lib/ratelimit'
+import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { FragmentSchema, morphEditSchema, MorphEditSchema } from '@/lib/schema'
 import { generateObject, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
 
-const rateLimitMaxRequests = process.env.RATE_LIMIT_MAX_REQUESTS
-  ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS)
-  : 10
-const ratelimitWindow = process.env.RATE_LIMIT_WINDOW
-  ? (process.env.RATE_LIMIT_WINDOW as Duration)
-  : '1d'
-
 
 export async function POST(req: Request) {
   const {
     messages,
+    userID,
+    teamID,
     model,
     config,
     currentFragment,
   }: {
     messages: ModelMessage[]
+    userID: string | undefined
+    teamID: string | undefined
     model: LLMModel
     config: LLMModelConfig
     currentFragment: FragmentSchema
@@ -39,14 +35,7 @@ export async function POST(req: Request) {
     return new Response('No AI model selected. Please choose a valid model.', { status: 400 })
   }
 
-  // Rate limiting (same as chat route)
-  const limit = !config.apiKey
-    ? await ratelimit(
-        req.headers.get('x-forwarded-for'),
-        rateLimitMaxRequests,
-        ratelimitWindow,
-      )
-    : false
+  const limit = await applyChatRateLimit({ req, config, userID, teamID })
 
   if (limit) {
     return createRateLimitResponse(limit)

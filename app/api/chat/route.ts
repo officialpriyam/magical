@@ -1,5 +1,4 @@
 import { handleAPIError, createRateLimitResponse } from '@/lib/api-errors'
-import { Duration } from '@/lib/duration'
 import {
   getModelClient,
   hasProviderCredentials,
@@ -8,19 +7,12 @@ import {
   resolveGenerationModel,
 } from '@/lib/models'
 import { toPrompt } from '@/lib/prompt'
-import ratelimit from '@/lib/ratelimit'
+import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { fragmentSchema as schema } from '@/lib/schema'
 import { Templates } from '@/lib/templates'
 import { generateObject, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
-
-const rateLimitMaxRequests = process.env.RATE_LIMIT_MAX_REQUESTS
-  ? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS)
-  : 10
-const ratelimitWindow = process.env.RATE_LIMIT_WINDOW
-  ? (process.env.RATE_LIMIT_WINDOW as Duration)
-  : '1d'
 
 export async function POST(req: Request) {
   const {
@@ -43,13 +35,7 @@ export async function POST(req: Request) {
     return new Response('No AI model selected. Please choose a valid model.', { status: 400 })
   }
 
-  const limit = !config.apiKey
-    ? await ratelimit(
-        req.headers.get('x-forwarded-for'),
-        rateLimitMaxRequests,
-        ratelimitWindow,
-      )
-    : false
+  const limit = await applyChatRateLimit({ req, config, userID, teamID })
 
   if (limit) {
     return createRateLimitResponse(limit)

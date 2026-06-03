@@ -85,9 +85,14 @@ export function createRateLimitResponse(limit: {
   remaining: number
   reset: number
 }): Response {
-  return new Response('You have reached your request limit for the day.', {
+  return new Response(JSON.stringify({
+    type: 'rate_limit',
+    error: 'You have reached your request limit. Please try again later.',
+    limit,
+  }), {
     status: 429,
     headers: {
+      'Content-Type': 'application/json',
       'X-RateLimit-Limit': limit.amount.toString(),
       'X-RateLimit-Remaining': limit.remaining.toString(),
       'X-RateLimit-Reset': limit.reset.toString(),
