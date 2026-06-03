@@ -690,7 +690,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
 
     if (!hadProjectBeforePrompt) {
-      router.replace(`/chat/${projectForPrompt.id}`)
+      window.history.replaceState(null, '', `/chat/${projectForPrompt.id}`)
     }
 
     if (shouldRenameProject) {

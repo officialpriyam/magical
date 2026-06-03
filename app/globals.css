@@ -31,6 +31,9 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --torch-core: rgba(255, 213, 145, 0.42);
+  --torch-warm: rgba(247, 142, 57, 0.16);
+  --torch-fade: rgba(255, 255, 255, 0);
 }
 
 .dark {
@@ -54,6 +57,9 @@
   --border: 240 3.7% 15.9%;
   --input: 240 3.7% 15.9%;
   --ring: 240 4.9% 83.9%;
+  --torch-core: rgba(255, 190, 96, 0.28);
+  --torch-warm: rgba(236, 112, 37, 0.14);
+  --torch-fade: rgba(9, 9, 11, 0);
 }
 
 @layer base {
@@ -65,10 +71,13 @@
     color: hsl(var(--foreground));
     font-family: var(--font-sans, sans-serif);
     background-image: radial-gradient(
-      ellipse 80% 50% at 50% -20%,
-      rgba(0, 174, 239, 0.3),
-      rgba(255, 255, 255, 0)
+      ellipse 56% 38% at 50% -12%,
+      var(--torch-core) 0%,
+      var(--torch-warm) 42%,
+      var(--torch-fade) 78%
     );
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 }
 
