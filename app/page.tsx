@@ -7,7 +7,7 @@ import { PromptInputBox } from '@/components/ui/ai-prompt-box';
 import { NavBar } from '@/components/navbar';
 import { useAuth } from '@/lib/auth';
 import dynamic from 'next/dynamic';
-import { Project, createProject, saveMessage, getProjectMessages, generateProjectTitle, getProject, updateProject } from '@/lib/database';
+import { Project, saveMessage, getProjectMessages, generateProjectTitle, getProject, updateProject } from '@/lib/database';
 import { Message, toAISDKMessages, toMessageImage } from '@/lib/messages';
 import type { LLMModel, LLMModelConfig } from '@/lib/models';
 import { FragmentSchema, fragmentSchema as schema } from '@/lib/schema';
@@ -25,6 +25,7 @@ import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
 import { SupabaseClient } from '@supabase/supabase-js';
 import models from '@/lib/models.json';
+import { invalidateCache } from '@/lib/caching';
 
 const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
@@ -778,11 +779,32 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       return null
     }
 
-    const newProject = await createProject(
-      supabase,
-      DEFAULT_NEW_CHAT_TITLE,
-      selectedTemplate === 'auto' ? undefined : selectedTemplate,
-    )
+    let newProject: Project | null = null
+
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: DEFAULT_NEW_CHAT_TITLE,
+          templateId: selectedTemplate === 'auto' ? undefined : selectedTemplate,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        setErrorMessage(data.error || 'Could not create a new chat.')
+        return null
+      }
+
+      newProject = data.project || null
+    } catch (error) {
+      console.error('Error creating chat project:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Could not create a new chat.')
+      return null
+    }
 
     if (!newProject) {
       setErrorMessage('Could not create a new chat. Check your Supabase project table and auth settings.')
@@ -790,6 +812,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
 
     skipNextProjectMessagesLoadRef.current = newProject.id
+    invalidateCache(new RegExp(`^projects:${session.user.id}:`))
     setCurrentProject(newProject)
     setChatHistoryRefreshKey((key) => key + 1)
     if (navigate) {
