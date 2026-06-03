@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { Sandbox } from '@e2b/code-interpreter';
+import { createE2BSandbox } from '@/lib/e2b-sandbox';
 
 const E2B_API_KEY = process.env.E2B_API_KEY;
 
@@ -53,7 +54,7 @@ async function getSandbox(sessionID: string) {
     }
   }
 
-  const sandbox = await Sandbox.create({
+  const sandbox = await createE2BSandbox(undefined, {
     apiKey: E2B_API_KEY,
     metadata: {
       sessionID,

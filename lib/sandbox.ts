@@ -1,4 +1,5 @@
 import { Sandbox } from '@e2b/code-interpreter'
+import { createE2BSandbox } from './e2b-sandbox'
 
 const E2B_API_KEY = process.env.E2B_API_KEY
 const sandboxTimeout = 10 * 60 * 1000
@@ -14,7 +15,7 @@ export async function getSandbox(sessionID: string, template?: string): Promise<
     return sandboxes.get(sessionID)!
   }
 
-  const sandbox = await Sandbox.create(template || 'code-interpreter-v1', {
+  const sandbox = await createE2BSandbox(template || 'code-interpreter-v1', {
     apiKey: E2B_API_KEY,
     metadata: {
       sessionID,

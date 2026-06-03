@@ -1,6 +1,7 @@
 import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
-import { Sandbox } from '@e2b/code-interpreter'
+import { createE2BSandbox } from '@/lib/e2b-sandbox'
+import type { Sandbox } from '@e2b/code-interpreter'
 import { FileSystemNode } from '@/components/file-tree'
 
 const sandboxTimeout = 10 * 60 * 1000
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
 
     let sbx
     try {
-      sbx = await Sandbox.create(fragment.template, {
+      sbx = await createE2BSandbox(fragment.template, {
         metadata: {
           template: fragment.template,
           userID: userID ?? '',
