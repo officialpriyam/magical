@@ -166,12 +166,17 @@ export async function getProject(
   supabase: SupabaseClient<any, "public", any> | null = browserSupabase,
   projectId: string
 ): Promise<Project | null> {
+  const { data: { user } } = await supabase!.auth.getUser()
+  if (!user) return null
+
   return safeApiCall(supabase!, async () => {
     const { data, error } = await supabase!
       .from('projects')
       .select('*')
       .eq('id', projectId)
-      .single()
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .maybeSingle()
 
     if (error) throw error
     return data
@@ -187,12 +192,14 @@ export async function updateProject(
   if (user) {
     invalidateCache(new RegExp(`^projects:${user.id}:`))
   }
+  if (!user) return false
 
   return safeApiCall(supabase!, async () => {
     const { error } = await supabase!
       .from('projects')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) throw error
     return true
@@ -208,6 +215,7 @@ export async function deleteProject(
   if (user) {
     invalidateCache(new RegExp(`^projects:${user.id}:`))
   }
+  if (!user) return false
 
   return safeApiCall(supabase!, async () => {
     if (permanent) {
@@ -215,6 +223,7 @@ export async function deleteProject(
         .from('projects')
         .delete()
         .eq('id', id)
+        .eq('user_id', user.id)
       if (error) throw error
     } else {
       const { error } = await supabase!
@@ -224,6 +233,7 @@ export async function deleteProject(
           status: 'deleted'
         })
         .eq('id', id)
+        .eq('user_id', user.id)
       if (error) throw error
     }
     return true
@@ -240,6 +250,9 @@ export async function saveMessage(
   message: Message,
   sequenceNumber: number,
 ): Promise<boolean> {
+  const { data: { user } } = await supabase!.auth.getUser()
+  if (!user) return false
+
   return safeApiCall(
     supabase!,
     async () => {
@@ -264,13 +277,27 @@ export async function getProjectMessages(
   supabase: SupabaseClient<any, "public", any> | null = browserSupabase,
   projectId: string
 ): Promise<Message[]> {
-  const cacheKey = `project-messages:${projectId}`
+  const { data: { user } } = await supabase!.auth.getUser()
+  if (!user) return []
+
+  const cacheKey = `project-messages:${user.id}:${projectId}`
   const cachedMessages = getFromCache<Message[]>(cacheKey)
   if (cachedMessages) {
     return cachedMessages
   }
 
   return safeApiCall(supabase!, async () => {
+    const { data: project, error: projectError } = await supabase!
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .maybeSingle()
+
+    if (projectError) throw projectError
+    if (!project) return []
+
     const { data, error } = await supabase!
       .from('messages')
       .select('*')
@@ -295,8 +322,22 @@ export async function clearProjectMessages(
   supabase: SupabaseClient<any, "public", any> | null = browserSupabase,
   projectId: string
 ): Promise<boolean> {
-  invalidateCache(`project-messages:${projectId}`)
+  const { data: { user } } = await supabase!.auth.getUser()
+  if (!user) return false
+
+  invalidateCache(`project-messages:${user.id}:${projectId}`)
   return safeApiCall(supabase!, async () => {
+    const { data: project, error: projectError } = await supabase!
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .maybeSingle()
+
+    if (projectError) throw projectError
+    if (!project) return false
+
     const { error } = await supabase!
       .from('messages')
       .delete()

@@ -1,4 +1,25 @@
--- Function to save message and update project timestamp
+-- Restrict project/chat data so only the owning user can access it.
+
+DROP POLICY IF EXISTS "Users can view their own projects" ON public.projects;
+CREATE POLICY "Users can view their own projects" ON public.projects
+  FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can view messages from their projects" ON public.messages;
+CREATE POLICY "Users can view messages from their projects" ON public.messages
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.projects
+      WHERE projects.id = messages.project_id
+      AND projects.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view their own fragments or public ones" ON public.fragments;
+CREATE POLICY "Users can view their own fragments" ON public.fragments
+  FOR SELECT USING (auth.uid() = user_id);
+
+REVOKE SELECT ON public.projects FROM anon;
+
 CREATE OR REPLACE FUNCTION public.save_message_and_update_project(
   project_id_param UUID,
   role_param TEXT,
@@ -24,7 +45,6 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  -- Insert or update the message (upsert to handle duplicates)
   INSERT INTO public.messages (
     project_id,
     role,
@@ -47,7 +67,6 @@ BEGIN
     object_data = EXCLUDED.object_data,
     result_data = EXCLUDED.result_data;
 
-  -- Update the project's updated_at timestamp
   UPDATE public.projects
   SET updated_at = NOW()
   WHERE id = project_id_param
@@ -55,5 +74,6 @@ BEGIN
 END;
 $$;
 
--- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION public.save_message_and_update_project TO authenticated;
+
+NOTIFY pgrst, 'reload schema';

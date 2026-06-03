@@ -17,6 +17,7 @@ import { ExecutionResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { DeepPartial } from 'ai';
 import { experimental_useObject as useObject } from '@ai-sdk/react';
+import { useRouter } from 'next/navigation';
 import { usePostHog } from 'posthog-js/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
@@ -47,7 +48,12 @@ const Preview = dynamic(() => import('@/components/preview').then(mod => ({ defa
   ssr: false,
 });
 
-export default function Home() {
+type HomeProps = {
+  initialProjectId?: string
+}
+
+export default function Home({ initialProjectId }: HomeProps = {}) {
+  const router = useRouter()
   const supabase = createSupabaseBrowserClient()
   const [selectedTemplate, setSelectedTemplate] = useState<'auto' | TemplateId>('auto')
   const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
@@ -99,6 +105,9 @@ export default function Home() {
     const project = await getProject(supabase, chatId);
     if (project) {
       setCurrentProject(project);
+      router.push(`/chat/${project.id}`)
+    } else {
+      setErrorMessage('Chat not found or you do not have access.')
     }
   };
 
@@ -117,6 +126,42 @@ export default function Home() {
   // Determine which API to use based on morph toggle and existing fragment
   const shouldUseMorph = useMorphApply && fragment && fragment.code && fragment.file_path
   const apiEndpoint = shouldUseMorph ? '/api/chat/morph-chat' : '/api/chat'
+
+  useEffect(() => {
+    const projectId = initialProjectId
+    if (!projectId || !session?.user?.id) return
+
+    let isMounted = true
+
+    async function loadInitialProject(projectId: string) {
+      setIsLoadingProject(true)
+      const project = await getProject(supabase, projectId)
+
+      if (!isMounted) return
+
+      if (!project) {
+        setIsLoadingProject(false)
+        setErrorMessage('Chat not found or you do not have access.')
+        router.replace('/')
+        return
+      }
+
+      setCurrentProject(project)
+      setResult(undefined)
+      setFragment(undefined)
+      setSelectedFile(null)
+      setCurrentTab('code')
+      setIsPreviewLoading(false)
+      setIsPreviewPanelOpen(false)
+      setIsLoadingProject(false)
+    }
+
+    loadInitialProject(projectId)
+
+    return () => {
+      isMounted = false
+    }
+  }, [initialProjectId, router, session?.user?.id, supabase])
 
   useEffect(() => {
     let isMounted = true
@@ -436,6 +481,7 @@ export default function Home() {
           const newProject = await createProject(supabase, title, selectedTemplate === 'auto' ? undefined : selectedTemplate)
           if (newProject) {
             setCurrentProject(newProject)
+            router.replace(`/chat/${newProject.id}`)
           }
         }
       } catch (error) {
@@ -518,6 +564,7 @@ export default function Home() {
     setCurrentTab('code')
     setIsPreviewLoading(false)
     setCurrentProject(null)
+    router.push('/')
   }
 
   function setCurrentPreview(preview: {

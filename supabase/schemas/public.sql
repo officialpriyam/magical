@@ -732,7 +732,7 @@ CREATE POLICY "Users can manage their own preferences" ON public.user_preference
 
 -- Project policies
 CREATE POLICY "Users can view their own projects" ON public.projects
-  FOR SELECT USING (auth.uid() = user_id OR is_public = true);
+  FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert their own projects" ON public.projects
   FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -749,7 +749,7 @@ CREATE POLICY "Users can view messages from their projects" ON public.messages
     EXISTS (
       SELECT 1 FROM public.projects
       WHERE projects.id = messages.project_id
-      AND (projects.user_id = auth.uid() OR projects.is_public = true)
+      AND projects.user_id = auth.uid()
     )
   );
 
@@ -763,8 +763,8 @@ CREATE POLICY "Users can insert messages to their projects" ON public.messages
   );
 
 -- Fragment policies
-CREATE POLICY "Users can view their own fragments or public ones" ON public.fragments
-  FOR SELECT USING (auth.uid() = user_id OR is_public = true);
+CREATE POLICY "Users can view their own fragments" ON public.fragments
+  FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can manage their own fragments" ON public.fragments
   FOR ALL USING (auth.uid() = user_id);
@@ -857,8 +857,20 @@ CREATE OR REPLACE FUNCTION public.save_message_and_update_project(
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.projects
+    WHERE id = project_id_param
+      AND user_id = auth.uid()
+      AND deleted_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Project not found or access denied'
+      USING ERRCODE = '42501';
+  END IF;
+
   -- Insert the message
   INSERT INTO public.messages (
     project_id,
