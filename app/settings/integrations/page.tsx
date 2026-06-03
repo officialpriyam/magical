@@ -223,13 +223,13 @@ export default function IntegrationsSettings() {
       return
     }
 
-    setConnecting(serviceId)
-    
     try {
       if (serviceId === 'github') {
         window.location.assign('/api/github/connect')
         return
       }
+
+      setConnecting(serviceId)
 
       console.log(`Connecting ${serviceId} for user:`, session.user.id)
       

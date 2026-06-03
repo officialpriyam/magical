@@ -1,26 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/auth-utils'
 import { getAppBaseUrl, getGitHubScopes } from '@/lib/github-server'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
-  const { error } = await authenticateUser()
+  const baseUrl = getAppBaseUrl(request)
+  const redirectToSettings = (status: string) =>
+    NextResponse.redirect(`${baseUrl}/settings/integrations?github=${status}`)
 
-  if (error) {
-    return error
-  }
-
-  if (!process.env.GITHUB_CLIENT_ID) {
-    return NextResponse.json(
-      { error: 'GitHub OAuth is not configured. Add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET.' },
-      { status: 503 },
-    )
+  if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+    return redirectToSettings('not_configured')
   }
 
   const state = randomUUID()
-  const baseUrl = getAppBaseUrl(request)
   const redirectUri = `${baseUrl}/api/github/callback`
   const params = new URLSearchParams({
     client_id: process.env.GITHUB_CLIENT_ID,
