@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { supabaseServiceRoleKey } from '@/lib/supabase-credentials'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,11 @@ export async function POST(request: NextRequest) {
         ? body.templateId.trim()
         : null
 
-    const { data: project, error } = await supabase
+    const writeSupabase = supabaseServiceRoleKey
+      ? await createServerClient(true)
+      : supabase
+
+    const { data: project, error } = await writeSupabase
       .from('projects')
       .insert({
         user_id: user.id,

@@ -646,7 +646,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     const hadProjectBeforePrompt = !!currentProject
     const projectForPrompt = await ensureChatProject({ navigate: false })
     if (!projectForPrompt) {
-      setErrorMessage('Could not create a new chat. Check your Supabase project table and auth settings.')
       return
     }
 
@@ -795,7 +794,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        setErrorMessage(data.error || 'Could not create a new chat.')
+        const code = data.code ? ` (${data.code})` : ''
+        setErrorMessage(`${data.error || 'Could not create a new chat.'}${code}`)
         return null
       }
 
@@ -807,7 +807,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
 
     if (!newProject) {
-      setErrorMessage('Could not create a new chat. Check your Supabase project table and auth settings.')
+      setErrorMessage('Project creation API returned no project. Check Vercel logs for /api/projects.')
       return null
     }
 
