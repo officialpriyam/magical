@@ -19,7 +19,7 @@ import { DeepPartial } from 'ai';
 import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { useRouter } from 'next/navigation';
 import { usePostHog } from 'posthog-js/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
@@ -27,6 +27,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import models from '@/lib/models.json';
 
 const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
+const MAX_AUTO_FIX_ATTEMPTS = 2
 
 function getSandboxErrorMessage(errorResult: { error?: string; type?: string }) {
   if (errorResult.type === 'config_error') {
@@ -34,6 +35,67 @@ function getSandboxErrorMessage(errorResult: { error?: string; type?: string }) 
   }
 
   return errorResult.error || 'AI generated the code, but preview setup failed.'
+}
+
+type SandboxErrorResult = {
+  error?: string
+  type?: string
+  details?: string
+}
+
+function getExecutionErrorDetails(result: ExecutionResult) {
+  if (result.template !== 'code-interpreter-v1' || !result.runtimeError) {
+    return ''
+  }
+
+  const error = result.runtimeError
+  const parts = [
+    error.name || 'Runtime error',
+    error.value,
+    error.traceback,
+    result.stderr?.length ? `stderr:\n${result.stderr.join('\n')}` : '',
+    result.stdout?.length ? `stdout:\n${result.stdout.join('\n')}` : '',
+  ]
+
+  return parts.filter(Boolean).join('\n\n')
+}
+
+function getSandboxErrorDetails(errorResult: SandboxErrorResult) {
+  return [
+    errorResult.error,
+    errorResult.details ? `Details:\n${errorResult.details}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+function isAutoFixableSandboxError(errorResult: SandboxErrorResult) {
+  return errorResult.type === 'execution_error' || errorResult.type === 'validation_error'
+}
+
+function buildAutoFixPrompt({
+  fragment,
+  errorDetails,
+  attempt,
+}: {
+  fragment: DeepPartial<FragmentSchema>
+  errorDetails: string
+  attempt: number
+}) {
+  return `Automatic error fix request.
+
+The generated artifact failed when Magical AI tried to run it in the sandbox. Fix the current artifact and return a corrected complete artifact in the required response format.
+
+Keep the user's original request and the current template unless the error requires a template change. If dependencies, install commands, ports, file paths, or code are wrong, update those fields too.
+
+Template: ${fragment.template || 'unknown'}
+File: ${fragment.file_path || 'unknown'}
+Attempt: ${attempt}/${MAX_AUTO_FIX_ATTEMPTS}
+
+Sandbox error:
+\`\`\`text
+${errorDetails || 'Unknown sandbox error'}
+\`\`\``
 }
 
 const PricingModal = dynamic(() => import('@/components/pricing').then(mod => ({ default: mod.PricingModal })), {
@@ -75,6 +137,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [messagesCount, setMessagesCount] = useState(0)
   const [errorsEncountered, setErrorsEncountered] = useState(0)
   const [messages, setMessages] = useState<Message[]>([]);
+  const messagesRef = useRef<Message[]>([])
+  const autoFixAttemptsRef = useRef(0)
+  const lastAutoFixSignatureRef = useRef('')
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
   const [availableModels, setAvailableModels] = useState<LLMModel[]>(models.models as LLMModel[])
   const [currentTab, setCurrentTab] = useState<'code' | 'fragment' | 'terminal' | 'interpreter' | 'editor' | 'files' | 'ide'>('code');
@@ -94,12 +159,17 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setAuthView(view)
   }, [setAuthView])
   const [errorMessage, setErrorMessage] = useState('')
+  const [autoFixMessage, setAutoFixMessage] = useState('')
   
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [isLoadingProject, setIsLoadingProject] = useState(false)
 
   const { session } = useAuth(setAuthDialogCallback, setAuthViewCallback)
   const { userTeam } = useUserTeam()
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   const handleChatSelected = async (chatId: string) => {
     const project = await getProject(supabase, chatId);
@@ -246,17 +316,20 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         // Use original error message if parsing fails
       }
       
+      setAutoFixMessage('')
       setIsRateLimited(isRateLimit);
       setErrorMessage(displayMessage);
     },
     onFinish: async ({ object: fragment, error }: { object: DeepPartial<FragmentSchema> | undefined, error: any }) => {
       if (error) {
+        setAutoFixMessage('')
         setIsPreviewLoading(false)
         setErrorMessage(error instanceof Error ? error.message : 'AI generation failed.')
         return
       }
 
       if (!fragment) {
+        setAutoFixMessage('')
         setIsPreviewLoading(false)
         setErrorMessage('AI generation finished without returning code.')
         return
@@ -292,6 +365,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           result = await response.json()
         } catch (sandboxError) {
           console.error('Sandbox request failed:', sandboxError)
+          setAutoFixMessage('')
           setErrorMessage('AI generated the code, but preview setup failed. Check E2B configuration on Vercel.')
           setIsPreviewLoading(false)
           return
@@ -299,8 +373,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         
         if (!response.ok) {
           // If response is not ok, result is an error object
-          const errorResult = result as { error?: string };
+          const errorResult = result as SandboxErrorResult;
           console.error('Sandbox creation failed:', errorResult);
+          const errorDetails = getSandboxErrorDetails(errorResult)
+          if (isAutoFixableSandboxError(errorResult) && startAutoFix(fragment, errorDetails)) {
+            setIsPreviewLoading(false);
+            return;
+          }
+
+          setAutoFixMessage('')
           setErrorMessage(getSandboxErrorMessage(errorResult));
           setIsPreviewLoading(false);
           return;
@@ -317,23 +398,168 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           posthog.capture('sandbox_created', { url: executionResult.url });
         }
 
+        const messagesWithResult = withLatestAssistantFragment(messagesRef.current, fragment, executionResult)
+        messagesRef.current = messagesWithResult
+        setMessages(messagesWithResult)
         setResult(executionResult);
         setCurrentPreview({ fragment, result: executionResult });
-        setMessage({ result: executionResult });
+
+        const executionErrorDetails = getExecutionErrorDetails(executionResult)
+        if (executionErrorDetails) {
+          if (startAutoFix(fragment, executionErrorDetails, executionResult)) {
+            setCurrentTab('interpreter');
+            setIsPreviewLoading(false);
+            return;
+          }
+
+          setAutoFixMessage('')
+          setErrorMessage('Generated code still has runtime errors. Review the interpreter output or try a different prompt.')
+          setCurrentTab('interpreter');
+          setIsPreviewLoading(false);
+          return;
+        }
+
+        autoFixAttemptsRef.current = 0
+        lastAutoFixSignatureRef.current = ''
+        setAutoFixMessage('')
         setCurrentTab('fragment');
         setIsPreviewLoading(false);
     },
   })
 
+  function getTemplateForSubmission(preferredTemplate?: string) {
+    if (selectedTemplate !== 'auto') {
+      return { [selectedTemplate]: templates[selectedTemplate] }
+    }
+
+    if (
+      preferredTemplate &&
+      Object.prototype.hasOwnProperty.call(templates, preferredTemplate)
+    ) {
+      const templateId = preferredTemplate as TemplateId
+      return { [templateId]: templates[templateId] }
+    }
+
+    return templates
+  }
+
+  function withLatestAssistantFragment(
+    currentMessages: Message[],
+    assistantFragment: DeepPartial<FragmentSchema>,
+    executionResult?: ExecutionResult,
+  ) {
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: [
+        { type: 'text', text: assistantFragment.commentary || '' },
+        { type: 'code', text: assistantFragment.code || '' },
+      ],
+      object: assistantFragment,
+      result: executionResult,
+    }
+
+    const nextMessages = [...currentMessages]
+    const lastMessage = nextMessages[nextMessages.length - 1]
+
+    if (lastMessage?.role === 'assistant') {
+      nextMessages[nextMessages.length - 1] = {
+        ...lastMessage,
+        ...assistantMessage,
+      }
+      return nextMessages
+    }
+
+    return [...nextMessages, assistantMessage]
+  }
+
+  function startAutoFix(
+    fragmentToFix: DeepPartial<FragmentSchema>,
+    errorDetails: string,
+    executionResult?: ExecutionResult,
+  ) {
+    if (!session || !currentModel || !fragmentToFix?.code) {
+      return false
+    }
+
+    const signature = [
+      fragmentToFix.template,
+      fragmentToFix.file_path,
+      fragmentToFix.code,
+      errorDetails,
+    ].join('|')
+
+    if (lastAutoFixSignatureRef.current === signature) {
+      return false
+    }
+
+    if (autoFixAttemptsRef.current >= MAX_AUTO_FIX_ATTEMPTS) {
+      return false
+    }
+
+    const attempt = autoFixAttemptsRef.current + 1
+    autoFixAttemptsRef.current = attempt
+    lastAutoFixSignatureRef.current = signature
+
+    const fixPrompt = buildAutoFixPrompt({
+      fragment: fragmentToFix,
+      errorDetails,
+      attempt,
+    })
+
+    const messagesWithFailedFragment = withLatestAssistantFragment(
+      messagesRef.current,
+      fragmentToFix,
+      executionResult,
+    )
+    const updatedMessages: Message[] = [
+      ...messagesWithFailedFragment,
+      {
+        role: 'user',
+        content: [{ type: 'text', text: fixPrompt }],
+      },
+    ]
+
+    messagesRef.current = updatedMessages
+    setMessages(updatedMessages)
+    setErrorMessage('')
+    setAutoFixMessage(`Automatic fix ${attempt}/${MAX_AUTO_FIX_ATTEMPTS} is running...`)
+    setCurrentTab('code')
+
+    try {
+      submit({
+        userID: session.user.id,
+        teamID: userTeam?.id,
+        messages: toAISDKMessages(updatedMessages),
+        template: getTemplateForSubmission(fragmentToFix.template),
+        model: currentModel,
+        config: languageModel,
+        ...(shouldUseMorph && fragmentToFix ? { currentFragment: fragmentToFix } : {}),
+      })
+
+      posthog.capture('auto_fix_started', {
+        attempt,
+        template: fragmentToFix.template,
+      })
+
+      return true
+    } catch (error) {
+      console.error('Automatic fix submission failed:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Automatic fix failed to start.')
+      return false
+    }
+  }
+
   useEffect(() => {
     async function loadProjectMessages() {
       if (!currentProject) {
+        messagesRef.current = []
         setMessages([])
         return
       }
 
       setIsLoadingProject(true)
       const projectMessages = await getProjectMessages(supabase, currentProject.id)
+      messagesRef.current = projectMessages
       setMessages(projectMessages)
       setIsLoadingProject(false)
     }
@@ -359,30 +585,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   useEffect(() => {
     if (object) {
       setFragment(object)
-      const content: Message['content'] = [
-        { type: 'text', text: object.commentary || '' },
-        { type: 'code', text: object.code || '' },
-      ]
       setMessages(prev => {
-        const lastMessage = prev[prev.length - 1]
-        if (!lastMessage || lastMessage.role !== 'assistant') {
-          return [
-            ...prev,
-            {
-              role: 'assistant',
-              content,
-              object,
-            },
-          ]
-        } else {
-          const newMessages = [...prev]
-          newMessages[prev.length - 1] = {
-            ...lastMessage,
-            content,
-            object,
-          }
-          return newMessages
-        }
+        const nextMessages = withLatestAssistantFragment(prev, object)
+        messagesRef.current = nextMessages
+        return nextMessages
       })
     }
   }, [object])
@@ -406,23 +612,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }, [session?.user?.id, sessionStartTime, fragmentsGenerated, messagesCount, errorsEncountered])
 
-  function setMessage(message: Partial<Message>, index?: number) {
-    setMessages((previousMessages) => {
-      const updatedMessages = [...previousMessages]
-      updatedMessages[index ?? previousMessages.length - 1] = {
-        ...previousMessages[index ?? previousMessages.length - 1],
-        ...message,
-      }
-      return updatedMessages
-    })
-  }
-
   async function handleSendPrompt(message: string, files: File[] = []) {
     if (!session) {
       return setAuthDialog(true)
     }
 
+    autoFixAttemptsRef.current = 0
+    lastAutoFixSignatureRef.current = ''
     setErrorMessage('')
+    setAutoFixMessage('')
 
     if (isLoading) {
       stop()
@@ -450,20 +648,16 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       role: 'user',
       content,
     }
-    const updatedMessages = [...messages, newMessage]
+    const updatedMessages = [...messagesRef.current, newMessage]
+    messagesRef.current = updatedMessages
     setMessages(updatedMessages)
-
-    const templateToSend =
-      selectedTemplate === 'auto'
-        ? templates
-        : { [selectedTemplate]: templates[selectedTemplate] }
 
     try {
       submit({
       userID: session?.user?.id,
       teamID: userTeam?.id,
       messages: toAISDKMessages(updatedMessages),
-      template: templateToSend,
+      template: getTemplateForSubmission(),
       model: currentModel,
       config: languageModel,
       ...(shouldUseMorph && fragment ? { currentFragment: fragment } : {}),
@@ -507,11 +701,14 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }
 
   function retry() {
+    autoFixAttemptsRef.current = 0
+    lastAutoFixSignatureRef.current = ''
+    setAutoFixMessage('')
     submit({
       userID: session?.user?.id,
       teamID: userTeam?.id,
-      messages: toAISDKMessages(messages),
-      template: templates,
+      messages: toAISDKMessages(messagesRef.current),
+      template: getTemplateForSubmission(fragment?.template),
       model: currentModel,
       config: languageModel,
       ...(shouldUseMorph && fragment ? { currentFragment: fragment } : {}),
@@ -558,11 +755,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   function handleClearChat() {
     stop()
+    autoFixAttemptsRef.current = 0
+    lastAutoFixSignatureRef.current = ''
+    messagesRef.current = []
     setMessages([])
     setFragment(undefined)
     setResult(undefined)
     setCurrentTab('code')
     setIsPreviewLoading(false)
+    setAutoFixMessage('')
     setCurrentProject(null)
     router.push('/')
   }
@@ -661,7 +862,14 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }
 
   function handleUndo() {
-    setMessages((previousMessages) => [...previousMessages.slice(0, -2)])
+    autoFixAttemptsRef.current = 0
+    lastAutoFixSignatureRef.current = ''
+    setAutoFixMessage('')
+    setMessages((previousMessages) => {
+      const nextMessages = [...previousMessages.slice(0, -2)]
+      messagesRef.current = nextMessages
+      return nextMessages
+    })
     setCurrentPreview({ fragment: undefined, result: undefined })
   }
 
@@ -753,6 +961,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           </div>
           
           <div className="space-y-4 mt-4">
+            {autoFixMessage && (
+              <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-600 dark:text-amber-400 text-sm">
+                <span>{autoFixMessage}</span>
+                <button onClick={stop} className="ml-4 p-1 rounded-md hover:bg-amber-500/20">Stop</button>
+              </div>
+            )}
             {(error || errorMessage) && (
               <div className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
                 <span>{errorMessage || error?.message || 'AI generation failed.'}</span>
