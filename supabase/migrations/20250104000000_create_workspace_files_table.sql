@@ -44,15 +44,19 @@ CREATE INDEX IF NOT EXISTS idx_workspace_files_created_at ON public.workspace_fi
 ALTER TABLE public.workspace_files ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view their own workspace files" ON public.workspace_files;
 CREATE POLICY "Users can view their own workspace files" ON public.workspace_files
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own workspace files" ON public.workspace_files;
 CREATE POLICY "Users can insert their own workspace files" ON public.workspace_files
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own workspace files" ON public.workspace_files;
 CREATE POLICY "Users can update their own workspace files" ON public.workspace_files
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own workspace files" ON public.workspace_files;
 CREATE POLICY "Users can delete their own workspace files" ON public.workspace_files
   FOR DELETE USING (auth.uid() = user_id);
 

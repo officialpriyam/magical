@@ -15,6 +15,7 @@ CREATE POLICY "Users can view messages from their projects" ON public.messages
   );
 
 DROP POLICY IF EXISTS "Users can view their own fragments or public ones" ON public.fragments;
+DROP POLICY IF EXISTS "Users can view their own fragments" ON public.fragments;
 CREATE POLICY "Users can view their own fragments" ON public.fragments
   FOR SELECT USING (auth.uid() = user_id);
 

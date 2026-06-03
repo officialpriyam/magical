@@ -30,5 +30,6 @@ CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON public.tasks (created_at DESC
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policy
+DROP POLICY IF EXISTS "Users can manage their own tasks" ON public.tasks;
 CREATE POLICY "Users can manage their own tasks" ON public.tasks
   FOR ALL USING (auth.uid() = user_id);
