@@ -7,7 +7,7 @@ import { PromptInputBox } from '@/components/ui/ai-prompt-box';
 import { NavBar } from '@/components/navbar';
 import { useAuth } from '@/lib/auth';
 import dynamic from 'next/dynamic';
-import { Project, createProject, saveMessage, getProjectMessages, generateProjectTitle, getProject } from '@/lib/database';
+import { Project, createProject, saveMessage, getProjectMessages, generateProjectTitle, getProject, updateProject } from '@/lib/database';
 import { Message, toAISDKMessages, toMessageImage } from '@/lib/messages';
 import type { LLMModel, LLMModelConfig } from '@/lib/models';
 import { FragmentSchema, fragmentSchema as schema } from '@/lib/schema';
@@ -27,6 +27,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import models from '@/lib/models.json';
 
 const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
+const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
 const MAX_AUTO_FIX_ATTEMPTS = 2
 
 function getSandboxErrorMessage(errorResult: { error?: string; type?: string }) {
@@ -140,6 +141,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const messagesRef = useRef<Message[]>([])
   const autoFixAttemptsRef = useRef(0)
   const lastAutoFixSignatureRef = useRef('')
+  const skipNextProjectMessagesLoadRef = useRef('')
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
   const [availableModels, setAvailableModels] = useState<LLMModel[]>(models.models as LLMModel[])
   const [currentTab, setCurrentTab] = useState<'code' | 'fragment' | 'terminal' | 'interpreter' | 'editor' | 'files' | 'ide'>('code');
@@ -163,6 +165,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [isLoadingProject, setIsLoadingProject] = useState(false)
+  const [chatHistoryRefreshKey, setChatHistoryRefreshKey] = useState(0)
 
   const { session } = useAuth(setAuthDialogCallback, setAuthViewCallback)
   const { userTeam } = useUserTeam()
@@ -172,6 +175,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }, [messages])
 
   const handleChatSelected = async (chatId: string) => {
+    skipNextProjectMessagesLoadRef.current = ''
     const project = await getProject(supabase, chatId);
     if (project) {
       setCurrentProject(project);
@@ -552,8 +556,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   useEffect(() => {
     async function loadProjectMessages() {
       if (!currentProject) {
+        skipNextProjectMessagesLoadRef.current = ''
         messagesRef.current = []
         setMessages([])
+        return
+      }
+
+      if (skipNextProjectMessagesLoadRef.current === currentProject.id) {
+        skipNextProjectMessagesLoadRef.current = ''
+        setIsLoadingProject(false)
         return
       }
 
@@ -631,8 +642,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       return
     }
 
+    const hadProjectBeforePrompt = !!currentProject
+    const projectForPrompt = await ensureChatProject({ navigate: false })
+    if (!projectForPrompt) {
+      setErrorMessage('Could not create a new chat. Check your Supabase project table and auth settings.')
+      return
+    }
+
     const currentInput = message
     const currentFiles = files
+    const shouldRenameProject =
+      projectForPrompt.title === DEFAULT_NEW_CHAT_TITLE &&
+      messagesRef.current.length === 0
     setCurrentTab('code')
 
     const content: Message['content'] = [{ type: 'text', text: currentInput }]
@@ -668,19 +689,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       return
     }
 
-    if (!currentProject) {
-      try {
-        const title = await generateProjectTitle(currentInput)
-        if (supabase) {
-          const newProject = await createProject(supabase, title, selectedTemplate === 'auto' ? undefined : selectedTemplate)
-          if (newProject) {
-            setCurrentProject(newProject)
-            router.replace(`/chat/${newProject.id}`)
-          }
-        }
-      } catch (error) {
-        console.error('Error creating project:', error)
-      }
+    if (!hadProjectBeforePrompt) {
+      router.replace(`/chat/${projectForPrompt.id}`)
+    }
+
+    if (shouldRenameProject) {
+      void renameProjectFromPrompt(projectForPrompt, currentInput)
     }
 
     // Enhanced chat analytics
@@ -753,10 +767,68 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     posthog.capture(`${target}_click`, { target })
   }
 
-  function handleClearChat() {
+  async function createNewChatProject({ navigate = true }: { navigate?: boolean } = {}) {
+    if (!session) {
+      setAuthDialog(true)
+      return null
+    }
+
+    if (!supabase) {
+      setErrorMessage('Supabase is not configured, so a chat project cannot be created.')
+      return null
+    }
+
+    const newProject = await createProject(
+      supabase,
+      DEFAULT_NEW_CHAT_TITLE,
+      selectedTemplate === 'auto' ? undefined : selectedTemplate,
+    )
+
+    if (!newProject) {
+      setErrorMessage('Could not create a new chat. Check your Supabase project table and auth settings.')
+      return null
+    }
+
+    skipNextProjectMessagesLoadRef.current = newProject.id
+    setCurrentProject(newProject)
+    setChatHistoryRefreshKey((key) => key + 1)
+    if (navigate) {
+      router.replace(`/chat/${newProject.id}`)
+    }
+    return newProject
+  }
+
+  async function ensureChatProject({ navigate = true }: { navigate?: boolean } = {}) {
+    if (currentProject) {
+      return currentProject
+    }
+
+    return createNewChatProject({ navigate })
+  }
+
+  async function renameProjectFromPrompt(project: Project, prompt: string) {
+    if (!supabase) return
+
+    try {
+      const title = await generateProjectTitle(prompt)
+      const updated = await updateProject(supabase, project.id, { title })
+
+      if (updated) {
+        setCurrentProject((current) =>
+          current?.id === project.id ? { ...current, title } : current,
+        )
+        setChatHistoryRefreshKey((key) => key + 1)
+      }
+    } catch (error) {
+      console.error('Error updating project title:', error)
+    }
+  }
+
+  function resetChatState() {
     stop()
     autoFixAttemptsRef.current = 0
     lastAutoFixSignatureRef.current = ''
+    skipNextProjectMessagesLoadRef.current = ''
     messagesRef.current = []
     setMessages([])
     setFragment(undefined)
@@ -765,6 +837,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setIsPreviewLoading(false)
     setAutoFixMessage('')
     setCurrentProject(null)
+    setSelectedFile(null)
+    setIsPreviewPanelOpen(false)
+  }
+
+  function handleClearChat() {
+    resetChatState()
     router.push('/')
   }
 
@@ -873,8 +951,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setCurrentPreview({ fragment: undefined, result: undefined })
   }
 
-  function handleStartNewChat() {
-    handleClearChat()
+  async function handleStartNewChat() {
+    resetChatState()
+    const newProject = await createNewChatProject()
+    if (!newProject) {
+      router.push('/')
+    }
   }
 
   function handleSearch(query: string) {
@@ -914,6 +996,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           onGetFreeTokens={handleGetFreeTokens}
           onSignOut={logout}
           searchQuery={searchQuery}
+          refreshKey={chatHistoryRefreshKey}
         />
       )}
 

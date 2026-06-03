@@ -120,6 +120,7 @@ export async function createProject(
       .single()
 
     if (error) throw error
+    invalidateCache(new RegExp(`^projects:${user.id}:`))
     return data
   }, null, 'createProject')
 }

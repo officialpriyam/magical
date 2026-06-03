@@ -30,6 +30,7 @@ interface SidebarProps {
   onSignOut?: () => void;
   onChatSelected?: (chatId: string) => void;
   searchQuery?: string;
+  refreshKey?: number;
 }
 
 interface ChatHistoryItem {
@@ -48,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSignOut = () => {},
   onChatSelected = () => {},
   searchQuery: externalSearchQuery = "",
+  refreshKey = 0,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isOpen, setIsOpen] = React.useState(initialIsOpen);
@@ -171,7 +173,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
       authListener?.subscription.unsubscribe();
     };
-  }, []);
+  }, [refreshKey]);
 
   return (
     <div className="flex h-screen">
