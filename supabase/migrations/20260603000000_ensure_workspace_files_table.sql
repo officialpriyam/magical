@@ -1,5 +1,5 @@
 -- =============================================================================
--- Create workspace_files table for IDE file management
+-- Ensure workspace_files exists for IDE and GitHub import storage
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
@@ -33,35 +33,61 @@ CREATE TABLE IF NOT EXISTS public.workspace_files (
   CONSTRAINT workspace_files_size_check CHECK (size_bytes >= 0)
 );
 
--- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_workspace_files_user_id ON public.workspace_files (user_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_files_project_id ON public.workspace_files (project_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_files_path ON public.workspace_files (user_id, path);
 CREATE INDEX IF NOT EXISTS idx_workspace_files_parent_path ON public.workspace_files (user_id, parent_path);
 CREATE INDEX IF NOT EXISTS idx_workspace_files_created_at ON public.workspace_files (created_at DESC);
 
--- Enable Row Level Security
 ALTER TABLE public.workspace_files ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
-CREATE POLICY "Users can view their own workspace files" ON public.workspace_files
-  FOR SELECT USING (auth.uid() = user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'workspace_files'
+      AND policyname = 'Users can view their own workspace files'
+  ) THEN
+    CREATE POLICY "Users can view their own workspace files" ON public.workspace_files
+      FOR SELECT USING (auth.uid() = user_id);
+  END IF;
 
-CREATE POLICY "Users can insert their own workspace files" ON public.workspace_files
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'workspace_files'
+      AND policyname = 'Users can insert their own workspace files'
+  ) THEN
+    CREATE POLICY "Users can insert their own workspace files" ON public.workspace_files
+      FOR INSERT WITH CHECK (auth.uid() = user_id);
+  END IF;
 
-CREATE POLICY "Users can update their own workspace files" ON public.workspace_files
-  FOR UPDATE USING (auth.uid() = user_id);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'workspace_files'
+      AND policyname = 'Users can update their own workspace files'
+  ) THEN
+    CREATE POLICY "Users can update their own workspace files" ON public.workspace_files
+      FOR UPDATE USING (auth.uid() = user_id);
+  END IF;
 
-CREATE POLICY "Users can delete their own workspace files" ON public.workspace_files
-  FOR DELETE USING (auth.uid() = user_id);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'workspace_files'
+      AND policyname = 'Users can delete their own workspace files'
+  ) THEN
+    CREATE POLICY "Users can delete their own workspace files" ON public.workspace_files
+      FOR DELETE USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
--- Add trigger for automatic timestamp updates
 DROP TRIGGER IF EXISTS update_workspace_files_updated_at ON public.workspace_files;
 CREATE TRIGGER update_workspace_files_updated_at BEFORE UPDATE ON public.workspace_files
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
--- Grant permissions
 GRANT ALL ON public.workspace_files TO authenticated;
 
 NOTIFY pgrst, 'reload schema';

@@ -1,6 +1,12 @@
 import { handleAPIError, createRateLimitResponse } from '@/lib/api-errors'
 import { Duration } from '@/lib/duration'
-import { getModelClient, LLMModel, LLMModelConfig, resolveGenerationModel } from '@/lib/models'
+import {
+  getModelClient,
+  hasProviderCredentials,
+  LLMModel,
+  LLMModelConfig,
+  resolveGenerationModel,
+} from '@/lib/models'
 import { toPrompt } from '@/lib/prompt'
 import ratelimit from '@/lib/ratelimit'
 import { fragmentSchema as schema } from '@/lib/schema'
@@ -55,11 +61,19 @@ export async function POST(req: Request) {
   console.log('model', model)
   // console.log('config', config)
 
-  const resolvedModel = resolveGenerationModel(model, config)
-  const { model: modelNameString, apiKey: modelApiKey, ...modelParams } = config
-  const modelClient = getModelClient(resolvedModel, config)
-
   try {
+    const resolvedModel = resolveGenerationModel(model, config)
+
+    if (!hasProviderCredentials(resolvedModel.providerId, config)) {
+      return new Response(
+        `No API key is configured for ${resolvedModel.provider}. Add the provider key in Vercel environment variables or enter your own API key in chat settings.`,
+        { status: 400 },
+      )
+    }
+
+    const { model: modelNameString, apiKey: modelApiKey, ...modelParams } = config
+    const modelClient = getModelClient(resolvedModel, config)
+
     const stream = await streamObject({
       model: modelClient as LanguageModel,
       schema,

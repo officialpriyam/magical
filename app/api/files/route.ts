@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import {
+  isMissingWorkspaceTableError,
   normalizeWorkspacePath,
-  toFileUploadRow,
+  toWorkspaceFileRow,
   toWorkspaceFile,
   type WorkspaceFile,
 } from '@/lib/workspace-files'
@@ -54,13 +55,17 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: rows, error } = await supabase
-      .from('file_uploads')
-      .select('id, file_name, file_path, file_size, metadata, updated_at')
+      .from('workspace_files')
+      .select('id, name, path, content, is_directory, parent_path, size_bytes, metadata, updated_at')
       .eq('user_id', user.id)
-      .eq('bucket_name', 'workspace-files')
-      .order('file_path', { ascending: true })
+      .order('path', { ascending: true })
 
     if (error) {
+      if (isMissingWorkspaceTableError(error)) {
+        console.warn('workspace_files table is missing; returning an empty workspace file list.')
+        return NextResponse.json([])
+      }
+
       console.error('Error fetching workspace files:', error)
       return NextResponse.json({ error: 'Failed to fetch files' }, { status: 500 })
     }
@@ -96,25 +101,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await supabase
-      .from('file_uploads')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('bucket_name', 'workspace-files')
-      .eq('file_path', normalizedPath)
-
     const { data: file, error } = await supabase
-      .from('file_uploads')
-      .insert(toFileUploadRow({
+      .from('workspace_files')
+      .upsert(toWorkspaceFileRow({
         userId: user.id,
         path: normalizedPath,
         content,
         isDirectory,
-      }) as never)
+      }) as never, { onConflict: 'user_id,path' })
       .select()
       .single()
 
     if (error) {
+      if (isMissingWorkspaceTableError(error)) {
+        return NextResponse.json(
+          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
+          { status: 503 },
+        )
+      }
+
       console.error('Error creating workspace file:', error)
       return NextResponse.json({ error: 'Failed to create file' }, { status: 500 })
     }
@@ -146,18 +151,21 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { data: rows, error: fetchError } = await supabase
-      .from('file_uploads')
-      .select('id, file_path')
+      .from('workspace_files')
+      .select('id, path')
       .eq('user_id', user.id)
-      .eq('bucket_name', 'workspace-files')
 
     if (fetchError) {
+      if (isMissingWorkspaceTableError(fetchError)) {
+        return NextResponse.json({ success: true })
+      }
+
       console.error('Error finding workspace files to delete:', fetchError)
       return NextResponse.json({ error: 'Failed to delete file' }, { status: 500 })
     }
 
     const ids = (rows || [])
-      .filter((row: any) => row.file_path === normalizedPath || row.file_path.startsWith(`${normalizedPath}/`))
+      .filter((row: any) => row.path === normalizedPath || row.path.startsWith(`${normalizedPath}/`))
       .map((row: any) => row.id)
 
     if (ids.length === 0) {
@@ -165,11 +173,15 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { error } = await supabase
-      .from('file_uploads')
+      .from('workspace_files')
       .delete()
       .in('id', ids)
 
     if (error) {
+      if (isMissingWorkspaceTableError(error)) {
+        return NextResponse.json({ success: true })
+      }
+
       console.error('Error deleting workspace file:', error)
       return NextResponse.json({ error: 'Failed to delete file' }, { status: 500 })
     }

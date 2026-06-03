@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
-import { normalizeWorkspacePath, toFileUploadRow, toWorkspaceFile } from '@/lib/workspace-files'
+import {
+  isMissingWorkspaceTableError,
+  normalizeWorkspacePath,
+  toWorkspaceFileRow,
+  toWorkspaceFile,
+} from '@/lib/workspace-files'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes for large imports
@@ -45,7 +50,7 @@ export async function POST(request: NextRequest) {
       }))
       .filter((file) => file.path)
       .map((file) =>
-        toFileUploadRow({
+        toWorkspaceFileRow({
           userId: user.id,
           path: file.path,
           content: file.content || '',
@@ -53,26 +58,32 @@ export async function POST(request: NextRequest) {
         }),
       )
 
-    const paths = insertData.map((file) => file.file_path)
+    const paths = insertData.map((file) => file.path)
 
     if (paths.length === 0) {
       return NextResponse.json({ error: 'No valid files to import' }, { status: 400 })
     }
 
     await supabase
-      .from('file_uploads')
+      .from('workspace_files')
       .delete()
       .eq('user_id', user.id)
-      .eq('bucket_name', 'workspace-files')
-      .in('file_path', paths)
+      .in('path', paths)
 
     // Insert all files in a single batch operation
     const { data: insertedFiles, error: insertError } = await supabase
-      .from('file_uploads')
+      .from('workspace_files')
       .insert(insertData as never)
       .select()
 
     if (insertError) {
+      if (isMissingWorkspaceTableError(insertError)) {
+        return NextResponse.json(
+          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
+          { status: 503 },
+        )
+      }
+
       console.error('Error batch inserting files:', insertError)
 
       // Check if it's a duplicate key error

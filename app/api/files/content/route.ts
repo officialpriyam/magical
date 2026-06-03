@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
-import { normalizeWorkspacePath, toFileUploadRow, toWorkspaceFile } from '@/lib/workspace-files'
+import {
+  isMissingWorkspaceTableError,
+  normalizeWorkspacePath,
+  toWorkspaceFileRow,
+  toWorkspaceFile,
+} from '@/lib/workspace-files'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,15 +27,21 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: rows, error } = await supabase
-      .from('file_uploads')
-      .select('id, file_name, file_path, file_size, metadata, updated_at')
+      .from('workspace_files')
+      .select('id, name, path, content, is_directory, parent_path, size_bytes, metadata, updated_at')
       .eq('user_id', user.id)
-      .eq('bucket_name', 'workspace-files')
-      .eq('file_path', path)
+      .eq('path', path)
       .order('updated_at', { ascending: false })
       .limit(1)
 
     if (error || !rows?.length) {
+      if (error && isMissingWorkspaceTableError(error)) {
+        return NextResponse.json(
+          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
+          { status: 404 },
+        )
+      }
+
       console.error('Error fetching file content:', error)
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
@@ -72,20 +83,26 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: existingRows, error: existingError } = await supabase
-      .from('file_uploads')
+      .from('workspace_files')
       .select('id')
       .eq('user_id', user.id)
-      .eq('bucket_name', 'workspace-files')
-      .eq('file_path', normalizedPath)
+      .eq('path', normalizedPath)
       .order('updated_at', { ascending: false })
       .limit(1)
 
     if (existingError) {
+      if (isMissingWorkspaceTableError(existingError)) {
+        return NextResponse.json(
+          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
+          { status: 503 },
+        )
+      }
+
       console.error('Error finding file to update:', existingError)
       return NextResponse.json({ error: 'Failed to update file' }, { status: 500 })
     }
 
-    const row = toFileUploadRow({
+    const row = toWorkspaceFileRow({
       userId: user.id,
       path: normalizedPath,
       content,
@@ -95,9 +112,13 @@ export async function POST(request: NextRequest) {
     const existingId = existingRows?.[0]?.id
     const query = existingId
       ? supabase
-          .from('file_uploads')
+          .from('workspace_files')
           .update({
-            file_size: row.file_size,
+            name: row.name,
+            content: row.content,
+            is_directory: row.is_directory,
+            parent_path: row.parent_path,
+            size_bytes: row.size_bytes,
             mime_type: row.mime_type,
             metadata: row.metadata,
             updated_at: new Date().toISOString(),
@@ -106,7 +127,7 @@ export async function POST(request: NextRequest) {
           .select()
           .single()
       : supabase
-          .from('file_uploads')
+          .from('workspace_files')
           .insert(row as never)
           .select()
           .single()
@@ -114,6 +135,13 @@ export async function POST(request: NextRequest) {
     const { data: file, error } = await query
 
     if (error) {
+      if (isMissingWorkspaceTableError(error)) {
+        return NextResponse.json(
+          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
+          { status: 503 },
+        )
+      }
+
       console.error('Error updating file content:', error)
       return NextResponse.json({ error: 'Failed to update file' }, { status: 500 })
     }

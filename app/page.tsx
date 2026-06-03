@@ -27,6 +27,14 @@ import models from '@/lib/models.json';
 
 const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
 
+function getSandboxErrorMessage(errorResult: { error?: string; type?: string }) {
+  if (errorResult.type === 'config_error') {
+    return 'AI generated the code, but preview cannot start because E2B_API_KEY is missing in Vercel.'
+  }
+
+  return errorResult.error || 'AI generated the code, but preview setup failed.'
+}
+
 const PricingModal = dynamic(() => import('@/components/pricing').then(mod => ({ default: mod.PricingModal })), {
   ssr: false,
 });
@@ -190,8 +198,22 @@ export default function Home() {
       setErrorMessage(displayMessage);
     },
     onFinish: async ({ object: fragment, error }: { object: DeepPartial<FragmentSchema> | undefined, error: any }) => {
-      if (!error && fragment) {
-        setIsPreviewLoading(true);
+      if (error) {
+        setIsPreviewLoading(false)
+        setErrorMessage(error instanceof Error ? error.message : 'AI generation failed.')
+        return
+      }
+
+      if (!fragment) {
+        setIsPreviewLoading(false)
+        setErrorMessage('AI generation finished without returning code.')
+        return
+      }
+
+      setFragment(fragment)
+      setCurrentPreview({ fragment, result: undefined })
+      setCurrentTab('fragment')
+      setIsPreviewLoading(true);
         // Enhanced analytics tracking
         if (fragment.code && fragment.template) {
         }
@@ -202,23 +224,32 @@ export default function Home() {
           template: fragment?.template,
         })
 
-        const response = await fetch('/api/sandbox', {
-          method: 'POST',
-          body: JSON.stringify({
-            fragment,
-            userID: session?.user?.id,
-            teamID: userTeam?.id,
-            accessToken: session?.access_token,
-          }),
-        })
+        let response: Response
+        let result: any
 
-        const result = await response.json()
+        try {
+          response = await fetch('/api/sandbox', {
+            method: 'POST',
+            body: JSON.stringify({
+              fragment,
+              userID: session?.user?.id,
+              teamID: userTeam?.id,
+              accessToken: session?.access_token,
+            }),
+          })
+          result = await response.json()
+        } catch (sandboxError) {
+          console.error('Sandbox request failed:', sandboxError)
+          setErrorMessage('AI generated the code, but preview setup failed. Check E2B configuration on Vercel.')
+          setIsPreviewLoading(false)
+          return
+        }
         
         if (!response.ok) {
           // If response is not ok, result is an error object
           const errorResult = result as { error?: string };
           console.error('Sandbox creation failed:', errorResult);
-          setErrorMessage(errorResult.error || 'Failed to create sandbox environment');
+          setErrorMessage(getSandboxErrorMessage(errorResult));
           setIsPreviewLoading(false);
           return;
         }
@@ -239,7 +270,6 @@ export default function Home() {
         setMessage({ result: executionResult });
         setCurrentTab('fragment');
         setIsPreviewLoading(false);
-      }
     },
   })
 

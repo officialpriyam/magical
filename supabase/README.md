@@ -45,6 +45,7 @@ This directory contains the complete database schema for Magical AI, organized i
 
 1. **`20250929060300_create_tasks_table.sql`** - Historical tasks table creation
 2. **`20250929163414_create_save_message_function.sql`** - Message handling function
+3. **`20260603000000_ensure_workspace_files_table.sql`** - Workspace file storage for IDE and GitHub import
 
 ## Loading Order
 
@@ -69,6 +70,7 @@ For a fresh database setup, load files in this order:
 -- 6. Apply any additional migrations
 \i migrations/20250929060300_create_tasks_table.sql
 \i migrations/20250929163414_create_save_message_function.sql
+\i migrations/20260603000000_ensure_workspace_files_table.sql
 ```
 
 ## Key Features

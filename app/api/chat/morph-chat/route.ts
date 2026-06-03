@@ -1,6 +1,12 @@
 import { handleAPIError, createRateLimitResponse } from '@/lib/api-errors'
 import { Duration } from '@/lib/duration'
-import { getModelClient, LLMModel, LLMModelConfig, resolveGenerationModel } from '@/lib/models'
+import {
+  getModelClient,
+  hasProviderCredentials,
+  LLMModel,
+  LLMModelConfig,
+  resolveGenerationModel,
+} from '@/lib/models'
 import { applyPatch } from '@/lib/morph'
 import ratelimit from '@/lib/ratelimit'
 import { FragmentSchema, morphEditSchema, MorphEditSchema } from '@/lib/schema'
@@ -46,11 +52,19 @@ export async function POST(req: Request) {
     return createRateLimitResponse(limit)
   }
 
-  const resolvedModel = resolveGenerationModel(model, config)
-  const { model: _model, apiKey: _apiKey, ...modelParams } = config
-  const modelClient = getModelClient(resolvedModel, config)
-
   try {
+    const resolvedModel = resolveGenerationModel(model, config)
+
+    if (!hasProviderCredentials(resolvedModel.providerId, config)) {
+      return new Response(
+        `No API key is configured for ${resolvedModel.provider}. Add the provider key in Vercel environment variables or enter your own API key in chat settings.`,
+        { status: 400 },
+      )
+    }
+
+    const { model: _model, apiKey: _apiKey, ...modelParams } = config
+    const modelClient = getModelClient(resolvedModel, config)
+
     const contextualSystemPrompt = `You are a code editor. Generate a JSON response with exactly these fields:
 
 {
