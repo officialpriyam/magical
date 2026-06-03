@@ -6,8 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ChatSettings } from '../chat-settings'
 import { ChatPicker } from '../chat-picker'
-import { LLMModel, LLMModelConfig } from '@/lib/models'
-import { TemplateId, Templates } from '@/lib/templates'
+import type { LLMModel, LLMModelConfig } from '@/lib/models'
+import type { TemplateId, Templates } from '@/lib/templates'
 import { getMatchingCommands, isSlashCommand, extractCommand, SlashCommand } from '@/lib/slash-commands'
 import { SlashCommandMenu } from '../slash-command-menu'
 

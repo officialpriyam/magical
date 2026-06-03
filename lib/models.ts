@@ -6,6 +6,7 @@ import { createMistral } from '@ai-sdk/mistral'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOllama } from 'ollama-ai-provider'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
+import bundledModels from '@/lib/models.json'
 
 export type LLMModel = {
   id: string
@@ -27,8 +28,68 @@ export type LLMModelConfig = {
   maxTokens?: number
 }
 
+export function resolveGenerationModel(model: LLMModel, config: LLMModelConfig): LLMModel {
+  if (hasProviderCredentials(model.providerId, config)) {
+    return model
+  }
+
+  const fallbackIds = [
+    'models/gemini-2.0-flash',
+    'qwen/qwen3-coder',
+    'anthropic/claude-haiku-4.5',
+    'claude-3-5-haiku-latest',
+    'gpt-4o-mini',
+  ]
+
+  for (const fallbackId of fallbackIds) {
+    const fallbackModel = (bundledModels.models as LLMModel[]).find(
+      (candidate) => candidate.id === fallbackId,
+    )
+
+    if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, {})) {
+      return fallbackModel
+    }
+  }
+
+  return model
+}
+
+export function hasProviderCredentials(providerId: string, config: LLMModelConfig) {
+  if (config.apiKey) return true
+
+  switch (providerId) {
+    case 'anthropic':
+      return Boolean(process.env.ANTHROPIC_API_KEY)
+    case 'openai':
+      return Boolean(process.env.OPENAI_API_KEY)
+    case 'google':
+      return Boolean(process.env.GOOGLE_AI_API_KEY)
+    case 'vertex':
+      return Boolean(process.env.GOOGLE_VERTEX_CREDENTIALS || process.env.GOOGLE_AI_API_KEY)
+    case 'mistral':
+      return Boolean(process.env.MISTRAL_API_KEY)
+    case 'groq':
+      return Boolean(process.env.GROQ_API_KEY)
+    case 'togetherai':
+      return Boolean(process.env.TOGETHER_API_KEY)
+    case 'fireworks':
+      return Boolean(process.env.FIREWORKS_API_KEY)
+    case 'xai':
+      return Boolean(process.env.XAI_API_KEY)
+    case 'deepseek':
+      return Boolean(process.env.DEEPSEEK_API_KEY)
+    case 'openrouter':
+      return Boolean(process.env.OPENROUTER_API_KEY)
+    case 'ollama':
+      return Boolean(config.baseURL)
+    default:
+      return false
+  }
+}
+
 export function getModelClient(model: LLMModel, config: LLMModelConfig) {
-  const { id: modelNameString, providerId } = model
+  const { providerId } = model
+  const modelNameString = getProviderModelName(model)
   const { apiKey, baseURL } = config
 
   const providerConfigs = {
@@ -117,6 +178,14 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
   }
 
   return createClient()
+}
+
+function getProviderModelName(model: LLMModel) {
+  if (model.providerId === 'google') {
+    return model.id.replace(/^models\//, '')
+  }
+
+  return model.id
 }
 
 export function getDefaultModelParams(model: LLMModel) {

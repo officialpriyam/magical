@@ -7,8 +7,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { LLMModel, LLMModelConfig } from '@/lib/models'
-import { TemplateId, Templates } from '@/lib/templates'
+import type { LLMModel, LLMModelConfig } from '@/lib/models'
+import type { TemplateId, Templates } from '@/lib/templates'
 import 'core-js/actual/object/group-by'
 import { Sparkles } from 'lucide-react'
 import Image from 'next/image'

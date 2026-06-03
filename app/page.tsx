@@ -9,7 +9,7 @@ import { useAuth } from '@/lib/auth';
 import dynamic from 'next/dynamic';
 import { Project, createProject, saveMessage, getProjectMessages, generateProjectTitle, getProject } from '@/lib/database';
 import { Message, toAISDKMessages, toMessageImage } from '@/lib/messages';
-import { LLMModelConfig } from '@/lib/models';
+import type { LLMModel, LLMModelConfig } from '@/lib/models';
 import { FragmentSchema, fragmentSchema as schema } from '@/lib/schema';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import templates, { TemplateId } from '@/lib/templates';
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { DeepPartial } from 'ai';
 import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { usePostHog } from 'posthog-js/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
@@ -62,6 +62,7 @@ export default function Home() {
   const [errorsEncountered, setErrorsEncountered] = useState(0)
   const [messages, setMessages] = useState<Message[]>([]);
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
+  const [availableModels, setAvailableModels] = useState<LLMModel[]>(models.models as LLMModel[])
   const [currentTab, setCurrentTab] = useState<'code' | 'fragment' | 'terminal' | 'interpreter' | 'editor' | 'files' | 'ide'>('code');
   const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
@@ -93,12 +94,12 @@ export default function Home() {
     }
   };
 
-  const filteredModels = models.models.filter((model: any) => {
+  const filteredModels = useMemo(() => availableModels.filter((model: any) => {
     if (process.env.NEXT_PUBLIC_HIDE_LOCAL_MODELS) {
       return model.providerId !== 'ollama'
     }
     return true
-  })
+  }), [availableModels])
 
   const currentModel =
     filteredModels.find((model: any) => model.id === languageModel.model) ||
@@ -108,6 +109,49 @@ export default function Home() {
   // Determine which API to use based on morph toggle and existing fragment
   const shouldUseMorph = useMorphApply && fragment && fragment.code && fragment.file_path
   const apiEndpoint = shouldUseMorph ? '/api/chat/morph-chat' : '/api/chat'
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadModels() {
+      try {
+        const response = await fetch('/api/models')
+        if (!response.ok) return
+
+        const data = await response.json()
+        if (isMounted && Array.isArray(data.models) && data.models.length > 0) {
+          setAvailableModels(data.models)
+        }
+      } catch (error) {
+        console.warn('Using bundled model list because dynamic models failed:', error)
+      }
+    }
+
+    loadModels()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (filteredModels.length === 0) return
+
+    const selectedModelExists = filteredModels.some(
+      (model: any) => model.id === languageModel.model,
+    )
+
+    if (!selectedModelExists) {
+      const fallbackModel =
+        filteredModels.find((model: any) => model.id === DEFAULT_MODEL_ID) ||
+        filteredModels[0]
+
+      setLanguageModel({
+        ...languageModel,
+        model: fallbackModel.id,
+      })
+    }
+  }, [filteredModels, languageModel, setLanguageModel])
 
   const { object, submit, isLoading, stop, error } = useObject({
     api: apiEndpoint,
@@ -296,6 +340,8 @@ export default function Home() {
       return setAuthDialog(true)
     }
 
+    setErrorMessage('')
+
     if (isLoading) {
       stop()
     }
@@ -330,7 +376,8 @@ export default function Home() {
         ? templates
         : { [selectedTemplate]: templates[selectedTemplate] }
 
-    submit({
+    try {
+      submit({
       userID: session?.user?.id,
       teamID: userTeam?.id,
       messages: toAISDKMessages(updatedMessages),
@@ -338,7 +385,12 @@ export default function Home() {
       model: currentModel,
       config: languageModel,
       ...(shouldUseMorph && fragment ? { currentFragment: fragment } : {}),
-    })
+      })
+    } catch (error) {
+      console.error('Prompt submission failed:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Prompt submission failed.')
+      return
+    }
 
     if (!currentProject) {
       try {
@@ -617,14 +669,15 @@ export default function Home() {
           </div>
           
           <div className="space-y-4 mt-4">
-            {error && (
+            {(error || errorMessage) && (
               <div className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
-                <span>{errorMessage}</span>
+                <span>{errorMessage || error?.message || 'AI generation failed.'}</span>
                 <button onClick={retry} className="ml-4 p-1 rounded-md hover:bg-red-500/20">Retry</button>
               </div>
             )}
               <PromptInputBox
                 onSend={handleSendPrompt}
+                isLoading={isLoading}
                 templates={templates}
                 selectedTemplate={selectedTemplate}
                 onSelectedTemplateChange={setSelectedTemplate}

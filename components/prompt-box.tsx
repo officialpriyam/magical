@@ -1,5 +1,5 @@
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
-import { LLMModel, LLMModelConfig } from "@/lib/models";
+import type { LLMModel, LLMModelConfig } from "@/lib/models";
 import models from "@/lib/models.json";
 import templates, { TemplateId } from "@/lib/templates";
 import { useState } from "react";
