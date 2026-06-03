@@ -25,6 +25,8 @@ import { HeroPillSecond } from '@/components/announcement';
 import { SupabaseClient } from '@supabase/supabase-js';
 import models from '@/lib/models.json';
 
+const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
+
 const PricingModal = dynamic(() => import('@/components/pricing').then(mod => ({ default: mod.PricingModal })), {
   ssr: false,
 });
@@ -43,7 +45,7 @@ export default function Home() {
   const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
     'languageModel',
     {
-      model: 'claude-3-5-sonnet-latest',
+      model: DEFAULT_MODEL_ID,
     },
   )
   const [useMorphApply, setUseMorphApply] = useLocalStorage(
@@ -98,13 +100,14 @@ export default function Home() {
     return true
   })
 
-  const currentModel = filteredModels.find(
-    (model: any) => model.id === languageModel.model,
-  );
+  const currentModel =
+    filteredModels.find((model: any) => model.id === languageModel.model) ||
+    filteredModels.find((model: any) => model.id === DEFAULT_MODEL_ID) ||
+    filteredModels[0]
 
   // Determine which API to use based on morph toggle and existing fragment
   const shouldUseMorph = useMorphApply && fragment && fragment.code && fragment.file_path
-  const apiEndpoint = shouldUseMorph ? '/api/morph-chat' : '/api/chat'
+  const apiEndpoint = shouldUseMorph ? '/api/chat/morph-chat' : '/api/chat'
 
   const { object, submit, isLoading, stop, error } = useObject({
     api: apiEndpoint,
@@ -295,6 +298,11 @@ export default function Home() {
 
     if (isLoading) {
       stop()
+    }
+
+    if (!currentModel) {
+      setErrorMessage('No AI model is available. Check your model list and provider configuration.')
+      return
     }
 
     const currentInput = message

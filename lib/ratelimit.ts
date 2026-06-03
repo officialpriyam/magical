@@ -8,21 +8,25 @@ export default async function ratelimit(
   window: Duration,
 ) {
   if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-    const ratelimit = new Ratelimit({
-      redis: kv,
-      limiter: Ratelimit.slidingWindow(maxRequests, window),
-    })
+    try {
+      const ratelimit = new Ratelimit({
+        redis: kv,
+        limiter: Ratelimit.slidingWindow(maxRequests, window),
+      })
 
-    const { success, limit, reset, remaining } = await ratelimit.limit(
-      `ratelimit_${key}`,
-    )
+      const { success, limit, reset, remaining } = await ratelimit.limit(
+        `ratelimit_${key}`,
+      )
 
-    if (!success) {
-      return {
-        amount: limit,
-        reset,
-        remaining,
+      if (!success) {
+        return {
+          amount: limit,
+          reset,
+          remaining,
+        }
       }
+    } catch (error) {
+      console.warn('Rate limiting disabled because KV is unavailable:', error)
     }
   }
 }

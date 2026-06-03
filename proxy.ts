@@ -4,11 +4,15 @@ import type { NextRequest } from 'next/server'
 
 export async function proxy(req: NextRequest) {
   if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-    const id = req.nextUrl.pathname.split('/').pop()
-    const url = await kv.get(`fragment:${id}`)
+    try {
+      const id = req.nextUrl.pathname.split('/').pop()
+      const url = await kv.get(`fragment:${id}`)
 
-    if (url) {
-      return NextResponse.redirect(url as string)
+      if (url) {
+        return NextResponse.redirect(url as string)
+      }
+    } catch (error) {
+      console.warn('KV short URL lookup failed:', error)
     }
 
     return NextResponse.redirect(new URL('/', req.url))

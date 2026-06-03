@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { normalizeWorkspacePath, toFileUploadRow, toWorkspaceFile } from '@/lib/workspace-files'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes for large imports
@@ -37,28 +38,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Prepare batch insert data
-    const insertData = files.map(file => {
-      const pathParts = file.path.split('/')
-      const name = pathParts[pathParts.length - 1]
-      const parentPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : null
-      const sizeBytes = Buffer.byteLength(file.content || '', 'utf8')
+    const insertData = files
+      .map((file) => ({
+        ...file,
+        path: normalizeWorkspacePath(file.path),
+      }))
+      .filter((file) => file.path)
+      .map((file) =>
+        toFileUploadRow({
+          userId: user.id,
+          path: file.path,
+          content: file.content || '',
+          isDirectory: file.isDirectory || false,
+        }),
+      )
 
-      return {
-        user_id: user.id,
-        path: file.path,
-        name,
-        content: file.content || '',
-        is_directory: file.isDirectory || false,
-        parent_path: parentPath,
-        size_bytes: sizeBytes,
-      }
-    })
+    const paths = insertData.map((file) => file.file_path)
+
+    if (paths.length === 0) {
+      return NextResponse.json({ error: 'No valid files to import' }, { status: 400 })
+    }
+
+    await supabase
+      .from('file_uploads')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('bucket_name', 'workspace-files')
+      .in('file_path', paths)
 
     // Insert all files in a single batch operation
     const { data: insertedFiles, error: insertError } = await supabase
-      .from('workspace_files')
-      .insert(insertData)
+      .from('file_uploads')
+      .insert(insertData as never)
       .select()
 
     if (insertError) {
@@ -81,7 +92,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       imported: insertedFiles?.length || 0,
-      files: insertedFiles
+      files: (insertedFiles || []).map(toWorkspaceFile)
     })
   } catch (error) {
     console.error('Error in POST /api/files/batch:', error)

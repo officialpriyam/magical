@@ -1,36 +1,43 @@
 import { NextResponse } from 'next/server'
+import { authenticateUser } from '@/lib/auth-utils'
+import { getGitHubAccessToken, githubHeaders } from '@/lib/github-server'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    if (!process.env.GITHUB_TOKEN) {
+    const { user, error } = await authenticateUser()
+
+    if (error) {
+      return error
+    }
+
+    const accessToken = await getGitHubAccessToken(user.id)
+
+    if (!accessToken) {
       return NextResponse.json(
         {
           error:
-            'GitHub token not configured. Add GITHUB_TOKEN to list account repositories, or import a public repository by URL.',
+            'GitHub account is not connected. Connect GitHub to list account repositories, or import a public repository by URL.',
         },
         { status: 401 },
       )
     }
 
     const response = await fetch('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
+      headers: githubHeaders(accessToken),
     })
 
     if (!response.ok) {
       throw new Error(`GitHub API error: ${response.status}`)
     }
 
-    const user = await response.json()
+    const githubUser = await response.json()
 
     return NextResponse.json({
-      login: user.login,
-      name: user.name,
-      avatar_url: user.avatar_url,
+      login: githubUser.login,
+      name: githubUser.name,
+      avatar_url: githubUser.avatar_url,
     })
   } catch (error) {
     console.error('Error fetching GitHub user:', error)

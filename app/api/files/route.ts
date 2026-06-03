@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import {
+  normalizeWorkspacePath,
+  toFileUploadRow,
+  toWorkspaceFile,
+  type WorkspaceFile,
+} from '@/lib/workspace-files'
 
 export const dynamic = 'force-dynamic'
 
 // Helper function to build file tree from flat list
-function buildFileTree(files: any[]): any[] {
+function buildFileTree(files: WorkspaceFile[]): any[] {
   const tree: any[] = []
   const pathMap = new Map<string, any>()
 
@@ -47,20 +53,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch all workspace files for the user
-    const { data: files, error } = await supabase
-      .from('workspace_files')
-      .select('*')
+    const { data: rows, error } = await supabase
+      .from('file_uploads')
+      .select('id, file_name, file_path, file_size, metadata, updated_at')
       .eq('user_id', user.id)
-      .order('path', { ascending: true })
+      .eq('bucket_name', 'workspace-files')
+      .order('file_path', { ascending: true })
 
     if (error) {
       console.error('Error fetching workspace files:', error)
       return NextResponse.json({ error: 'Failed to fetch files' }, { status: 500 })
     }
 
+    const files = dedupeWorkspaceFiles((rows || []).map(toWorkspaceFile))
+
     // Build file tree structure
-    const fileTree = buildFileTree(files || [])
+    const fileTree = buildFileTree(files)
 
     return NextResponse.json(fileTree)
   } catch (error) {
@@ -73,8 +81,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { path, isDirectory, content = '' } = body
+    const normalizedPath = typeof path === 'string' ? normalizeWorkspacePath(path) : ''
 
-    if (!path) {
+    if (!normalizedPath) {
       return NextResponse.json({ error: 'Path is required' }, { status: 400 })
     }
 
@@ -87,26 +96,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Extract file name and parent path
-    const pathParts = path.split('/')
-    const name = pathParts[pathParts.length - 1]
-    const parentPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : null
+    await supabase
+      .from('file_uploads')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('bucket_name', 'workspace-files')
+      .eq('file_path', normalizedPath)
 
-    // Calculate content size
-    const sizeBytes = Buffer.byteLength(content, 'utf8')
-
-    // Insert the new file
     const { data: file, error } = await supabase
-      .from('workspace_files')
-      .insert({
-        user_id: user.id,
-        path,
-        name,
+      .from('file_uploads')
+      .insert(toFileUploadRow({
+        userId: user.id,
+        path: normalizedPath,
         content,
-        is_directory: isDirectory,
-        parent_path: parentPath,
-        size_bytes: sizeBytes,
-      })
+        isDirectory,
+      }) as never)
       .select()
       .single()
 
@@ -115,7 +119,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create file' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, file })
+    return NextResponse.json({ success: true, file: toWorkspaceFile(file) })
   } catch (error) {
     console.error('Error in POST /api/files:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -126,8 +130,9 @@ export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json()
     const { path } = body
+    const normalizedPath = typeof path === 'string' ? normalizeWorkspacePath(path) : ''
 
-    if (!path) {
+    if (!normalizedPath) {
       return NextResponse.json({ error: 'Path is required' }, { status: 400 })
     }
 
@@ -140,12 +145,29 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Use LIKE to match all nested paths that start with this path
-    const { error } = await supabase
-      .from('workspace_files')
-      .delete()
+    const { data: rows, error: fetchError } = await supabase
+      .from('file_uploads')
+      .select('id, file_path')
       .eq('user_id', user.id)
-      .or(`path.eq.${path},path.like.${path}/%`)
+      .eq('bucket_name', 'workspace-files')
+
+    if (fetchError) {
+      console.error('Error finding workspace files to delete:', fetchError)
+      return NextResponse.json({ error: 'Failed to delete file' }, { status: 500 })
+    }
+
+    const ids = (rows || [])
+      .filter((row: any) => row.file_path === normalizedPath || row.file_path.startsWith(`${normalizedPath}/`))
+      .map((row: any) => row.id)
+
+    if (ids.length === 0) {
+      return NextResponse.json({ success: true })
+    }
+
+    const { error } = await supabase
+      .from('file_uploads')
+      .delete()
+      .in('id', ids)
 
     if (error) {
       console.error('Error deleting workspace file:', error)
@@ -157,4 +179,17 @@ export async function DELETE(request: NextRequest) {
     console.error('Error in DELETE /api/files:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+function dedupeWorkspaceFiles(files: WorkspaceFile[]) {
+  const byPath = new Map<string, WorkspaceFile>()
+
+  for (const file of files) {
+    const existing = byPath.get(file.path)
+    if (!existing || new Date(file.updated_at || 0) > new Date(existing.updated_at || 0)) {
+      byPath.set(file.path, file)
+    }
+  }
+
+  return Array.from(byPath.values())
 }

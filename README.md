@@ -75,7 +75,13 @@ Use these project settings on Vercel:
 - Build command: `pnpm build`
 - Output directory: `.next`
 
-Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set `E2B_API_KEY`, one AI provider key, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. `GITHUB_TOKEN` is optional for public repository URL imports, but required for private repositories and account/org listing.
+Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set `E2B_API_KEY`, one AI provider key, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
+
+Use this GitHub OAuth callback URL:
+
+```txt
+https://your-vercel-domain.com/api/github/callback
+```
 
 ## Environment
 
@@ -84,7 +90,7 @@ The generated `.env.local` contains placeholders for all runtime keys referenced
 - AI providers and E2B
 - Supabase
 - Vercel KV rate limiting and short URLs
-- GitHub import token
+- GitHub OAuth connection settings
 - Morph apply mode
 - PostHog analytics toggle
 - Optional ZeroBounce email validation

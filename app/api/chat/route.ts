@@ -33,6 +33,10 @@ export async function POST(req: Request) {
     config: LLMModelConfig
   } = await req.json()
 
+  if (!model?.id || !model?.providerId) {
+    return new Response('No AI model selected. Please choose a valid model.', { status: 400 })
+  }
+
   const limit = !config.apiKey
     ? await ratelimit(
         req.headers.get('x-forwarded-for'),

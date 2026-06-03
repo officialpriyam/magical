@@ -1,33 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
+import {
+  getGitHubAccessToken,
+  getOptionalAuthenticatedUser,
+  githubHeaders,
+} from '@/lib/github-server'
 
 export const dynamic = 'force-dynamic'
-
-function githubHeaders() {
-  return {
-    ...(process.env.GITHUB_TOKEN
-      ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
-      : {}),
-    Accept: 'application/vnd.github.v3+json',
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
     const owner = request.nextUrl.searchParams.get('owner')
+    const user = await getOptionalAuthenticatedUser()
+    const userAccessToken = user ? await getGitHubAccessToken(user.id) : null
+    const accessToken = userAccessToken || process.env.GITHUB_TOKEN || null
 
     if (!owner) {
       return NextResponse.json({ error: 'Owner parameter is required' }, { status: 400 })
     }
 
     // First, get the authenticated user to check if this is their repos
-    const userResponse = await fetch('https://api.github.com/user', {
-      headers: githubHeaders(),
-    })
-
     let isAuthenticatedUser = false
-    if (userResponse.ok) {
-      const user = await userResponse.json()
-      isAuthenticatedUser = user.login === owner
+    if (accessToken) {
+      const userResponse = await fetch('https://api.github.com/user', {
+        headers: githubHeaders(accessToken),
+      })
+
+      if (userResponse.ok) {
+        const githubUser = await userResponse.json()
+        isAuthenticatedUser = githubUser.login === owner
+      }
     }
 
     // Fetch all repositories by paginating through all pages
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       } else {
         // Check if it's an organization
         const orgResponse = await fetch(`https://api.github.com/orgs/${owner}`, {
-          headers: githubHeaders(),
+          headers: githubHeaders(accessToken),
         })
 
         if (orgResponse.ok) {
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
       }
 
       const response = await fetch(apiUrl, {
-        headers: githubHeaders(),
+        headers: githubHeaders(accessToken),
       })
 
       if (!response.ok) {

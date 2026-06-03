@@ -50,6 +50,11 @@ interface UsageLimits {
   upgrade_required: boolean
 }
 
+interface GitHubStatus {
+  connected: boolean
+  username?: string
+}
+
 interface GitHubImportProps {
   onImport?: (repo: GitHubRepo, files: any[]) => void
   onClose?: () => void
@@ -65,6 +70,7 @@ export function GitHubImport({ onImport, onClose }: GitHubImportProps) {
   const [publicRepoUrl, setPublicRepoUrl] = useState('')
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null)
   const [isImporting, setIsImporting] = useState(false)
+  const [githubStatus, setGitHubStatus] = useState<GitHubStatus | null>(null)
 
   const parseGitHubRepoUrl = (value: string) => {
     const trimmed = value.trim()
@@ -85,6 +91,17 @@ export function GitHubImport({ onImport, onClose }: GitHubImportProps) {
 
     setIsLoading(true)
     try {
+      const statusResponse = await fetch('/api/github/status')
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json()
+        setGitHubStatus(statusData)
+
+        if (!statusData.connected) {
+          setRepositories([])
+          return
+        }
+      }
+
       // First get the current user
       const userResponse = await fetch('/api/github/user')
       if (!userResponse.ok) {
@@ -153,7 +170,7 @@ export function GitHubImport({ onImport, onClose }: GitHubImportProps) {
       console.error('Error loading repositories:', error)
       toast({
         title: "Error",
-        description: "Failed to list GitHub repositories. Add GITHUB_TOKEN for account repos, or paste a public repository URL below.",
+        description: "Connect your GitHub account for private repos, or paste a public repository URL below.",
         variant: "destructive",
       })
     } finally {
@@ -379,6 +396,14 @@ export function GitHubImport({ onImport, onClose }: GitHubImportProps) {
           </div>
           <div className="flex items-center gap-2">
             <Button
+              variant={githubStatus?.connected ? 'secondary' : 'default'}
+              size="sm"
+              onClick={() => { window.location.assign('/api/github/connect') }}
+            >
+              <GitBranch className="h-4 w-4 mr-2" />
+              {githubStatus?.connected ? githubStatus.username || 'Connected' : 'Connect GitHub'}
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               onClick={loadRepositories}
@@ -399,7 +424,7 @@ export function GitHubImport({ onImport, onClose }: GitHubImportProps) {
           </div>
         </div>
         <CardDescription>
-          Select a repository to import into your workspace.
+          Select a connected repository to import into your workspace, or load a public repository by URL.
           {usageLimits && (
             <span className="block mt-2">
               <Badge variant={usageLimits.can_import ? "secondary" : "destructive"} className="mr-2">
@@ -426,6 +451,12 @@ export function GitHubImport({ onImport, onClose }: GitHubImportProps) {
             />
           </div>
 
+          {githubStatus && !githubStatus.connected && (
+            <div className="rounded-md border p-3 text-sm text-muted-foreground">
+              Connect GitHub to list your private repositories and organization repositories.
+            </div>
+          )}
+           
           <div className="flex gap-2">
             <Input
               placeholder="https://github.com/owner/repo"

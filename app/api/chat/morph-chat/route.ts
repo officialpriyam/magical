@@ -29,6 +29,10 @@ export async function POST(req: Request) {
     currentFragment: FragmentSchema
   } = await req.json()
 
+  if (!model?.id || !model?.providerId) {
+    return new Response('No AI model selected. Please choose a valid model.', { status: 400 })
+  }
+
   // Rate limiting (same as chat route)
   const limit = !config.apiKey
     ? await ratelimit(

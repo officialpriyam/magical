@@ -5,6 +5,7 @@ import { FragmentInterpreter } from './fragment-interpreter'
 import { CodeEditor } from './code-editor'
 import { SandboxFileTree } from './sandbox-file-tree'
 import { IDE } from './ide'
+import { GitHubSave } from './github-save'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -186,7 +187,7 @@ export function Preview({
             </TabsList>
           </div>
           <div className="flex items-center justify-end gap-2">
-            {/* Add any additional buttons here */}
+            <GitHubSave fragment={fragment} result={result} />
           </div>
         </div>
         <div className="overflow-y-auto w-full h-full">

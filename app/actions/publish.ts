@@ -36,13 +36,17 @@ export async function publish(
   })
 
   if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
-    const id = nanoid()
-    await kv.set(`fragment:${id}`, url, { px: expiration })
+    try {
+      const id = nanoid()
+      await kv.set(`fragment:${id}`, url, { px: expiration })
 
-    return {
-      url: process.env.NEXT_PUBLIC_SITE_URL
-        ? `https://${process.env.NEXT_PUBLIC_SITE_URL}/s/${id}`
-        : `/s/${id}`,
+      return {
+        url: process.env.NEXT_PUBLIC_SITE_URL
+          ? `https://${process.env.NEXT_PUBLIC_SITE_URL}/s/${id}`
+          : `/s/${id}`,
+      }
+    } catch (error) {
+      console.warn('KV short URL publish failed; returning sandbox URL:', error)
     }
   }
 

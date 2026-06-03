@@ -12,8 +12,9 @@ import {
   Plus, 
   Unlink,
   Loader2,
+  RefreshCw,
+  GitBranch,
   ExternalLink,
-  RefreshCw
 } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -25,6 +26,13 @@ import {
 import { UserIntegration } from '@/lib/database.types'
 
 const availableIntegrations = [
+  {
+    id: 'github',
+    name: 'GitHub',
+    description: 'Import private repositories and save generated code',
+    icon: GitBranch,
+    color: 'bg-neutral-900 text-white'
+  },
   {
     id: 'google-drive',
     name: 'Google Drive', 
@@ -65,7 +73,29 @@ export default function IntegrationsSettings() {
       console.log('Loading integrations for user:', session.user.id)
       const userIntegrations = await getUserIntegrations(session.user.id)
       console.log('Loaded integrations:', userIntegrations)
-      setIntegrations(userIntegrations)
+
+      const statusResponse = await fetch('/api/github/status')
+      if (statusResponse.ok) {
+        const githubStatus = await statusResponse.json()
+        const withoutGitHub = userIntegrations.filter(
+          (integration) => integration.service_name !== 'github',
+        )
+
+        setIntegrations([
+          ...withoutGitHub,
+          {
+            id: 'github',
+            user_id: session.user.id,
+            service_name: 'github',
+            is_connected: Boolean(githubStatus.connected),
+            connection_data: githubStatus,
+            created_at: githubStatus.connected_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ])
+      } else {
+        setIntegrations(userIntegrations)
+      }
     } catch (error) {
       console.error('Error loading integrations:', error)
       toast({
@@ -121,6 +151,11 @@ export default function IntegrationsSettings() {
     setConnecting(serviceId)
     
     try {
+      if (serviceId === 'github') {
+        window.location.assign('/api/github/connect')
+        return
+      }
+
       console.log(`Connecting ${serviceId} for user:`, session.user.id)
       
       const success = await upsertUserIntegration(session.user.id, serviceId, {
@@ -161,7 +196,9 @@ export default function IntegrationsSettings() {
     try {
       console.log(`Disconnecting ${serviceId} for user:`, session.user.id)
 
-      const success = await disconnectUserIntegration(session.user.id, serviceId)
+      const success = serviceId === 'github'
+        ? await fetch('/api/github/disconnect', { method: 'POST' }).then(response => response.ok)
+        : await disconnectUserIntegration(session.user.id, serviceId)
 
       if (success) {
         await loadIntegrations()
@@ -288,6 +325,15 @@ export default function IntegrationsSettings() {
                           Connected {new Date(integration.connection_data.connected_at as string).toLocaleDateString()}
                         </p>
                       )}
+                      {service.id === 'github' &&
+                        integration?.connection_data &&
+                        typeof integration.connection_data === 'object' &&
+                        'username' in integration.connection_data &&
+                        integration.connection_data.username && (
+                          <p className="text-xs text-muted-foreground">
+                            @{integration.connection_data.username as string}
+                          </p>
+                        )}
                       {integration?.connection_data &&
                        typeof integration.connection_data === 'object' &&
                        'simulated' in integration.connection_data &&

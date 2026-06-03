@@ -1,24 +1,31 @@
 import { NextResponse } from 'next/server'
+import { authenticateUser } from '@/lib/auth-utils'
+import { getGitHubAccessToken, githubHeaders } from '@/lib/github-server'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    if (!process.env.GITHUB_TOKEN) {
+    const { user, error } = await authenticateUser()
+
+    if (error) {
+      return error
+    }
+
+    const accessToken = await getGitHubAccessToken(user.id)
+
+    if (!accessToken) {
       return NextResponse.json(
         {
           error:
-            'GitHub token not configured. Add GITHUB_TOKEN to list organizations.',
+            'GitHub account is not connected. Connect GitHub to list organizations.',
         },
         { status: 401 },
       )
     }
 
     const response = await fetch('https://api.github.com/user/orgs', {
-      headers: {
-        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
+      headers: githubHeaders(accessToken),
     })
 
     if (!response.ok) {
