@@ -267,6 +267,7 @@ export async function saveMessage(
       })
 
       if (error) throw error
+      invalidateCache(`project-messages:${user.id}:${projectId}`)
       return true
     },
     false,

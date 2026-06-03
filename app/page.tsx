@@ -143,6 +143,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const autoFixAttemptsRef = useRef(0)
   const lastAutoFixSignatureRef = useRef('')
   const skipNextProjectMessagesLoadRef = useRef('')
+  const isHydratingProjectMessagesRef = useRef(false)
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
   const [availableModels, setAvailableModels] = useState<LLMModel[]>(models.models as LLMModel[])
   const [currentTab, setCurrentTab] = useState<'code' | 'fragment' | 'terminal' | 'interpreter' | 'editor' | 'files' | 'ide'>('code');
@@ -167,9 +168,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [isLoadingProject, setIsLoadingProject] = useState(false)
   const [chatHistoryRefreshKey, setChatHistoryRefreshKey] = useState(0)
+  const [projectMessagesRefreshKey, setProjectMessagesRefreshKey] = useState(0)
 
   const { session } = useAuth(setAuthDialogCallback, setAuthViewCallback)
   const { userTeam } = useUserTeam()
+  const currentProjectId = currentProject?.id
 
   useEffect(() => {
     messagesRef.current = messages
@@ -179,7 +182,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     skipNextProjectMessagesLoadRef.current = ''
     const project = await getProject(supabase, chatId);
     if (project) {
+      setErrorMessage('')
       setCurrentProject(project);
+      setProjectMessagesRefreshKey((key) => key + 1)
       router.push(`/chat/${project.id}`)
     } else {
       setErrorMessage('Chat not found or you do not have access.')
@@ -555,44 +560,71 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }
 
   useEffect(() => {
+    let isMounted = true
+
     async function loadProjectMessages() {
-      if (!currentProject) {
+      if (!currentProjectId) {
         skipNextProjectMessagesLoadRef.current = ''
+        isHydratingProjectMessagesRef.current = false
         messagesRef.current = []
         setMessages([])
         return
       }
 
-      if (skipNextProjectMessagesLoadRef.current === currentProject.id) {
+      if (skipNextProjectMessagesLoadRef.current === currentProjectId) {
         skipNextProjectMessagesLoadRef.current = ''
+        isHydratingProjectMessagesRef.current = false
         setIsLoadingProject(false)
         return
       }
 
       setIsLoadingProject(true)
-      const projectMessages = await getProjectMessages(supabase, currentProject.id)
+      invalidateCache(new RegExp(`^project-messages:[^:]+:${currentProjectId}$`))
+      const projectMessages = await getProjectMessages(supabase, currentProjectId)
+
+      if (!isMounted) return
+
       messagesRef.current = projectMessages
+      isHydratingProjectMessagesRef.current = projectMessages.length > 0
       setMessages(projectMessages)
+
+      const latestPreviewMessage = [...projectMessages]
+        .reverse()
+        .find((message) => message.object)
+
+      setFragment(latestPreviewMessage?.object)
+      setResult(latestPreviewMessage?.result)
+      setSelectedFile(null)
+      setCurrentTab(latestPreviewMessage?.object ? 'fragment' : 'code')
       setIsLoadingProject(false)
     }
 
     loadProjectMessages()
-  }, [currentProject, supabase])
+
+    return () => {
+      isMounted = false
+    }
+  }, [currentProjectId, projectMessagesRefreshKey, supabase])
 
   useEffect(() => {
     async function saveMessagesToDb() {
-      if (!currentProject || !session || messages.length === 0) return
+      if (!currentProjectId || !session || messages.length === 0) return
+
+      if (isHydratingProjectMessagesRef.current) {
+        isHydratingProjectMessagesRef.current = false
+        return
+      }
 
       const lastMessage = messages[messages.length - 1]
       const sequenceNumber = messages.length - 1
 
-      await saveMessage(supabase, currentProject.id, lastMessage, sequenceNumber)
+      await saveMessage(supabase, currentProjectId, lastMessage, sequenceNumber)
     }
 
-    if (messages.length > 0 && currentProject && session) {
+    if (messages.length > 0 && currentProjectId && session) {
       saveMessagesToDb()
     }
-  }, [messages, currentProject, session, supabase])
+  }, [messages, currentProjectId, session, supabase])
 
   useEffect(() => {
     if (object) {
@@ -852,6 +884,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     autoFixAttemptsRef.current = 0
     lastAutoFixSignatureRef.current = ''
     skipNextProjectMessagesLoadRef.current = ''
+    isHydratingProjectMessagesRef.current = false
     messagesRef.current = []
     setMessages([])
     setFragment(undefined)
