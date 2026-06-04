@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase-server'
 import {
   isMissingWorkspaceTableError,
   normalizeWorkspacePath,
+  toFileUploadRow,
   toWorkspaceFileRow,
   toWorkspaceFile,
 } from '@/lib/workspace-files'
@@ -78,10 +79,46 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       if (isMissingWorkspaceTableError(insertError)) {
-        return NextResponse.json(
-          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
-          { status: 503 },
-        )
+        const fallbackRows = files
+          .map((file) => ({
+            ...file,
+            path: normalizeWorkspacePath(file.path),
+          }))
+          .filter((file) => file.path)
+          .map((file) =>
+            toFileUploadRow({
+              userId: user.id,
+              path: file.path,
+              content: file.content || '',
+              isDirectory: file.isDirectory || false,
+            }),
+          )
+
+        await supabase
+          .from('file_uploads')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('bucket_name', 'workspace-files')
+          .in('file_path', paths)
+
+        const { data: fallbackFiles, error: fallbackError } = await supabase
+          .from('file_uploads')
+          .insert(fallbackRows as never)
+          .select()
+
+        if (fallbackError) {
+          console.error('Error batch inserting fallback workspace files:', fallbackError)
+          return NextResponse.json({
+            error: 'Failed to import files',
+            details: fallbackError.message,
+          }, { status: 500 })
+        }
+
+        return NextResponse.json({
+          success: true,
+          imported: fallbackFiles?.length || 0,
+          files: (fallbackFiles || []).map(toWorkspaceFile),
+        })
       }
 
       console.error('Error batch inserting files:', insertError)

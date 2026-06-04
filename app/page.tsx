@@ -31,6 +31,10 @@ import { Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo } from 'luci
 const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
 const MAX_AUTO_FIX_ATTEMPTS = 2
+const GITHUB_REQUIRED_MESSAGE =
+  'Connect GitHub before generating code. Open Settings > Integrations, connect GitHub, then try again.'
+const GITHUB_STATUS_ERROR_MESSAGE =
+  'Could not verify your GitHub connection. Check Settings > Integrations, then try again.'
 
 type ChatMode = 'plan' | 'build'
 
@@ -850,6 +854,37 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setAutoFixMessage('')
   }
 
+  async function ensureGitHubConnectedBeforeCodeGeneration() {
+    if (!session) {
+      setAuthDialog(true)
+      return false
+    }
+
+    try {
+      const response = await fetch('/api/github/status', { cache: 'no-store' })
+      const data = await response.json().catch(() => ({}))
+
+      if (response.ok && data?.connected) {
+        return true
+      }
+
+      setErrorMessage(
+        response.ok
+          ? GITHUB_REQUIRED_MESSAGE
+          : data?.error || GITHUB_STATUS_ERROR_MESSAGE,
+      )
+      setAutoFixMessage('')
+      setIsPreviewLoading(false)
+      return false
+    } catch (error) {
+      console.error('GitHub connection check failed:', error)
+      setErrorMessage(GITHUB_STATUS_ERROR_MESSAGE)
+      setAutoFixMessage('')
+      setIsPreviewLoading(false)
+      return false
+    }
+  }
+
   function handleAcceptPlan(plan: MessagePlan, answer?: string) {
     if (!session) {
       setAuthDialog(true)
@@ -871,51 +906,57 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       return
     }
 
-    const answerText = answer?.trim()
-    const continuePrompt = [
-      'Accept this plan and continue building the project.',
-      answerText ? `User answer: ${answerText}` : '',
-      'Use the accepted plan as the implementation direction.',
-      '',
-      formatPlanForModel(plan),
-    ]
-      .filter(Boolean)
-      .join('\n')
+    void (async () => {
+      if (!(await ensureGitHubConnectedBeforeCodeGeneration())) {
+        return
+      }
 
-    const updatedMessages: Message[] = [
-      ...messagesRef.current,
-      {
-        role: 'user',
-        content: [{ type: 'text', text: continuePrompt }],
-      },
-    ]
+      const answerText = answer?.trim()
+      const continuePrompt = [
+        'Accept this plan and continue building the project.',
+        answerText ? `User answer: ${answerText}` : '',
+        'Use the accepted plan as the implementation direction.',
+        '',
+        formatPlanForModel(plan),
+      ]
+        .filter(Boolean)
+        .join('\n')
 
-    messagesRef.current = updatedMessages
-    setMessages(updatedMessages)
-    setCurrentTab('code')
-    setIsPreviewPanelOpen(true)
+      const updatedMessages: Message[] = [
+        ...messagesRef.current,
+        {
+          role: 'user',
+          content: [{ type: 'text', text: continuePrompt }],
+        },
+      ]
 
-    try {
-      submit({
-        userID: session.user.id,
-        teamID: userTeam?.id,
-        messages: toAISDKMessages(updatedMessages),
-        template: getTemplateForSubmission(fragment?.template),
-        model: currentModel,
-        config: languageModel,
-        ...(shouldUseMorph && fragment ? { currentFragment: fragment } : {}),
-      })
+      messagesRef.current = updatedMessages
+      setMessages(updatedMessages)
+      setCurrentTab('code')
+      setIsPreviewPanelOpen(true)
 
-      setMessagesCount(prev => prev + 1)
-      posthog.capture('chat_plan_accepted', {
-        template: selectedTemplate,
-        model: languageModel.model,
-        answeredQuestion: Boolean(answerText),
-      })
-    } catch (error) {
-      console.error('Plan continuation failed:', error)
-      setErrorMessage(error instanceof Error ? error.message : 'Plan continuation failed.')
-    }
+      try {
+        submit({
+          userID: session.user.id,
+          teamID: userTeam?.id,
+          messages: toAISDKMessages(updatedMessages),
+          template: getTemplateForSubmission(fragment?.template),
+          model: currentModel,
+          config: languageModel,
+          ...(shouldUseMorph && fragment ? { currentFragment: fragment } : {}),
+        })
+
+        setMessagesCount(prev => prev + 1)
+        posthog.capture('chat_plan_accepted', {
+          template: selectedTemplate,
+          model: languageModel.model,
+          answeredQuestion: Boolean(answerText),
+        })
+      } catch (error) {
+        console.error('Plan continuation failed:', error)
+        setErrorMessage(error instanceof Error ? error.message : 'Plan continuation failed.')
+      }
+    })()
   }
 
   async function handleSendPrompt(message: string, files: File[] = [], mode: ChatMode = chatMode) {
@@ -985,6 +1026,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       return
     }
 
+    if (!(await ensureGitHubConnectedBeforeCodeGeneration())) {
+      return
+    }
+
     try {
       submit({
       userID: session?.user?.id,
@@ -1018,7 +1063,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     })
   }
 
-  function retry() {
+  async function retry() {
+    if (!(await ensureGitHubConnectedBeforeCodeGeneration())) {
+      return
+    }
+
     autoFixAttemptsRef.current = 0
     lastAutoFixSignatureRef.current = ''
     setAutoFixMessage('')

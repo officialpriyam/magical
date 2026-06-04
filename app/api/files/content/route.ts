@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase-server'
 import {
   isMissingWorkspaceTableError,
   normalizeWorkspacePath,
+  toFileUploadRow,
   toWorkspaceFileRow,
   toWorkspaceFile,
 } from '@/lib/workspace-files'
@@ -36,10 +37,30 @@ export async function GET(request: NextRequest) {
 
     if (error || !rows?.length) {
       if (error && isMissingWorkspaceTableError(error)) {
-        return NextResponse.json(
-          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
-          { status: 404 },
-        )
+        const { data: fallbackRows, error: fallbackError } = await supabase
+          .from('file_uploads')
+          .select('id, file_name, file_path, file_size, mime_type, metadata, updated_at')
+          .eq('user_id', user.id)
+          .eq('bucket_name', 'workspace-files')
+          .eq('file_path', path)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+
+        if (fallbackError || !fallbackRows?.length) {
+          return NextResponse.json({ error: 'File not found' }, { status: 404 })
+        }
+
+        const fallbackFile = toWorkspaceFile(fallbackRows[0])
+
+        if (fallbackFile.is_directory) {
+          return NextResponse.json({ error: 'Cannot read content of a directory' }, { status: 400 })
+        }
+
+        return NextResponse.json({
+          content: fallbackFile.content,
+          path: fallbackFile.path,
+          name: fallbackFile.name,
+        })
       }
 
       console.error('Error fetching file content:', error)
@@ -92,10 +113,13 @@ export async function POST(request: NextRequest) {
 
     if (existingError) {
       if (isMissingWorkspaceTableError(existingError)) {
-        return NextResponse.json(
-          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
-          { status: 503 },
-        )
+        const fallback = await upsertFileUploadFallback(supabase, user.id, normalizedPath, content)
+
+        if (fallback.error) {
+          return NextResponse.json({ error: fallback.error }, { status: fallback.status })
+        }
+
+        return NextResponse.json({ success: true, file: fallback.file })
       }
 
       console.error('Error finding file to update:', existingError)
@@ -136,10 +160,13 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (isMissingWorkspaceTableError(error)) {
-        return NextResponse.json(
-          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
-          { status: 503 },
-        )
+        const fallback = await upsertFileUploadFallback(supabase, user.id, normalizedPath, content)
+
+        if (fallback.error) {
+          return NextResponse.json({ error: fallback.error }, { status: fallback.status })
+        }
+
+        return NextResponse.json({ success: true, file: fallback.file })
       }
 
       console.error('Error updating file content:', error)
@@ -151,4 +178,48 @@ export async function POST(request: NextRequest) {
     console.error('Error in POST /api/files/content:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+async function upsertFileUploadFallback(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  userId: string,
+  path: string,
+  content: string,
+) {
+  const { error: deleteError } = await supabase
+    .from('file_uploads')
+    .delete()
+    .eq('user_id', userId)
+    .eq('bucket_name', 'workspace-files')
+    .eq('file_path', path)
+
+  if (deleteError && isMissingWorkspaceTableError(deleteError)) {
+    return {
+      error: 'Supabase file storage tables are missing. Run the Magical AI database schema in Supabase.',
+      status: 503,
+    }
+  }
+
+  if (deleteError) {
+    console.error('Error replacing fallback file content:', deleteError)
+    return { error: 'Failed to update file', status: 500 }
+  }
+
+  const { data: file, error } = await supabase
+    .from('file_uploads')
+    .insert(toFileUploadRow({
+      userId,
+      path,
+      content,
+      isDirectory: false,
+    }) as never)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating fallback file content:', error)
+    return { error: 'Failed to update file', status: 500 }
+  }
+
+  return { file: toWorkspaceFile(file), status: 200 }
 }
