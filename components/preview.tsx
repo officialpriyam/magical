@@ -5,7 +5,7 @@ import { FragmentInterpreter } from './fragment-interpreter'
 import { CodeEditor } from './code-editor'
 import { SandboxFileTree } from './sandbox-file-tree'
 import { IDE } from './ide'
-import { GitHubSave } from './github-save'
+import { GitHubSave, type GitHubWorkspace } from './github-save'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -29,6 +29,7 @@ export function Preview({
   isPreviewLoading,
   fragment,
   projectTitle,
+  onGitHubWorkspaceSaved,
   result,
   onClose,
   code,
@@ -45,6 +46,7 @@ export function Preview({
   isPreviewLoading: boolean
   fragment?: DeepPartial<FragmentSchema>
   projectTitle?: string
+  onGitHubWorkspaceSaved?: (workspace: GitHubWorkspace) => Promise<void> | void
   result?: ExecutionResult
   onClose: () => void
   code?: string
@@ -245,6 +247,7 @@ export function Preview({
               result={result}
               projectTitle={projectTitle}
               sandboxFiles={sandboxFiles}
+              onWorkspaceSaved={onGitHubWorkspaceSaved}
             />
           </div>
         </div>

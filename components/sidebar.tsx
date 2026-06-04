@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { X, MessageCircle, Search, Gift, Settings, HelpCircle, CreditCard, User, LogOut, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo } from 'lucide-react';
+import { X, MessageCircle, Search, Gift, Settings, HelpCircle, CreditCard, User, LogOut, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -40,7 +40,7 @@ interface ChatHistoryItem {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  isOpen: initialIsOpen = false,
+  isOpen: initialIsOpen = true,
   onClose = () => {},
   userPlan = "Personal Plan",
   onStartNewChat = () => {},
@@ -179,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="flex h-screen">
       {/* Always visible icons */}
       <div 
-        className={`bg-background border-r border-border flex flex-col items-center py-4 transition-all duration-300 ease-in-out ${
+        className={`bg-[#0b0b0c] border-r border-white/10 flex flex-col items-center py-4 transition-all duration-300 ease-in-out ${
           isOpen ? 'w-0 opacity-0 overflow-hidden' : 'w-16 opacity-100'
         }`}
         onMouseEnter={handleMouseEnter}
@@ -297,19 +297,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Collapsible Sidebar Content */}
       <div
-        className={`h-screen bg-background border-r border-border flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen ? 'w-80 opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full overflow-hidden'
+        className={`h-screen bg-[#0b0b0c] border-r border-white/10 flex flex-col transition-all duration-300 ease-in-out ${
+          isOpen ? 'w-64 opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full overflow-hidden'
         }`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         {/* Header Section */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
           <div>
-            <div className="text-xl font-bold text-foreground">
+            <div className="text-xl font-bold text-white">
               Magical AI
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-white/55">
               Developed by priyx
             </div>
           </div>
@@ -324,8 +324,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </Button>
         </div>
 
+        <div className="p-3 space-y-1">
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 bg-white/10 text-white hover:bg-white/15"
+            onClick={handleCloseSidebar}
+          >
+            <MessageCircle className="h-4 w-4" />
+            Home
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+            onClick={() => {
+              setTimeout(() => {
+                const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement
+                searchInput?.focus()
+              }, 100)
+            }}
+          >
+            <Search className="h-4 w-4" />
+            Search
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Resources
+          </Button>
+          <Button
+            variant="ghost"
+            asChild
+            className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+          >
+            <Link href="/settings/integrations">
+              <GitBranch className="h-4 w-4" />
+              Connectors
+            </Link>
+          </Button>
+        </div>
+
         {/* Chat Controls */}
-        <div className="p-4 space-y-3">
+        <div className="px-4 pb-4 space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -333,14 +374,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               placeholder="Search"
               value={activeSearchQuery}
               onChange={handleSearchChange}
-              className="pl-10 bg-muted/50 border-border transition-colors"
+              className="pl-10 bg-white/5 border-white/10 text-white transition-colors placeholder:text-white/45"
             />
           </div>
         </div>
 
         {/* Chat History */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          <h3 className="text-sm font-medium text-foreground mb-2">Your Chats</h3>
+          <h3 className="text-sm font-medium text-white/70 mb-2">Projects</h3>
           {Object.keys(groupedChats).length === 0 ? (
             <p className="text-sm text-muted-foreground">No previous conversations</p>
           ) : (
@@ -354,7 +395,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
-                            className="w-full justify-start gap-2 text-muted-foreground hover:text-primary dark:hover:text-foreground hover:bg-primary/5 dark:hover:bg-muted/50 group transition-colors"
+                            className="w-full justify-start gap-2 text-white/75 hover:text-white hover:bg-white/10 group transition-colors"
                           >
                             <MessageCircle className="h-4 w-4 flex-shrink-0" />
                             <span className="truncate">{chat.title}</span>
@@ -432,7 +473,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* User Information */}
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
               <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.user_metadata?.name ?? 'User'} />

@@ -7,7 +7,7 @@ import { PromptInputBox } from '@/components/ui/ai-prompt-box';
 import { NavBar } from '@/components/navbar';
 import { useAuth } from '@/lib/auth';
 import dynamic from 'next/dynamic';
-import { Project, saveMessage, getProjectMessages, generateProjectTitle, getProject, updateProject } from '@/lib/database';
+import { Project, saveMessage, getProjectMessages, generateProjectTitle, getProject, updateProject, getProjects } from '@/lib/database';
 import { Message, toAISDKMessages, toMessageImage } from '@/lib/messages';
 import type { LLMModel, LLMModelConfig } from '@/lib/models';
 import { FragmentSchema, fragmentSchema as schema } from '@/lib/schema';
@@ -26,10 +26,13 @@ import { HeroPillSecond } from '@/components/announcement';
 import { SupabaseClient } from '@supabase/supabase-js';
 import models from '@/lib/models.json';
 import { invalidateCache } from '@/lib/caching';
+import type { GitHubWorkspace } from '@/components/github-save';
 
 const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
 const MAX_AUTO_FIX_ATTEMPTS = 2
+
+type ChatMode = 'plan' | 'build'
 
 function getSandboxErrorMessage(errorResult: { error?: string; type?: string }) {
   if (errorResult.type === 'config_error') {
@@ -130,6 +133,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     'useMorphApply',
     process.env.NEXT_PUBLIC_USE_MORPH_APPLY === 'true',
   )
+  const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'build')
 
   const posthog = usePostHog()
 
@@ -140,6 +144,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [errorsEncountered, setErrorsEncountered] = useState(0)
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([])
+  const githubSyncTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const restoringProjectRef = useRef('')
+  const skipNextWorkspaceRestoreRef = useRef('')
   const autoFixAttemptsRef = useRef(0)
   const lastAutoFixSignatureRef = useRef('')
   const skipNextProjectMessagesLoadRef = useRef('')
@@ -149,6 +156,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [currentTab, setCurrentTab] = useState<'code' | 'fragment' | 'terminal' | 'interpreter' | 'editor' | 'files' | 'ide'>('code');
   const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isPlanLoading, setIsPlanLoading] = useState(false);
   const [isPreviewPanelOpen, setIsPreviewPanelOpen] = useState(false);
   const [isAuthDialogOpen, setAuthDialog] = useState(false);
   const [authView, setAuthView] = useState<ViewType>('sign_in')
@@ -166,6 +174,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [autoFixMessage, setAutoFixMessage] = useState('')
   
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
+  const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const [isLoadingProject, setIsLoadingProject] = useState(false)
   const [chatHistoryRefreshKey, setChatHistoryRefreshKey] = useState(0)
   const [projectMessagesRefreshKey, setProjectMessagesRefreshKey] = useState(0)
@@ -177,6 +186,36 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  useEffect(() => {
+    const syncTimers = githubSyncTimersRef.current
+
+    return () => {
+      Object.values(syncTimers).forEach(clearTimeout)
+    }
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadRecentProjects() {
+      if (!session?.user?.id) {
+        setRecentProjects([])
+        return
+      }
+
+      const projects = await getProjects(supabase)
+      if (isMounted) {
+        setRecentProjects(projects.slice(0, 6))
+      }
+    }
+
+    loadRecentProjects()
+
+    return () => {
+      isMounted = false
+    }
+  }, [chatHistoryRefreshKey, session?.user?.id, supabase])
 
   const handleChatSelected = async (chatId: string) => {
     skipNextProjectMessagesLoadRef.current = ''
@@ -436,6 +475,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         setIsPreviewLoading(false);
     },
   })
+  const isPromptLoading = isLoading || isPlanLoading
 
   function getTemplateForSubmission(preferredTemplate?: string) {
     if (selectedTemplate !== 'auto') {
@@ -559,6 +599,56 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }
 
+  const restoreProjectWorkspace = useCallback(async (
+    project: Project,
+    savedFragment: DeepPartial<FragmentSchema>,
+  ) => {
+    const workspace = getProjectGitHubWorkspace(project)
+
+    if (!workspace || !savedFragment?.template || restoringProjectRef.current === project.id) {
+      return
+    }
+
+    restoringProjectRef.current = project.id
+    setAutoFixMessage('Restoring files from GitHub...')
+    setIsPreviewLoading(true)
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/restore-sandbox`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fragment: savedFragment,
+          teamID: userTeam?.id,
+          accessToken: session?.access_token,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to restore GitHub workspace.')
+      }
+
+      const restoredResult = data as ExecutionResult
+      setResult(restoredResult)
+      setCurrentPreview({
+        fragment: savedFragment,
+        result: restoredResult,
+      })
+      setIsPreviewPanelOpen(true)
+      setCurrentTab('ide')
+      setAutoFixMessage('')
+    } catch (error) {
+      console.error('GitHub workspace restore failed:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to restore GitHub workspace.')
+      setAutoFixMessage('')
+    } finally {
+      setIsPreviewLoading(false)
+    }
+  }, [session?.access_token, userTeam?.id])
+
   useEffect(() => {
     let isMounted = true
 
@@ -597,6 +687,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setSelectedFile(null)
       setCurrentTab(latestPreviewMessage?.object ? 'fragment' : 'code')
       setIsLoadingProject(false)
+
+      if (skipNextWorkspaceRestoreRef.current === currentProject?.id) {
+        skipNextWorkspaceRestoreRef.current = ''
+      } else if (currentProject && latestPreviewMessage?.object && getProjectGitHubWorkspace(currentProject)) {
+        void restoreProjectWorkspace(currentProject, latestPreviewMessage.object)
+      }
     }
 
     loadProjectMessages()
@@ -604,7 +700,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       isMounted = false
     }
-  }, [currentProjectId, projectMessagesRefreshKey, supabase])
+  }, [currentProject, currentProjectId, projectMessagesRefreshKey, restoreProjectWorkspace, supabase])
 
   useEffect(() => {
     async function saveMessagesToDb() {
@@ -656,7 +752,50 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }, [session?.user?.id, sessionStartTime, fragmentsGenerated, messagesCount, errorsEncountered])
 
-  async function handleSendPrompt(message: string, files: File[] = []) {
+  async function submitPlanResponse(updatedMessages: Message[]) {
+    setIsPlanLoading(true)
+
+    try {
+      const response = await fetch('/api/chat/plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userID: session?.user?.id,
+          teamID: userTeam?.id,
+          messages: toAISDKMessages(updatedMessages),
+          model: currentModel,
+          config: languageModel,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Plan generation failed.')
+      }
+
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: data.plan || 'I could not create a plan for that request.',
+          },
+        ],
+      }
+      const nextMessages = [...messagesRef.current, assistantMessage]
+      messagesRef.current = nextMessages
+      setMessages(nextMessages)
+    } catch (error) {
+      console.error('Plan mode request failed:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Plan mode failed.')
+    } finally {
+      setIsPlanLoading(false)
+    }
+  }
+
+  async function handleSendPrompt(message: string, files: File[] = [], mode: ChatMode = chatMode) {
     if (!session) {
       return setAuthDialog(true)
     }
@@ -705,6 +844,24 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     messagesRef.current = updatedMessages
     setMessages(updatedMessages)
 
+    if (!hadProjectBeforePrompt) {
+      window.history.replaceState(null, '', `/chat/${projectForPrompt.id}`)
+    }
+
+    if (shouldRenameProject) {
+      void renameProjectFromPrompt(projectForPrompt, currentInput)
+    }
+
+    if (mode === 'plan') {
+      await submitPlanResponse(updatedMessages)
+      setMessagesCount(prev => prev + 1)
+      posthog.capture('chat_plan_submit', {
+        template: selectedTemplate,
+        model: languageModel.model,
+      })
+      return
+    }
+
     try {
       submit({
       userID: session?.user?.id,
@@ -719,14 +876,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       console.error('Prompt submission failed:', error)
       setErrorMessage(error instanceof Error ? error.message : 'Prompt submission failed.')
       return
-    }
-
-    if (!hadProjectBeforePrompt) {
-      window.history.replaceState(null, '', `/chat/${projectForPrompt.id}`)
-    }
-
-    if (shouldRenameProject) {
-      void renameProjectFromPrompt(projectForPrompt, currentInput)
     }
 
     // Enhanced chat analytics
@@ -879,6 +1028,75 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }
 
+  async function handleGitHubWorkspaceSaved(workspace: GitHubWorkspace) {
+    if (!currentProject) return
+
+    try {
+      const response = await fetch(`/api/projects/${currentProject.id}/github-workspace`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(workspace),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not connect this project to GitHub.')
+      }
+
+      if (data.project) {
+        skipNextWorkspaceRestoreRef.current = data.project.id
+        setCurrentProject(data.project)
+        invalidateCache(new RegExp(`^projects:${session?.user?.id}:`))
+        setChatHistoryRefreshKey((key) => key + 1)
+      }
+    } catch (error) {
+      console.error('Error saving GitHub workspace metadata:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Could not connect this project to GitHub.')
+    }
+  }
+
+  function scheduleGitHubFileSync(path: string, content: string) {
+    const workspace = currentProject ? getProjectGitHubWorkspace(currentProject) : null
+
+    if (!workspace?.autoSync) return
+
+    if (githubSyncTimersRef.current[path]) {
+      clearTimeout(githubSyncTimersRef.current[path])
+    }
+
+    githubSyncTimersRef.current[path] = setTimeout(() => {
+      void syncFileToGitHub(workspace, path, content)
+      delete githubSyncTimersRef.current[path]
+    }, 1800)
+  }
+
+  async function syncFileToGitHub(workspace: GitHubWorkspace, path: string, content: string) {
+    try {
+      const repoPath = withGitHubPathPrefix(toRepoPath(path), workspace.pathPrefix)
+      const response = await fetch(`/api/github/repos/${workspace.owner}/${workspace.repo}/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          branch: workspace.branch || 'main',
+          message: `Update ${repoPath} from Magical AI`,
+          files: [{ path: repoPath, content }],
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || 'GitHub sync failed.')
+      }
+    } catch (error) {
+      console.error('GitHub auto-sync failed:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'GitHub auto-sync failed.')
+    }
+  }
+
   function resetChatState() {
     stop()
     autoFixAttemptsRef.current = 0
@@ -933,6 +1151,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           if (selectedFile?.path === path) {
             setSelectedFile({ path, content })
           }
+          scheduleGitHubFileSync(path, content)
         } else {
           console.error('Failed to save sandbox file:', response.statusText)
         }
@@ -1026,9 +1245,58 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setIsPricingModalOpen(true)
   }
 
+  const isDashboardMode =
+    !isLoadingProject &&
+    messages.length === 0 &&
+    !fragment &&
+    !isPreviewPanelOpen
+  const displayName =
+    session?.user.user_metadata?.name ||
+    session?.user.user_metadata?.full_name ||
+    session?.user.email?.split('@')[0] ||
+    'there'
+  const promptInput = (
+    <PromptInputBox
+      onSend={handleSendPrompt}
+      isLoading={isPromptLoading}
+      chatMode={chatMode}
+      onChatModeChange={setChatMode}
+      placeholder={
+        chatMode === 'plan'
+          ? 'Ask Magical AI to plan what to build...'
+          : 'Ask Magical AI to build an app, page, or tool...'
+      }
+      templates={templates}
+      selectedTemplate={selectedTemplate}
+      onSelectedTemplateChange={setSelectedTemplate}
+      models={filteredModels}
+      languageModel={languageModel}
+      onLanguageModelChange={handleLanguageModelChange}
+      apiKeyConfigurable={!process.env.NEXT_PUBLIC_NO_API_KEY_INPUT}
+      baseURLConfigurable={!process.env.NEXT_PUBLIC_NO_BASE_URL_INPUT}
+      useMorphApply={useMorphApply}
+      onUseMorphApplyChange={setUseMorphApply}
+    />
+  )
+  const statusNotices = (
+    <>
+      {autoFixMessage && (
+        <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-600 dark:text-amber-400 text-sm">
+          <span>{autoFixMessage}</span>
+          <button onClick={stop} className="ml-4 p-1 rounded-md hover:bg-amber-500/20">Stop</button>
+        </div>
+      )}
+      {(error || errorMessage) && (
+        <div className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
+          <span>{errorMessage || error?.message || 'AI generation failed.'}</span>
+          <button onClick={retry} className="ml-4 p-1 rounded-md hover:bg-red-500/20">Retry</button>
+        </div>
+      )}
+    </>
+  )
 
   return (
-    <main className="flex min-h-screen max-h-screen">
+    <main className="flex min-h-screen max-h-screen bg-[#080809]">
       {supabase && (
         <AuthDialog
           open={isAuthDialogOpen}
@@ -1057,101 +1325,196 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       )}
 
       <div className={cn(
-        "grid w-full md:grid-cols-2 transition-all duration-300",
-        session ? "ml-16" : ""
+        "grid w-full md:grid-cols-2 transition-all duration-300"
       )}>
         <div
-          className={`flex flex-col w-full h-screen max-w-[800px] mx-auto px-4 ${fragment || isPreviewPanelOpen ? 'col-span-1' : 'col-span-2'}`}
+          className={cn(
+            "relative flex flex-col w-full h-screen mx-auto px-4",
+            isDashboardMode ? "col-span-2 max-w-none p-4" : "max-w-[800px]",
+            fragment || isPreviewPanelOpen ? 'col-span-1' : 'col-span-2',
+          )}
         >
-          <NavBar
-            session={session}
-            showLogin={() => setAuthDialog(true)}
-            signOut={logout}
-            onSocialClick={handleSocialClick}
-            onClear={handleClearChat}
-            canClear={messages.length > 0}
-            canUndo={messages.length > 1 && !isLoading}
-            onUndo={handleUndo}
-            onTogglePanel={() => {
-              setIsPreviewPanelOpen(!isPreviewPanelOpen)
-              if (!isPreviewPanelOpen) {
-                setCurrentTab('ide')
-              }
-            }}
-            isPanelOpen={isPreviewPanelOpen || !!fragment}
-          />
-          
-          <div className="flex justify-center mb-4">
-            <HeroPillSecond />
-          </div>
+          {(!isDashboardMode || !session) && (
+            <NavBar
+              session={session}
+              showLogin={() => setAuthDialog(true)}
+              signOut={logout}
+              onSocialClick={handleSocialClick}
+              onClear={handleClearChat}
+              canClear={messages.length > 0}
+              canUndo={messages.length > 1 && !isPromptLoading}
+              onUndo={handleUndo}
+              onTogglePanel={() => {
+                setIsPreviewPanelOpen(!isPreviewPanelOpen)
+                if (!isPreviewPanelOpen) {
+                  setCurrentTab('ide')
+                }
+              }}
+              isPanelOpen={isPreviewPanelOpen || !!fragment}
+            />
+          )}
 
-          <div className="flex-grow overflow-y-auto">
-            {isLoadingProject ? (
-              <div className="flex items-center justify-center h-32">
-                <div className="text-muted-foreground">Loading project...</div>
+          {isDashboardMode ? (
+            <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-white/10 bg-[#111113] text-white shadow-2xl">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-15%,rgba(255,255,255,0.16),transparent_24%),linear-gradient(180deg,rgba(45,91,178,0.86)_0%,rgba(116,114,248,0.82)_34%,rgba(246,82,188,0.96)_64%,rgba(255,26,82,0.98)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,8,9,0.28),rgba(8,8,9,0)_48%,rgba(8,8,9,0.2))]" />
+
+              <div className="relative z-10 flex w-full flex-col">
+                <div className="flex flex-1 flex-col items-center justify-center px-4 pt-16 text-center">
+                  <div className="mb-6">
+                    <HeroPillSecond />
+                  </div>
+                  <h1 className="mb-7 max-w-3xl text-3xl font-semibold tracking-normal text-white md:text-4xl">
+                    Let&apos;s build something, {displayName}
+                  </h1>
+                  <div className="w-full max-w-2xl">
+                    {statusNotices}
+                    {promptInput}
+                  </div>
+                </div>
+
+                <div className="mx-auto mt-8 w-[calc(100%-3rem)] max-w-7xl rounded-t-[1.5rem] border border-white/10 bg-[#130d10]/90 p-5 shadow-2xl backdrop-blur-md">
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-2 overflow-hidden rounded-full border border-white/10 bg-white/5 p-1 text-xs text-white/60">
+                      <span className="rounded-full bg-white/15 px-3 py-1 text-white">My projects</span>
+                      <span className="hidden px-3 py-1 sm:inline">Recently viewed</span>
+                      <span className="hidden px-3 py-1 md:inline">Connected to GitHub</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => recentProjects[0] && handleChatSelected(recentProjects[0].id)}
+                      className="shrink-0 text-sm font-medium text-white/85 hover:text-white"
+                    >
+                      Browse all -&gt;
+                    </button>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {recentProjects.length > 0 ? recentProjects.slice(0, 3).map((project) => {
+                      const workspace = getProjectGitHubWorkspace(project)
+
+                      return (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => handleChatSelected(project.id)}
+                          className="min-h-28 rounded-lg border border-white/10 bg-white/[0.06] p-4 text-left transition hover:bg-white/[0.1]"
+                        >
+                          <div className="line-clamp-2 text-sm font-semibold text-white">
+                            {project.title}
+                          </div>
+                          <div className="mt-3 text-xs text-white/55">
+                            {new Date(project.updated_at).toLocaleDateString()}
+                          </div>
+                          <div className="mt-4 text-xs text-white/65">
+                            {workspace ? workspace.fullName : 'Local project'}
+                          </div>
+                        </button>
+                      )
+                    }) : (
+                      <div className="rounded-lg border border-white/10 bg-white/[0.06] p-4 text-sm text-white/70 md:col-span-3">
+                        Your recent Magical AI projects will appear here after your first chat.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            ) : (
-              <Chat
-                messages={messages}
-                isLoading={isLoading}
-                isPreviewLoading={isPreviewLoading}
-                currentFragment={fragment}
-                autoFixMessage={autoFixMessage}
-                setCurrentPreview={setCurrentPreview}
-              />
-            )}
-          </div>
-          
-          <div className="space-y-4 mt-4">
-            {autoFixMessage && (
-              <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-600 dark:text-amber-400 text-sm">
-                <span>{autoFixMessage}</span>
-                <button onClick={stop} className="ml-4 p-1 rounded-md hover:bg-amber-500/20">Stop</button>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-center mb-4">
+                <HeroPillSecond />
               </div>
-            )}
-            {(error || errorMessage) && (
-              <div className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
-                <span>{errorMessage || error?.message || 'AI generation failed.'}</span>
-                <button onClick={retry} className="ml-4 p-1 rounded-md hover:bg-red-500/20">Retry</button>
+
+              <div className="flex-grow overflow-y-auto">
+                {isLoadingProject ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="text-muted-foreground">Loading project...</div>
+                  </div>
+                ) : (
+                  <Chat
+                    messages={messages}
+                    isLoading={isPromptLoading}
+                    isPreviewLoading={isPreviewLoading}
+                    currentFragment={fragment}
+                    autoFixMessage={autoFixMessage}
+                    setCurrentPreview={setCurrentPreview}
+                  />
+                )}
               </div>
+
+              <div className="space-y-4 mt-4">
+                {statusNotices}
+                {promptInput}
+              </div>
+            </>
             )}
-              <PromptInputBox
-                onSend={handleSendPrompt}
-                isLoading={isLoading}
-                templates={templates}
-                selectedTemplate={selectedTemplate}
-                onSelectedTemplateChange={setSelectedTemplate}
-                models={filteredModels}
-                languageModel={languageModel}
-                onLanguageModelChange={handleLanguageModelChange}
-                apiKeyConfigurable={!process.env.NEXT_PUBLIC_NO_API_KEY_INPUT}
-                baseURLConfigurable={!process.env.NEXT_PUBLIC_NO_BASE_URL_INPUT}
-                useMorphApply={useMorphApply}
-                onUseMorphApplyChange={setUseMorphApply}
-              />
-          </div>
         </div>
-          <Preview
-          teamID={userTeam?.id}
-          accessToken={session?.access_token}
-          selectedTab={currentTab}
-          onSelectedTabChange={setCurrentTab}
-          isChatLoading={isLoading}
-          isPreviewLoading={isPreviewLoading}
-          fragment={fragment}
-          projectTitle={currentProject?.title}
-          result={result as ExecutionResult}
-          onClose={() => {
-            setFragment(undefined)
-            setIsPreviewPanelOpen(false)
-          }}
-          code={fragment?.code || ''}
-          selectedFile={selectedFile}
-          onSelectFile={setSelectedFile}
-          onSave={handleSaveFile}
-          executeCode={handleExecuteCode}
-          />
+          {!isDashboardMode && (
+            <Preview
+              teamID={userTeam?.id}
+              accessToken={session?.access_token}
+              selectedTab={currentTab}
+              onSelectedTabChange={setCurrentTab}
+              isChatLoading={isPromptLoading}
+              isPreviewLoading={isPreviewLoading}
+              fragment={fragment}
+              projectTitle={currentProject?.title}
+              onGitHubWorkspaceSaved={handleGitHubWorkspaceSaved}
+              result={result as ExecutionResult}
+              onClose={() => {
+                setFragment(undefined)
+                setIsPreviewPanelOpen(false)
+              }}
+              code={fragment?.code || ''}
+              selectedFile={selectedFile}
+              onSelectFile={setSelectedFile}
+              onSave={handleSaveFile}
+              executeCode={handleExecuteCode}
+            />
+          )}
       </div>
     </main>
   )
+}
+
+function getProjectGitHubWorkspace(project: Project | null): GitHubWorkspace | null {
+  const workspace = project?.metadata?.githubWorkspace
+
+  if (!workspace || typeof workspace !== 'object') {
+    return null
+  }
+
+  const fullName =
+    typeof workspace.fullName === 'string'
+      ? workspace.fullName
+      : `${workspace.owner || ''}/${workspace.repo || ''}`
+  const [owner, repo] = fullName.split('/')
+
+  if (!owner || !repo) {
+    return null
+  }
+
+  return {
+    fullName: `${owner}/${repo}`,
+    owner,
+    repo,
+    branch: typeof workspace.branch === 'string' && workspace.branch ? workspace.branch : 'main',
+    pathPrefix: typeof workspace.pathPrefix === 'string' ? workspace.pathPrefix : '',
+    autoSync: workspace.autoSync !== false,
+    lastCommitSha: typeof workspace.lastCommitSha === 'string' ? workspace.lastCommitSha : null,
+  }
+}
+
+function toRepoPath(path: string) {
+  return path
+    .replace(/\\/g, '/')
+    .replace(/^\/?home\/user\/?/, '')
+    .replace(/^\/+/, '')
+}
+
+function withGitHubPathPrefix(path: string, prefix: string) {
+  const cleanPath = path.replace(/\\/g, '/').replace(/^\/+/, '').trim()
+  const cleanPrefix = prefix.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').trim()
+
+  return cleanPrefix ? `${cleanPrefix}/${cleanPath}` : cleanPath
 }

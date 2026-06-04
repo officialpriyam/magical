@@ -44,16 +44,28 @@ type SaveFile = {
   content: string
 }
 
+export type GitHubWorkspace = {
+  fullName: string
+  owner: string
+  repo: string
+  branch: string
+  pathPrefix: string
+  autoSync: boolean
+  lastCommitSha?: string | null
+}
+
 export function GitHubSave({
   fragment,
   result,
   projectTitle,
   sandboxFiles,
+  onWorkspaceSaved,
 }: {
   fragment?: DeepPartial<FragmentSchema>
   result?: ExecutionResult
   projectTitle?: string
   sandboxFiles?: FileSystemNode[]
+  onWorkspaceSaved?: (workspace: GitHubWorkspace) => Promise<void> | void
 }) {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
@@ -219,6 +231,15 @@ export function GitHubSave({
       toast({
         title: 'Saved to GitHub',
         description: `${data.committed} file${data.committed === 1 ? '' : 's'} committed to ${targetRepo}.`,
+      })
+      await onWorkspaceSaved?.({
+        fullName: targetRepo,
+        owner,
+        repo,
+        branch: targetBranch,
+        pathPrefix: normalizePathPrefix(pathPrefix),
+        autoSync: true,
+        lastCommitSha: data.files?.[data.files.length - 1]?.commit_sha || null,
       })
       setOpen(false)
     } catch (error) {
@@ -458,4 +479,8 @@ function toRepoPath(path: string) {
     .replace(/\\/g, '/')
     .replace(/^\/?home\/user\/?/, '')
     .replace(/^\/+/, '')
+}
+
+function normalizePathPrefix(value: string) {
+  return value.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').trim()
 }

@@ -477,7 +477,7 @@ const CustomDivider: React.FC = () => (
 
 // Main PromptInputBox Component
 interface PromptInputBoxProps {
-  onSend?: (message: string, files?: File[]) => void;
+  onSend?: (message: string, files?: File[], mode?: ChatMode) => void;
   isLoading?: boolean;
   placeholder?: string;
   className?: string;
@@ -491,7 +491,10 @@ interface PromptInputBoxProps {
   baseURLConfigurable: boolean
   useMorphApply?: boolean
   onUseMorphApplyChange?: (value: boolean) => void
+  chatMode?: ChatMode
+  onChatModeChange?: (mode: ChatMode) => void
 }
+type ChatMode = 'plan' | 'build'
 export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref: React.Ref<HTMLDivElement>) => {
   React.useEffect(() => {
     const styleSheet = document.createElement("style");
@@ -501,7 +504,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       document.head.removeChild(styleSheet);
     };
   }, []);
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange } = props;
   const [input, setInput] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
@@ -598,7 +601,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       else if (showThink) messagePrefix = "[Think: ";
       else if (showCanvas) messagePrefix = "[Canvas: ";
       const formattedInput = messagePrefix ? `${messagePrefix}${input}]` : input;
-      onSend(formattedInput, files);
+      onSend(formattedInput, files, chatMode);
       setInput("");
       setFiles([]);
       setFilePreviews({});
@@ -657,7 +660,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const handleStopRecording = (duration: number) => {
     console.log(`Stopped recording after ${duration} seconds`);
     setIsRecording(false);
-    onSend(`[Voice message - ${duration} seconds]`, []);
+    onSend(`[Voice message - ${duration} seconds]`, [], chatMode);
   };
 
   const hasContent = input.trim() !== "" || files.length > 0;
@@ -908,9 +911,38 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
             </div>
           </div>
 
-          <PromptInputAction
-            tooltip={
-              isLoading
+          <div className="flex items-center gap-2">
+            <PromptInputAction
+              tooltip="Choose whether Magical AI should plan first or build now"
+            >
+              <div className="flex h-8 items-center rounded-full border bg-muted/50 p-0.5">
+                {(['plan', 'build'] as ChatMode[]).map((mode) => {
+                  const isActive = chatMode === mode;
+                  const Icon = mode === 'plan' ? BrainCog : FolderCog;
+
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => onChatModeChange?.(mode)}
+                      className={cn(
+                        "flex h-7 items-center gap-1 rounded-full px-2 text-xs transition-colors",
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-primary"
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="capitalize">{mode}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </PromptInputAction>
+
+            <PromptInputAction
+              tooltip={
+                isLoading
                 ? "Stop generation"
                 : isRecording
                 ? "Stop recording"
@@ -948,6 +980,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
               )}
             </Button>
           </PromptInputAction>
+          </div>
         </PromptInputActions>
       </PromptInput>
 
