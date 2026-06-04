@@ -391,28 +391,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">{date}</h4>
                   <div className="space-y-1">
                     {chats.map((chat) => (
-                      <DropdownMenu key={chat.id}>
-                        <DropdownMenuTrigger asChild>
+                      <div key={chat.id} className="group flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          onClick={() => onChatSelected(chat.id)}
+                          className="min-w-0 flex-1 justify-start gap-2 text-white/75 hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                          <MessageCircle className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">{chat.title}</span>
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
-                            className="w-full justify-start gap-2 text-white/75 hover:text-white hover:bg-white/10 group transition-colors"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 text-white/45 opacity-0 transition-opacity hover:bg-white/10 hover:text-white group-hover:opacity-100"
+                            aria-label={`More actions for ${chat.title}`}
                           >
-                            <MessageCircle className="h-4 w-4 flex-shrink-0" />
-                            <span className="truncate">{chat.title}</span>
-                            <MoreHorizontal className="ml-auto h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" align="start">
-                          <DropdownMenuItem onClick={() => onChatSelected(chat.id)}>
-                            <CornerUpLeft className="mr-2 h-4 w-4" />
-                            <span>Re-enter</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteChat(chat.id)} className="text-red-500">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>Delete</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent side="right" align="start">
+                            <DropdownMenuItem onClick={() => onChatSelected(chat.id)}>
+                              <CornerUpLeft className="mr-2 h-4 w-4" />
+                              <span>Re-enter</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteChat(chat.id)} className="text-red-500">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     ))}
                   </div>
                 </div>

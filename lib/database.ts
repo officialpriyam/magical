@@ -266,7 +266,34 @@ export async function saveMessage(
         sequence_number_param: sequenceNumber,
       })
 
-      if (error) throw error
+      if (error) {
+        console.warn('save_message_and_update_project RPC failed; using direct message save fallback:', error)
+
+        const { error: upsertError } = await supabase!
+          .from('messages')
+          .upsert(
+            {
+              project_id: projectId,
+              role: message.role,
+              content: message.content,
+              object_data: message.object ?? null,
+              result_data: message.result ?? null,
+              sequence_number: sequenceNumber,
+            },
+            { onConflict: 'project_id,sequence_number' },
+          )
+
+        if (upsertError) throw upsertError
+
+        const { error: projectUpdateError } = await supabase!
+          .from('projects')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', projectId)
+          .eq('user_id', user.id)
+
+        if (projectUpdateError) throw projectUpdateError
+      }
+
       invalidateCache(`project-messages:${user.id}:${projectId}`)
       return true
     },

@@ -36,22 +36,26 @@ export function Chat({
   return (
     <div
       id="chat-container"
-      className="flex flex-col pb-12 gap-2 overflow-y-auto max-h-full"
+      className="flex h-full max-h-full flex-col gap-5 overflow-y-auto px-1 pb-6 pt-2"
     >
       {messages.length === 0 && !isLoading && !isPreviewLoading && (
-        <div className="flex items-center justify-center h-full text-muted-foreground text-lg font-serif">
+        <div className="flex h-full items-center justify-center text-sm text-white/45">
           Start a new conversation
         </div>
       )}
 
       {messages.map((message: Message, index: number) => (
         <div
-          className={`flex flex-col px-4 shadow-sm whitespace-pre-wrap ${message.role !== 'user' ? 'bg-accent dark:bg-white/5 border text-accent-foreground dark:text-muted-foreground py-4 rounded-2xl gap-4 w-full' : 'bg-gradient-to-b from-black/5 to-black/10 dark:from-black/30 dark:to-black/50 py-2 rounded-xl gap-2 w-fit'} font-serif text-primary`}
+          className={`flex flex-col whitespace-pre-wrap text-sm leading-6 ${
+            message.role === 'user'
+              ? 'self-end rounded-2xl bg-white/[0.07] px-4 py-2 text-white shadow-sm'
+              : 'w-full gap-3 text-white/90'
+          }`}
           key={index}
         >
           {message.content.map((content, id) => {
             if (content.type === 'text') {
-              return content.text
+              return <span key={id}>{content.text}</span>
             }
             if (content.type === 'image') {
               return (
@@ -73,18 +77,32 @@ export function Chat({
                   result: message.result,
                 })
               }
-              className="py-2 pl-2 w-full md:w-max flex items-center border rounded-xl select-none hover:bg-black/5 dark:hover:bg-white/5 hover:cursor-pointer"
+              className="w-full max-w-[22rem] rounded-xl border border-blue-500/70 bg-white/[0.035] p-3 shadow-[0_0_0_1px_rgba(37,99,235,0.18)] transition hover:bg-white/[0.055] hover:cursor-pointer"
             >
-              <div className="rounded-[0.5rem] w-10 h-10 bg-black/5 dark:bg-white/5 self-stretch flex items-center justify-center">
-                <Terminal strokeWidth={2} className="text-[#FF8800]" />
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-white">
+                    {message.object.title || 'Generated project'}
+                  </div>
+                  <div className="mt-1 truncate text-xs text-white/45">
+                    {message.object.file_path || message.object.template || 'Artifact ready'}
+                  </div>
+                </div>
+                <Terminal strokeWidth={2} className="h-4 w-4 shrink-0 text-[#FFB84D]" />
               </div>
-              <div className="pl-2 pr-4 flex flex-col">
-                <span className="font-bold font-sans text-sm text-primary">
-                  {message.object.title}
-                </span>
-                <span className="font-sans text-sm text-muted-foreground">
-                  Click to see fragment
-                </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className="h-8 rounded-md border border-white/15 bg-white/[0.04] text-xs font-medium text-white transition hover:bg-white/[0.08]"
+                >
+                  Details
+                </button>
+                <button
+                  type="button"
+                  className="h-8 rounded-md border border-white/10 bg-white/[0.08] text-xs font-medium text-white/70 transition hover:bg-white/[0.12] hover:text-white"
+                >
+                  Preview
+                </button>
               </div>
             </div>
           )}
@@ -130,8 +148,8 @@ function GenerationStatusCard({
   if (!status) return null
 
   return (
-    <div className="mx-4 mt-2 w-[calc(100%-2rem)] max-w-[36rem] rounded-2xl border bg-accent/70 px-4 py-3 shadow-sm dark:bg-white/5">
-      <div className="flex items-center justify-between gap-3 text-sm font-medium text-primary">
+    <div className="mt-2 w-full max-w-[36rem] rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 shadow-sm">
+      <div className="flex items-center justify-between gap-3 text-sm font-medium text-white">
         <div className="flex min-w-0 items-center gap-2">
           <Sparkles strokeWidth={2} className="h-4 w-4 shrink-0 animate-pulse text-[#FF8800]" />
           <span className="min-w-0 break-words">{status.title}</span>
@@ -140,14 +158,14 @@ function GenerationStatusCard({
           <button
             type="button"
             onClick={onStop}
-            className="flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground transition hover:bg-background hover:text-primary"
+            className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 text-xs text-red-200 transition hover:bg-red-500/20"
           >
             <Square className="h-3 w-3 fill-current" />
             Stop
           </button>
         )}
       </div>
-      <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="mt-2 flex items-center gap-2 text-sm text-white/55">
         <LoaderIcon strokeWidth={2} className="h-3.5 w-3.5 shrink-0 animate-spin" />
         <span className="min-w-0 break-words">{status.detail}</span>
       </div>

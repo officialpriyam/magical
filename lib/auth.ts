@@ -22,9 +22,39 @@ export function useAuth(
       return
     }
 
+    let isMounted = true
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return
+
+      setSession(session)
+      const user = session?.user
+
+      if (user) {
+        if (!user.user_metadata.is_fragments_user) {
+          supabase?.auth.updateUser({
+            data: { is_fragments_user: true },
+          })
+        }
+        posthog.identify(user.id, {
+          email: user.email,
+          supabase_id: user.id,
+        })
+      }
+
+      setLoading(false)
+    }).catch((error) => {
+      console.error('Failed to load auth session:', error)
+      if (isMounted) {
+        setLoading(false)
+      }
+    })
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+      if (!isMounted) return
+
       setSession(session)
       const user = session?.user
 
@@ -74,7 +104,10 @@ export function useAuth(
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [recovery, posthog, setAuthDialog, setAuthView])
 
   return {

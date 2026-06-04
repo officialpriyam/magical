@@ -161,7 +161,7 @@ export function Preview({
   }
 
   return (
-    <div className="absolute md:relative z-10 top-0 left-0 shadow-2xl md:rounded-tl-3xl md:rounded-bl-3xl md:border-l md:border-y bg-popover h-full w-full overflow-auto">
+    <div className="absolute left-0 top-0 z-10 h-full w-full overflow-hidden border border-white/10 bg-[#151615] shadow-2xl md:relative md:m-3 md:ml-0 md:h-[calc(100vh-1.5rem)] md:rounded-2xl">
       <Tabs
         value={selectedTab}
         onValueChange={(value) => {
@@ -170,7 +170,7 @@ export function Preview({
         }}
         className="h-full flex flex-col items-start justify-start"
       >
-        <div className="w-full p-2 grid grid-cols-3 items-center border-b relative z-10">
+        <div className="relative z-10 grid w-full grid-cols-3 items-center border-b border-white/10 bg-white/[0.03] p-2">
           <TooltipProvider>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>

@@ -493,6 +493,7 @@ interface PromptInputBoxProps {
   onUseMorphApplyChange?: (value: boolean) => void
   chatMode?: ChatMode
   onChatModeChange?: (mode: ChatMode) => void
+  onStop?: () => void
 }
 type ChatMode = 'plan' | 'build'
 export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref: React.Ref<HTMLDivElement>) => {
@@ -504,7 +505,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       document.head.removeChild(styleSheet);
     };
   }, []);
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange, onStop } = props;
   const [input, setInput] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
@@ -953,30 +954,39 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
           >
             <Button
               variant="default"
-              size="icon"
+              size={isLoading || hasContent ? "default" : "icon"}
               className={cn(
-                "h-8 w-8 rounded-full transition-all duration-200",
-                isRecording
-                  ? "bg-transparent hover:bg-red-50 dark:hover:bg-muted/30 text-red-500 hover:text-red-400"
+                "h-8 rounded-full transition-all duration-200",
+                isLoading
+                  ? "gap-1.5 bg-red-500/15 px-3 text-red-200 hover:bg-red-500/25"
+                  : isRecording
+                  ? "bg-red-500/15 text-red-300 hover:bg-red-500/25"
                   : hasContent
-                  ? "bg-primary hover:bg-primary/80 text-primary-foreground"
-                  : "bg-transparent hover:bg-primary/5 dark:hover:bg-muted/30 text-muted-foreground hover:text-primary"
+                  ? "gap-1.5 bg-white text-black hover:bg-white/90 px-3"
+                  : "bg-white/[0.08] text-white/80 hover:bg-white/[0.14] hover:text-white"
               )}
               onClick={() => {
-                if (isRecording) setIsRecording(false);
+                if (isLoading) onStop?.();
+                else if (isRecording) setIsRecording(false);
                 else if (hasContent) handleSubmit();
                 else setIsRecording(true);
               }}
-              disabled={isLoading && !hasContent}
+              disabled={false}
             >
               {isLoading ? (
-                <Square className="h-4 w-4 fill-[#1F2023] animate-pulse" />
+                <>
+                  <Square className="h-3.5 w-3.5 fill-current animate-pulse" />
+                  <span className="text-xs font-semibold">Stop</span>
+                </>
               ) : isRecording ? (
                 <StopCircle className="h-5 w-5 text-red-500" />
               ) : hasContent ? (
-                <ArrowUp className="h-4 w-4 text-primary-foreground" />
+                <>
+                  <ArrowUp className="h-4 w-4" />
+                  <span className="text-xs font-semibold">Send</span>
+                </>
               ) : (
-                <Mic className="h-5 w-5 text-primary-foreground transition-colors" />
+                <Mic className="h-5 w-5 text-current transition-colors" />
               )}
             </Button>
           </PromptInputAction>

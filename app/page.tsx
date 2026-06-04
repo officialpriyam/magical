@@ -4,7 +4,6 @@ import { ViewType } from '@/components/auth';
 import { AuthDialog } from '@/components/auth-dialog';
 import { Chat } from '@/components/chat';
 import { PromptInputBox } from '@/components/ui/ai-prompt-box';
-import { NavBar } from '@/components/navbar';
 import { useAuth } from '@/lib/auth';
 import dynamic from 'next/dynamic';
 import { Project, saveMessage, getProjectMessages, generateProjectTitle, getProject, updateProject, getProjects } from '@/lib/database';
@@ -27,6 +26,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import models from '@/lib/models.json';
 import { invalidateCache } from '@/lib/caching';
 import type { GitHubWorkspace } from '@/components/github-save';
+import { Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo } from 'lucide-react';
 
 const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
@@ -981,17 +981,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setLanguageModel({ ...languageModel, ...e })
   }
 
-  function handleSocialClick(target: 'github' | 'x' | 'discord') {
-    if (target === 'github') {
-      window.open('https://github.com/priyx/magical-ai', '_blank')
-    } else if (target === 'x') {
-      window.open('https://x.com/priyx', '_blank')
-    }
-
-    // Enhanced social tracking
-    posthog.capture(`${target}_click`, { target })
-  }
-
   async function createNewChatProject({ navigate = true }: { navigate?: boolean } = {}) {
     if (!session) {
       setAuthDialog(true)
@@ -1330,10 +1319,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }
 
   const isDashboardMode =
+    !initialProjectId &&
+    !currentProject &&
     !isLoadingProject &&
     messages.length === 0 &&
     !fragment &&
     !isPreviewPanelOpen
+  const projectHeaderTitle = currentProject?.title || 'Magical AI'
+  const projectHeaderSubtitle = currentProjectGitHubWorkspace
+    ? `Synced to ${currentProjectGitHubWorkspace.fullName}`
+    : currentProject
+      ? 'Previewing last saved version'
+      : 'Sign in to open this chat'
   const displayName =
     session?.user.user_metadata?.name ||
     session?.user.user_metadata?.full_name ||
@@ -1345,6 +1342,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       isLoading={isPromptLoading}
       chatMode={chatMode}
       onChatModeChange={setChatMode}
+      onStop={handleStopGeneration}
       placeholder={
         chatMode === 'plan'
           ? 'Ask Magical AI to plan what to build...'
@@ -1360,6 +1358,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       baseURLConfigurable={!process.env.NEXT_PUBLIC_NO_BASE_URL_INPUT}
       useMorphApply={useMorphApply}
       onUseMorphApplyChange={setUseMorphApply}
+      className={!isDashboardMode ? "mb-0 border-white/10 bg-[#20211f] shadow-none" : undefined}
     />
   )
   const statusNotices = (
@@ -1408,34 +1407,89 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         />
       )}
 
-      <div className={cn(
-        "grid w-full md:grid-cols-2 transition-all duration-300"
-      )}>
+      <div
+        className={cn(
+          "grid min-w-0 flex-1 transition-all duration-300",
+          isDashboardMode
+            ? "w-full md:grid-cols-2"
+            : "w-full grid-cols-1 xl:grid-cols-[minmax(380px,480px)_minmax(0,1fr)]",
+        )}
+      >
         <div
           className={cn(
-            "relative flex flex-col w-full h-screen mx-auto px-4",
-            isDashboardMode ? "col-span-2 max-w-none p-4" : "max-w-[800px]",
-            fragment || isPreviewPanelOpen ? 'col-span-1' : 'col-span-2',
+            "relative flex h-screen w-full flex-col",
+            isDashboardMode
+              ? "col-span-2 mx-auto max-w-none p-4"
+              : "min-w-0 border-r border-white/10 bg-[#111211]",
+            isDashboardMode && (fragment || isPreviewPanelOpen ? 'col-span-1' : 'col-span-2'),
           )}
         >
           {!isDashboardMode && (
-            <NavBar
-              session={session}
-              showLogin={() => setAuthDialog(true)}
-              signOut={logout}
-              onSocialClick={handleSocialClick}
-              onClear={handleClearChat}
-              canClear={messages.length > 0}
-              canUndo={messages.length > 1 && !isPromptLoading}
-              onUndo={handleUndo}
-              onTogglePanel={() => {
-                setIsPreviewPanelOpen(!isPreviewPanelOpen)
-                if (!isPreviewPanelOpen) {
-                  setCurrentTab('ide')
-                }
-              }}
-              isPanelOpen={isPreviewPanelOpen || !!fragment}
-            />
+            <div className="flex h-[76px] shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-white">
+                  {projectHeaderTitle}
+                </div>
+                <div className="mt-0.5 truncate text-xs text-white/55">
+                  {projectHeaderSubtitle}
+                </div>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-1">
+                {currentProject && (
+                  <button
+                    type="button"
+                    onClick={handleToggleProjectVisibility}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 text-xs text-white/70 transition hover:bg-white/[0.08] hover:text-white"
+                    title={currentProject.is_public ? 'Public project' : 'Private project'}
+                  >
+                    {currentProject.is_public ? (
+                      <Globe2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <Lock className="h-3.5 w-3.5" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {currentProject.is_public ? 'Public' : 'Private'}
+                    </span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  disabled={messages.length <= 1 || isPromptLoading}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/65 transition hover:bg-white/[0.08] hover:text-white disabled:pointer-events-none disabled:opacity-35"
+                  title="Undo"
+                >
+                  <Undo className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearChat}
+                  disabled={messages.length === 0}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/65 transition hover:bg-white/[0.08] hover:text-white disabled:pointer-events-none disabled:opacity-35"
+                  title="Clear chat"
+                >
+                  <Trash className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPreviewPanelOpen(!isPreviewPanelOpen)
+                    if (!isPreviewPanelOpen) {
+                      setCurrentTab('ide')
+                    }
+                  }}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/65 transition hover:bg-white/[0.08] hover:text-white"
+                  title={isPreviewPanelOpen || !!fragment ? 'Close panel' : 'Open IDE panel'}
+                >
+                  {isPreviewPanelOpen || !!fragment ? (
+                    <PanelRightClose className="h-4 w-4" />
+                  ) : (
+                    <PanelRightOpen className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
           )}
 
           {isDashboardMode ? (
@@ -1526,29 +1580,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             </div>
           ) : (
             <>
-              <div className="relative mb-4 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                <HeroPillSecond />
-                {currentProject && (
-                  <button
-                    type="button"
-                    onClick={handleToggleProjectVisibility}
-                    className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition hover:bg-muted hover:text-primary sm:absolute sm:right-0"
-                  >
-                    <span
-                      className={cn(
-                        'h-2 w-2 rounded-full',
-                        currentProject.is_public ? 'bg-emerald-500' : 'bg-muted-foreground',
-                      )}
-                    />
-                    {currentProject.is_public ? 'Public project' : 'Private project'}
-                  </button>
-                )}
-              </div>
-
-              <div className="flex-grow overflow-y-auto">
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
                 {isLoadingProject ? (
-                  <div className="flex items-center justify-center h-32">
-                    <div className="text-muted-foreground">Loading project...</div>
+                  <div className="flex h-full items-center justify-center">
+                    <div className="text-sm text-white/55">Loading project...</div>
                   </div>
                 ) : (
                   <Chat
@@ -1563,7 +1598,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 )}
               </div>
 
-              <div className="space-y-4 mt-4">
+              <div className="shrink-0 space-y-3 border-t border-white/10 bg-[#111211] p-3">
                 {statusNotices}
                 {promptInput}
               </div>
