@@ -56,12 +56,71 @@ const availableIntegrations = [
   }
 ]
 
+type GitHubNotice = {
+  title: string
+  description: string
+  variant?: 'destructive'
+}
+
+const githubStatusMessages: Record<string, GitHubNotice> = {
+  connected: {
+    title: 'GitHub connected',
+    description: 'Private repositories and generated-code saves are enabled.',
+  },
+  invalid_state: {
+    title: 'GitHub connection expired',
+    description: 'Start the GitHub connection again from this page.',
+    variant: 'destructive',
+  },
+  login_required: {
+    title: 'Sign in required',
+    description: 'Sign in to Magical AI before connecting GitHub.',
+    variant: 'destructive',
+  },
+  not_configured: {
+    title: 'GitHub OAuth is not configured',
+    description: 'Add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in Vercel, then redeploy.',
+    variant: 'destructive',
+  },
+  access_denied: {
+    title: 'GitHub connection cancelled',
+    description: 'Approve the GitHub OAuth request to connect your account.',
+    variant: 'destructive',
+  },
+  authorization_failed: {
+    title: 'GitHub authorization failed',
+    description: 'Start the GitHub connection again and check the OAuth app settings.',
+    variant: 'destructive',
+  },
+  token_exchange_failed: {
+    title: 'GitHub token exchange failed',
+    description: 'Check the GitHub OAuth client secret and callback URL.',
+    variant: 'destructive',
+  },
+  user_lookup_failed: {
+    title: 'GitHub account lookup failed',
+    description: 'GitHub authorized the app, but account details could not be loaded.',
+    variant: 'destructive',
+  },
+  storage_failed: {
+    title: 'Could not save GitHub connection',
+    description: 'Run the Supabase user_integrations migration, then connect again.',
+    variant: 'destructive',
+  },
+  error: {
+    title: 'GitHub connection failed',
+    description: 'Check Vercel logs for the GitHub OAuth callback.',
+    variant: 'destructive',
+  },
+}
+
 export default function IntegrationsSettings() {
   const { session } = useAuth(() => {}, () => {})
   const { toast } = useToast()
   const handledGitHubStatusRef = useRef(false)
   
   const [integrations, setIntegrations] = useState<UserIntegration[]>([])
+  const [githubNotice, setGitHubNotice] = useState<GitHubNotice | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [connecting, setConnecting] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
@@ -132,60 +191,9 @@ export default function IntegrationsSettings() {
 
     handledGitHubStatusRef.current = true
 
-    const messages: Record<string, { title: string; description: string; variant?: 'destructive' }> = {
-      connected: {
-        title: 'GitHub connected',
-        description: 'Private repositories and generated-code saves are enabled.',
-      },
-      invalid_state: {
-        title: 'GitHub connection expired',
-        description: 'Start the GitHub connection again from this page.',
-        variant: 'destructive',
-      },
-      login_required: {
-        title: 'Sign in required',
-        description: 'Sign in to Magical AI before connecting GitHub.',
-        variant: 'destructive',
-      },
-      not_configured: {
-        title: 'GitHub OAuth is not configured',
-        description: 'Add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in Vercel.',
-        variant: 'destructive',
-      },
-      access_denied: {
-        title: 'GitHub connection cancelled',
-        description: 'Approve the GitHub OAuth request to connect your account.',
-        variant: 'destructive',
-      },
-      authorization_failed: {
-        title: 'GitHub authorization failed',
-        description: 'Start the GitHub connection again and check the OAuth app settings.',
-        variant: 'destructive',
-      },
-      token_exchange_failed: {
-        title: 'GitHub token exchange failed',
-        description: 'Check the GitHub OAuth client secret and callback URL.',
-        variant: 'destructive',
-      },
-      user_lookup_failed: {
-        title: 'GitHub account lookup failed',
-        description: 'GitHub authorized the app, but account details could not be loaded.',
-        variant: 'destructive',
-      },
-      storage_failed: {
-        title: 'Could not save GitHub connection',
-        description: 'Run the Supabase user_integrations migration, then connect again.',
-        variant: 'destructive',
-      },
-      error: {
-        title: 'GitHub connection failed',
-        description: 'Check Vercel logs for the GitHub OAuth callback.',
-        variant: 'destructive',
-      },
-    }
+    const message = githubStatusMessages[githubStatus] || githubStatusMessages.error
 
-    const message = messages[githubStatus] || messages.error
-
+    setGitHubNotice(message)
     toast(message)
 
     if (githubStatus === 'connected') {
@@ -349,6 +357,19 @@ export default function IntegrationsSettings() {
           Refresh
         </Button>
       </div>
+
+      {githubNotice && (
+        <div
+          className={`rounded-lg border p-4 text-sm ${
+            githubNotice.variant === 'destructive'
+              ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
+              : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+          }`}
+        >
+          <div className="font-medium">{githubNotice.title}</div>
+          <div className="mt-1 opacity-90">{githubNotice.description}</div>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
