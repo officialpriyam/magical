@@ -2,7 +2,7 @@ import { Message } from '@/lib/messages'
 import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
 import { DeepPartial } from 'ai'
-import { LoaderIcon, Terminal, Sparkles } from 'lucide-react'
+import { LoaderIcon, Terminal, Sparkles, Square } from 'lucide-react'
 import { useEffect } from 'react'
 
 export function Chat({
@@ -11,6 +11,7 @@ export function Chat({
   isPreviewLoading = false,
   currentFragment,
   autoFixMessage,
+  onStop,
   setCurrentPreview,
 }: {
   messages: Message[]
@@ -18,6 +19,7 @@ export function Chat({
   isPreviewLoading?: boolean
   currentFragment?: DeepPartial<FragmentSchema>
   autoFixMessage?: string
+  onStop?: () => void
   setCurrentPreview: (preview: {
     fragment: DeepPartial<FragmentSchema> | undefined
     result: ExecutionResult | undefined
@@ -95,6 +97,7 @@ export function Chat({
           isLoading={isLoading}
           isPreviewLoading={isPreviewLoading}
           autoFixMessage={autoFixMessage}
+          onStop={onStop}
         />
       )}
     </div>
@@ -107,12 +110,14 @@ function GenerationStatusCard({
   isLoading,
   isPreviewLoading,
   autoFixMessage,
+  onStop,
 }: {
   messages: Message[]
   currentFragment?: DeepPartial<FragmentSchema>
   isLoading: boolean
   isPreviewLoading: boolean
   autoFixMessage?: string
+  onStop?: () => void
 }) {
   const status = getGenerationStatus({
     messages,
@@ -126,9 +131,21 @@ function GenerationStatusCard({
 
   return (
     <div className="mx-4 mt-2 w-[calc(100%-2rem)] max-w-[36rem] rounded-2xl border bg-accent/70 px-4 py-3 shadow-sm dark:bg-white/5">
-      <div className="flex items-center gap-2 text-sm font-medium text-primary">
-        <Sparkles strokeWidth={2} className="h-4 w-4 animate-pulse text-[#FF8800]" />
-        <span className="min-w-0 break-words">{status.title}</span>
+      <div className="flex items-center justify-between gap-3 text-sm font-medium text-primary">
+        <div className="flex min-w-0 items-center gap-2">
+          <Sparkles strokeWidth={2} className="h-4 w-4 shrink-0 animate-pulse text-[#FF8800]" />
+          <span className="min-w-0 break-words">{status.title}</span>
+        </div>
+        {onStop && (
+          <button
+            type="button"
+            onClick={onStop}
+            className="flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-xs text-muted-foreground transition hover:bg-background hover:text-primary"
+          >
+            <Square className="h-3 w-3 fill-current" />
+            Stop
+          </button>
+        )}
       </div>
       <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
         <LoaderIcon strokeWidth={2} className="h-3.5 w-3.5 shrink-0 animate-spin" />

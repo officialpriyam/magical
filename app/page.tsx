@@ -19,7 +19,7 @@ import { DeepPartial } from 'ai';
 import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { useRouter } from 'next/navigation';
 import { usePostHog } from 'posthog-js/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
@@ -147,6 +147,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const githubSyncTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const restoringProjectRef = useRef('')
   const skipNextWorkspaceRestoreRef = useRef('')
+  const planAbortControllerRef = useRef<AbortController | null>(null)
   const autoFixAttemptsRef = useRef(0)
   const lastAutoFixSignatureRef = useRef('')
   const skipNextProjectMessagesLoadRef = useRef('')
@@ -175,6 +176,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
+  const [magicCursor, setMagicCursor] = useState({ x: 50, y: 24 })
   const [isLoadingProject, setIsLoadingProject] = useState(false)
   const [chatHistoryRefreshKey, setChatHistoryRefreshKey] = useState(0)
   const [projectMessagesRefreshKey, setProjectMessagesRefreshKey] = useState(0)
@@ -191,6 +193,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     const syncTimers = githubSyncTimersRef.current
 
     return () => {
+      planAbortControllerRef.current?.abort()
       Object.values(syncTimers).forEach(clearTimeout)
     }
   }, [])
@@ -754,6 +757,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   async function submitPlanResponse(updatedMessages: Message[]) {
     setIsPlanLoading(true)
+    const abortController = new AbortController()
+    planAbortControllerRef.current = abortController
 
     try {
       const response = await fetch('/api/chat/plan', {
@@ -761,6 +766,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: abortController.signal,
         body: JSON.stringify({
           userID: session?.user?.id,
           teamID: userTeam?.id,
@@ -788,11 +794,26 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       messagesRef.current = nextMessages
       setMessages(nextMessages)
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
       console.error('Plan mode request failed:', error)
       setErrorMessage(error instanceof Error ? error.message : 'Plan mode failed.')
     } finally {
+      if (planAbortControllerRef.current === abortController) {
+        planAbortControllerRef.current = null
+      }
       setIsPlanLoading(false)
     }
+  }
+
+  function handleStopGeneration() {
+    planAbortControllerRef.current?.abort()
+    planAbortControllerRef.current = null
+    stop()
+    setIsPlanLoading(false)
+    setIsPreviewLoading(false)
+    setAutoFixMessage('')
   }
 
   async function handleSendPrompt(message: string, files: File[] = [], mode: ChatMode = chatMode) {
@@ -1057,6 +1078,28 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }
 
+  async function handleToggleProjectVisibility() {
+    if (!currentProject) return
+
+    const nextVisibility = !currentProject.is_public
+    const updated = await updateProject(supabase, currentProject.id, {
+      is_public: nextVisibility,
+    })
+
+    if (!updated) {
+      setErrorMessage('Could not update project visibility.')
+      return
+    }
+
+    setCurrentProject({
+      ...currentProject,
+      is_public: nextVisibility,
+      updated_at: new Date().toISOString(),
+    })
+    invalidateCache(new RegExp(`^projects:${session?.user?.id}:`))
+    setChatHistoryRefreshKey((key) => key + 1)
+  }
+
   function scheduleGitHubFileSync(path: string, content: string) {
     const workspace = currentProject ? getProjectGitHubWorkspace(currentProject) : null
 
@@ -1245,6 +1288,14 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setIsPricingModalOpen(true)
   }
 
+  function handleMagicPointerMove(event: PointerEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect()
+    setMagicCursor({
+      x: ((event.clientX - rect.left) / rect.width) * 100,
+      y: ((event.clientY - rect.top) / rect.height) * 100,
+    })
+  }
+
   const isDashboardMode =
     !isLoadingProject &&
     messages.length === 0 &&
@@ -1283,7 +1334,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       {autoFixMessage && (
         <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-600 dark:text-amber-400 text-sm">
           <span>{autoFixMessage}</span>
-          <button onClick={stop} className="ml-4 p-1 rounded-md hover:bg-amber-500/20">Stop</button>
+          <button onClick={handleStopGeneration} className="ml-4 p-1 rounded-md hover:bg-amber-500/20">Stop</button>
         </div>
       )}
       {(error || errorMessage) && (
@@ -1334,7 +1385,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             fragment || isPreviewPanelOpen ? 'col-span-1' : 'col-span-2',
           )}
         >
-          {(!isDashboardMode || !session) && (
+          {!isDashboardMode && (
             <NavBar
               session={session}
               showLogin={() => setAuthDialog(true)}
@@ -1355,9 +1406,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           )}
 
           {isDashboardMode ? (
-            <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-white/10 bg-[#111113] text-white shadow-2xl">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-15%,rgba(255,255,255,0.16),transparent_24%),linear-gradient(180deg,rgba(45,91,178,0.86)_0%,rgba(116,114,248,0.82)_34%,rgba(246,82,188,0.96)_64%,rgba(255,26,82,0.98)_100%)]" />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,8,9,0.28),rgba(8,8,9,0)_48%,rgba(8,8,9,0.2))]" />
+            <div
+              className="relative flex min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b0d0b] text-white shadow-2xl"
+              onPointerMove={handleMagicPointerMove}
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,196,87,0.30),transparent_28%),radial-gradient(circle_at_18%_75%,rgba(40,127,96,0.20),transparent_28%),linear-gradient(180deg,#151913_0%,#0b0d0b_52%,#100d08_100%)]" />
+              <div
+                className="pointer-events-none absolute inset-0 opacity-90 transition-opacity duration-200"
+                style={{
+                  background: `radial-gradient(circle at ${magicCursor.x}% ${magicCursor.y}%, rgba(255, 219, 122, 0.34), rgba(255, 176, 65, 0.12) 12%, transparent 26%)`,
+                }}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,8,9,0.16),rgba(8,8,9,0)_48%,rgba(8,8,9,0.24))]" />
 
               <div className="relative z-10 flex w-full flex-col">
                 <div className="flex flex-1 flex-col items-center justify-center px-4 pt-16 text-center">
@@ -1367,13 +1427,22 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   <h1 className="mb-7 max-w-3xl text-3xl font-semibold tracking-normal text-white md:text-4xl">
                     Let&apos;s build something, {displayName}
                   </h1>
+                  {!session && (
+                    <button
+                      type="button"
+                      onClick={() => setAuthDialog(true)}
+                      className="mb-5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+                    >
+                      Sign in to save chats
+                    </button>
+                  )}
                   <div className="w-full max-w-2xl">
                     {statusNotices}
                     {promptInput}
                   </div>
                 </div>
 
-                <div className="mx-auto mt-8 w-[calc(100%-3rem)] max-w-7xl rounded-t-[1.5rem] border border-white/10 bg-[#130d10]/90 p-5 shadow-2xl backdrop-blur-md">
+                <div className="mx-auto mt-8 w-[calc(100%-3rem)] max-w-7xl rounded-t-[1.5rem] border border-white/10 bg-[#100f0b]/90 p-5 shadow-2xl backdrop-blur-md">
                   <div className="mb-5 flex items-center justify-between gap-4">
                     <div className="flex min-w-0 items-center gap-2 overflow-hidden rounded-full border border-white/10 bg-white/5 p-1 text-xs text-white/60">
                       <span className="rounded-full bg-white/15 px-3 py-1 text-white">My projects</span>
@@ -1408,6 +1477,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                           <div className="mt-4 text-xs text-white/65">
                             {workspace ? workspace.fullName : 'Local project'}
                           </div>
+                          <div className="mt-3 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/60">
+                            {project.is_public ? 'Public' : 'Private'}
+                          </div>
                         </button>
                       )
                     }) : (
@@ -1421,8 +1493,23 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             </div>
           ) : (
             <>
-              <div className="flex justify-center mb-4">
+              <div className="relative mb-4 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                 <HeroPillSecond />
+                {currentProject && (
+                  <button
+                    type="button"
+                    onClick={handleToggleProjectVisibility}
+                    className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition hover:bg-muted hover:text-primary sm:absolute sm:right-0"
+                  >
+                    <span
+                      className={cn(
+                        'h-2 w-2 rounded-full',
+                        currentProject.is_public ? 'bg-emerald-500' : 'bg-muted-foreground',
+                      )}
+                    />
+                    {currentProject.is_public ? 'Public project' : 'Private project'}
+                  </button>
+                )}
               </div>
 
               <div className="flex-grow overflow-y-auto">
@@ -1437,6 +1524,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     isPreviewLoading={isPreviewLoading}
                     currentFragment={fragment}
                     autoFixMessage={autoFixMessage}
+                    onStop={handleStopGeneration}
                     setCurrentPreview={setCurrentPreview}
                   />
                 )}

@@ -20,7 +20,6 @@ import {
 import { Session } from '@supabase/supabase-js'
 import { ArrowRight, LogOut, Trash, Undo, Settings, Menu, PanelRightOpen, PanelRightClose } from 'lucide-react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { ThemeToggle } from './theme-toggle'
 
 export function NavBar({
@@ -122,20 +121,6 @@ export function NavBar({
                 </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  window.open('/', '_self')
-                }}
-              >
-                <Image
-                  src="/icon.png"
-                  width={16}
-                  height={16}
-                  className="mr-2 text-muted-foreground"
-                  alt={''}
-                />
-                About Magical AI
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onSocialClick('github')}>
                 <GitHubLogoIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                 Star on GitHub
