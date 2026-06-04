@@ -65,6 +65,11 @@
 @layer base {
   * {
     border-color: hsl(var(--border));
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
   }
   body {
     background-color: hsl(var(--background));
