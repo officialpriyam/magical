@@ -18,7 +18,7 @@ import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
 import { DeepPartial } from 'ai'
 import { ChevronsRight, LoaderCircle, Terminal, Code, FileCode, FolderTree, Folder } from 'lucide-react'
-import { Dispatch, SetStateAction, useState } from 'react'
+import { Dispatch, SetStateAction, useEffect, useState } from 'react'
 
 export function Preview({
   teamID,
@@ -28,6 +28,7 @@ export function Preview({
   isChatLoading,
   isPreviewLoading,
   fragment,
+  projectTitle,
   result,
   onClose,
   code,
@@ -43,15 +44,21 @@ export function Preview({
   isChatLoading: boolean
   isPreviewLoading: boolean
   fragment?: DeepPartial<FragmentSchema>
+  projectTitle?: string
   result?: ExecutionResult
   onClose: () => void
   code?: string
   selectedFile?: { path: string; content: string } | null
-  onSelectFile?: (file: { path: string; content: string }) => void
+  onSelectFile?: (file: { path: string; content: string } | null) => void
   onSave?: (path: string, content: string) => Promise<void>
   executeCode?: (code: string) => Promise<any>
 }) {
   const [isRefreshingFiles, setIsRefreshingFiles] = useState(false)
+  const [sandboxFiles, setSandboxFiles] = useState(result?.files || [])
+
+  useEffect(() => {
+    setSandboxFiles(result?.files || [])
+  }, [result?.files, result?.sbxId])
 
   async function handleSelectSandboxFile(path: string) {
     if (!result?.sbxId) return
@@ -82,13 +89,59 @@ export function Preview({
       const data = await response.json()
 
       if (response.ok && data.files) {
-        // Files refreshed - this would need to update result.files in parent
-        console.log('Files refreshed:', data.files)
+        setSandboxFiles(data.files)
       }
     } catch (error) {
       console.error('Error refreshing files:', error)
     } finally {
       setIsRefreshingFiles(false)
+    }
+  }
+
+  async function handleRenameSandboxFile(oldPath: string, newPath: string) {
+    if (!result?.sbxId) return
+
+    try {
+      const response = await fetch(`/api/sandbox/${result.sbxId}/files/content`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ oldPath, newPath }),
+      })
+
+      if (response.ok) {
+        await handleRefreshFiles()
+        if (selectedFile?.path === oldPath && onSelectFile) {
+          onSelectFile({ path: newPath, content: selectedFile.content })
+        }
+      }
+    } catch (error) {
+      console.error('Error renaming sandbox file:', error)
+    }
+  }
+
+  async function handleDeleteSandboxFile(path: string) {
+    if (!result?.sbxId) return
+
+    try {
+      const response = await fetch(`/api/sandbox/${result.sbxId}/files/content`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ path }),
+      })
+
+      if (response.ok) {
+        await handleRefreshFiles()
+        if (selectedFile?.path === path && onSelectFile) {
+          onSelectFile(null)
+          onSelectedTabChange('files')
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting sandbox file:', error)
     }
   }
 
@@ -170,7 +223,7 @@ export function Preview({
                 Editor
               </TabsTrigger>
               <TabsTrigger
-                disabled={!result || !result.files || result.files.length === 0}
+                disabled={!result || sandboxFiles.length === 0}
                 className="font-normal text-xs py-1 px-2 gap-1 flex items-center"
                 value="files"
               >
@@ -187,7 +240,12 @@ export function Preview({
             </TabsList>
           </div>
           <div className="flex items-center justify-end gap-2">
-            <GitHubSave fragment={fragment} result={result} />
+            <GitHubSave
+              fragment={fragment}
+              result={result}
+              projectTitle={projectTitle}
+              sandboxFiles={sandboxFiles}
+            />
           </div>
         </div>
         <div className="overflow-y-auto w-full h-full">
@@ -268,10 +326,12 @@ export function Preview({
               )}
             </TabsContent>
             <TabsContent value="files" className="h-full">
-              {result && result.files && result.files.length > 0 ? (
+              {result && sandboxFiles.length > 0 ? (
                 <SandboxFileTree
-                  files={result.files}
+                  files={sandboxFiles}
                   onSelectFile={handleSelectSandboxFile}
+                  onRenameFile={handleRenameSandboxFile}
+                  onDeleteFile={handleDeleteSandboxFile}
                   onRefresh={handleRefreshFiles}
                   isLoading={isRefreshingFiles}
                 />
@@ -283,7 +343,7 @@ export function Preview({
             </TabsContent>
             <TabsContent value="ide" className="h-full m-0 p-0">
               <div className="h-full w-full">
-                <IDE />
+                <IDE sandboxId={result?.sbxId} />
               </div>
             </TabsContent>
           </div>

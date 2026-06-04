@@ -83,6 +83,72 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ sbxId: string }> }
+) {
+  try {
+    const { sbxId } = await params
+    const { oldPath, newPath } = await req.json()
+
+    if (!sbxId) {
+      return jsonResponse({ error: 'Missing sandbox ID' }, 400)
+    }
+
+    if (!oldPath || !newPath) {
+      return jsonResponse({ error: 'Missing old path or new path' }, 400)
+    }
+
+    if (!process.env.E2B_API_KEY) {
+      return jsonResponse({ error: 'E2B_API_KEY not configured' }, 503)
+    }
+
+    const sbx = await Sandbox.connect(sbxId)
+    await sbx.files.rename(toSandboxRelativePath(oldPath), toSandboxRelativePath(newPath))
+
+    return jsonResponse({ success: true, path: newPath })
+  } catch (error: any) {
+    console.error('Error renaming sandbox file:', error)
+    return jsonResponse({
+      error: 'Failed to rename file',
+      details: error?.message || 'Unknown error',
+    }, 500)
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ sbxId: string }> }
+) {
+  try {
+    const { sbxId } = await params
+    const { path: filePath } = await req.json()
+
+    if (!sbxId) {
+      return jsonResponse({ error: 'Missing sandbox ID' }, 400)
+    }
+
+    if (!filePath) {
+      return jsonResponse({ error: 'Missing file path' }, 400)
+    }
+
+    if (!process.env.E2B_API_KEY) {
+      return jsonResponse({ error: 'E2B_API_KEY not configured' }, 503)
+    }
+
+    const sbx = await Sandbox.connect(sbxId)
+    await sbx.files.remove(toSandboxRelativePath(filePath))
+
+    return jsonResponse({ success: true })
+  } catch (error: any) {
+    console.error('Error deleting sandbox file:', error)
+    return jsonResponse({
+      error: 'Failed to delete file',
+      details: error?.message || 'Unknown error',
+    }, 500)
+  }
+}
+
 /**
  * POST /api/sandbox/[sbxId]/files/content
  * Writes content to a specific file in an E2B sandbox
@@ -155,4 +221,24 @@ export async function POST(
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
+}
+
+function toSandboxRelativePath(filePath: string) {
+  const userDir = '/home/user'
+  const normalizedPath = filePath.startsWith(userDir)
+    ? path.normalize(filePath)
+    : path.normalize(path.join(userDir, filePath))
+
+  if (!normalizedPath.startsWith(userDir + '/') && normalizedPath !== userDir) {
+    throw new Error('Access denied: Invalid path')
+  }
+
+  return normalizedPath === userDir ? '' : normalizedPath.substring(userDir.length + 1)
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }

@@ -1139,6 +1139,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           isChatLoading={isLoading}
           isPreviewLoading={isPreviewLoading}
           fragment={fragment}
+          projectTitle={currentProject?.title}
           result={result as ExecutionResult}
           onClose={() => {
             setFragment(undefined)

@@ -47,24 +47,32 @@ type SaveFile = {
 export function GitHubSave({
   fragment,
   result,
+  projectTitle,
+  sandboxFiles,
 }: {
   fragment?: DeepPartial<FragmentSchema>
   result?: ExecutionResult
+  projectTitle?: string
+  sandboxFiles?: FileSystemNode[]
 }) {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<GitHubStatus | null>(null)
   const [repositories, setRepositories] = useState<GitHubRepo[]>([])
+  const [saveMode, setSaveMode] = useState<'new' | 'existing'>('new')
   const [selectedRepo, setSelectedRepo] = useState('')
+  const [newRepoName, setNewRepoName] = useState('')
+  const [newRepoVisibility, setNewRepoVisibility] = useState<'private' | 'public'>('private')
   const [branch, setBranch] = useState('main')
   const [pathPrefix, setPathPrefix] = useState('')
   const [message, setMessage] = useState('Save generated code from Magical AI')
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
+  const generatedFiles = sandboxFiles || result?.files || []
   const hasGeneratedFiles = useMemo(
-    () => Boolean(fragment?.code || (result?.sbxId && result.files?.length)),
-    [fragment?.code, result?.files?.length, result?.sbxId],
+    () => Boolean(fragment?.code || (result?.sbxId && generatedFiles.length)),
+    [fragment?.code, generatedFiles.length, result?.sbxId],
   )
 
   const loadGitHub = useCallback(async () => {
@@ -131,21 +139,64 @@ export function GitHubSave({
   useEffect(() => {
     if (!open) return
 
+    setNewRepoName((current) => current || getDefaultRepoName(projectTitle || fragment?.title))
     loadGitHub()
-  }, [loadGitHub, open])
+  }, [fragment?.title, loadGitHub, open, projectTitle])
 
   async function saveToGitHub() {
-    if (!selectedRepo) return
+    if (saveMode === 'existing' && !selectedRepo) return
+    if (saveMode === 'new' && !newRepoName.trim()) return
 
     setIsSaving(true)
 
     try {
       const files = await collectFiles()
-      const [owner, repo] = selectedRepo.split('/')
+      let targetRepo = selectedRepo
+      let targetBranch = branch
 
       if (files.length === 0) {
         throw new Error('No generated files to save')
       }
+
+      if (saveMode === 'new') {
+        const createResponse = await fetch('/api/github/repos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: newRepoName,
+            private: newRepoVisibility === 'private',
+            description: `${projectTitle || fragment?.title || 'Generated project'} created by Magical AI`,
+          }),
+        })
+        const createdRepo = await createResponse.json()
+
+        if (!createResponse.ok) {
+          throw new Error(createdRepo.error || 'Failed to create GitHub repository')
+        }
+
+        targetRepo = createdRepo.full_name
+        targetBranch = createdRepo.default_branch || branch || 'main'
+        setSelectedRepo(targetRepo)
+        setRepositories((repos) => {
+          if (repos.some((repo) => repo.full_name === targetRepo)) {
+            return repos
+          }
+
+          return [
+            {
+              id: createdRepo.id,
+              full_name: createdRepo.full_name,
+              name: createdRepo.name,
+              private: Boolean(createdRepo.private),
+            },
+            ...repos,
+          ].sort((a, b) => a.full_name.localeCompare(b.full_name))
+        })
+      }
+
+      const [owner, repo] = targetRepo.split('/')
 
       const response = await fetch(`/api/github/repos/${owner}/${repo}/save`, {
         method: 'POST',
@@ -153,7 +204,7 @@ export function GitHubSave({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          branch,
+          branch: targetBranch,
           message,
           files,
         }),
@@ -167,7 +218,7 @@ export function GitHubSave({
 
       toast({
         title: 'Saved to GitHub',
-        description: `${data.committed} file${data.committed === 1 ? '' : 's'} committed to ${selectedRepo}.`,
+        description: `${data.committed} file${data.committed === 1 ? '' : 's'} committed to ${targetRepo}.`,
       })
       setOpen(false)
     } catch (error) {
@@ -183,8 +234,8 @@ export function GitHubSave({
   }
 
   async function collectFiles(): Promise<SaveFile[]> {
-    if (result?.sbxId && result.files?.length) {
-      const nodes = flattenFileNodes(result.files)
+    if (result?.sbxId && generatedFiles.length) {
+      const nodes = flattenFileNodes(generatedFiles)
       const files: SaveFile[] = []
 
       for (const node of nodes.slice(0, 100)) {
@@ -252,6 +303,50 @@ export function GitHubSave({
           </div>
         ) : status?.connected ? (
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={saveMode === 'new' ? 'default' : 'outline'}
+                onClick={() => setSaveMode('new')}
+              >
+                New repository
+              </Button>
+              <Button
+                type="button"
+                variant={saveMode === 'existing' ? 'default' : 'outline'}
+                onClick={() => setSaveMode('existing')}
+              >
+                Existing repository
+              </Button>
+            </div>
+            {saveMode === 'new' ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="github-new-repo">Repository name</Label>
+                  <Input
+                    id="github-new-repo"
+                    value={newRepoName}
+                    onChange={(event) => setNewRepoName(event.target.value)}
+                    placeholder="my-magical-project"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Visibility</Label>
+                  <Select
+                    value={newRepoVisibility}
+                    onValueChange={(value) => setNewRepoVisibility(value as 'private' | 'public')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="private">Private</SelectItem>
+                      <SelectItem value="public">Public</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
             <div className="space-y-2">
               <Label>Repository</Label>
               <Select value={selectedRepo} onValueChange={setSelectedRepo}>
@@ -267,6 +362,7 @@ export function GitHubSave({
                 </SelectContent>
               </Select>
             </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="github-branch">Branch</Label>
@@ -313,15 +409,34 @@ export function GitHubSave({
             Cancel
           </Button>
           {status?.connected && (
-            <Button onClick={saveToGitHub} disabled={isSaving || !selectedRepo}>
+            <Button
+              onClick={saveToGitHub}
+              disabled={
+                isSaving ||
+                (saveMode === 'existing' && !selectedRepo) ||
+                (saveMode === 'new' && !newRepoName.trim())
+              }
+            >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save
+              {saveMode === 'new' ? 'Create repo and save' : 'Save'}
             </Button>
           )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
+}
+
+function getDefaultRepoName(value?: string) {
+  const base = value || 'magical-ai-project'
+
+  return base
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9._-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 80) || 'magical-ai-project'
 }
 
 function flattenFileNodes(nodes: FileSystemNode[]): FileSystemNode[] {

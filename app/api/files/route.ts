@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import {
+  getWorkspaceFileParts,
   isMissingWorkspaceTableError,
   normalizeWorkspacePath,
   toWorkspaceFileRow,
@@ -189,6 +190,103 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error in DELETE /api/files:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const oldPath = typeof body.oldPath === 'string' ? normalizeWorkspacePath(body.oldPath) : ''
+    const newPath = typeof body.newPath === 'string' ? normalizeWorkspacePath(body.newPath) : ''
+
+    if (!oldPath || !newPath) {
+      return NextResponse.json({ error: 'Old path and new path are required' }, { status: 400 })
+    }
+
+    if (oldPath === newPath) {
+      return NextResponse.json({ success: true, path: newPath })
+    }
+
+    if (newPath.startsWith(`${oldPath}/`)) {
+      return NextResponse.json(
+        { error: 'A folder cannot be renamed inside itself.' },
+        { status: 400 },
+      )
+    }
+
+    const supabase = await createServerClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { data: rows, error: fetchError } = await supabase
+      .from('workspace_files')
+      .select('id, path')
+      .eq('user_id', user.id)
+
+    if (fetchError) {
+      if (isMissingWorkspaceTableError(fetchError)) {
+        return NextResponse.json(
+          { error: 'Workspace file table is not created. Run the Supabase workspace_files migration.' },
+          { status: 503 },
+        )
+      }
+
+      console.error('Error finding workspace files to rename:', fetchError)
+      return NextResponse.json({ error: 'Failed to rename file' }, { status: 500 })
+    }
+
+    const affectedRows = (rows || []).filter(
+      (row: any) => row.path === oldPath || row.path.startsWith(`${oldPath}/`),
+    )
+
+    if (affectedRows.length === 0) {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 })
+    }
+
+    const affectedIds = new Set(affectedRows.map((row: any) => row.id))
+    const targetConflict = (rows || []).some(
+      (row: any) =>
+        !affectedIds.has(row.id) &&
+        (row.path === newPath || row.path.startsWith(`${newPath}/`)),
+    )
+
+    if (targetConflict) {
+      return NextResponse.json(
+        { error: 'A file or folder already exists at the target path.' },
+        { status: 409 },
+      )
+    }
+
+    for (const row of affectedRows) {
+      const renamedPath = row.path === oldPath
+        ? newPath
+        : `${newPath}/${row.path.slice(oldPath.length + 1)}`
+      const parts = getWorkspaceFileParts(renamedPath)
+
+      const { error } = await supabase
+        .from('workspace_files')
+        .update({
+          path: parts.path,
+          name: parts.name,
+          parent_path: parts.parentPath,
+          updated_at: new Date().toISOString(),
+        } as never)
+        .eq('id', row.id)
+
+      if (error) {
+        console.error('Error renaming workspace file:', error)
+        return NextResponse.json({ error: 'Failed to rename file' }, { status: 500 })
+      }
+    }
+
+    return NextResponse.json({ success: true, path: newPath })
+  } catch (error) {
+    console.error('Error in PATCH /api/files:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

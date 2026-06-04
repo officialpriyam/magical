@@ -136,9 +136,25 @@ export function IDE({ sandboxId }: IDEProps = {}) {
   }
 
   async function handleDeleteFile(path: string) {
-    // File deletion in sandbox mode is not supported via this UI
-    if (isSandboxMode) {
-      console.log('File deletion in sandbox mode not supported')
+    if (isSandboxMode && sandboxId) {
+      try {
+        const response = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ path }),
+        })
+
+        if (response.ok) {
+          await fetchFiles()
+          if (selectedFile?.path === path) {
+            setSelectedFile(null)
+          }
+        }
+      } catch (error) {
+        console.error('Error deleting sandbox file:', error)
+      }
       return
     }
 
@@ -161,6 +177,51 @@ export function IDE({ sandboxId }: IDEProps = {}) {
       }
     } catch (error) {
       console.error('Error deleting file:', error)
+    }
+  }
+
+  async function handleRenameFile(oldPath: string, newPath: string) {
+    if (isSandboxMode && sandboxId) {
+      try {
+        const response = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ oldPath, newPath }),
+        })
+
+        if (response.ok) {
+          await fetchFiles()
+          if (selectedFile?.path === oldPath) {
+            setSelectedFile({ path: newPath, content: selectedFile.content })
+          }
+        }
+      } catch (error) {
+        console.error('Error renaming sandbox file:', error)
+      }
+      return
+    }
+
+    if (!session) return
+
+    try {
+      const response = await fetch('/api/files', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ oldPath, newPath }),
+      })
+
+      if (response.ok) {
+        await fetchFiles()
+        if (selectedFile?.path === oldPath) {
+          setSelectedFile({ path: newPath, content: selectedFile.content })
+        }
+      }
+    } catch (error) {
+      console.error('Error renaming file:', error)
     }
   }
 
@@ -215,8 +276,9 @@ export function IDE({ sandboxId }: IDEProps = {}) {
         <FileTree 
           files={files} 
           onSelectFile={handleSelectFile}
-          onCreateFile={handleCreateFile}
+          onCreateFile={isSandboxMode ? undefined : handleCreateFile}
           onDeleteFile={handleDeleteFile}
+          onRenameFile={handleRenameFile}
         />
       </div>
       <div className="w-3/4">
