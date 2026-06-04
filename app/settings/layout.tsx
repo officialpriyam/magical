@@ -1,11 +1,10 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { MagicalPageShell } from '@/components/magical-page-shell'
 import { cn } from '@/lib/utils'
 import { 
   User, 
-  Palette, 
-  CreditCard, 
   Shield, 
   Settings as SettingsIcon,
   ChevronLeft,
@@ -45,20 +44,19 @@ export default function SettingsLayout({
   const pathname = usePathname()
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6">
+    <MagicalPageShell contentClassName="container mx-auto px-4 py-6">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="border border-white/10 bg-white/5 text-white hover:bg-white/10">
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-semibold">Settings</h1>
+          <h1 className="text-2xl font-semibold text-white">Settings</h1>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-1">
-            <nav className="space-y-1">
+            <nav className="space-y-1 rounded-lg border border-white/10 bg-white/[0.04] p-2 backdrop-blur">
               {settingsNavigation.map((item) => {
                 const isActive = pathname === item.href
                 return (
@@ -68,8 +66,8 @@ export default function SettingsLayout({
                     className={cn(
                       'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                       isActive
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                        ? 'bg-white/[0.12] text-white'
+                        : 'text-white/60 hover:text-white hover:bg-white/[0.08]'
                     )}
                   >
                     <item.icon className="h-4 w-4" />
@@ -84,7 +82,6 @@ export default function SettingsLayout({
             {children}
           </div>
         </div>
-      </div>
-    </div>
+    </MagicalPageShell>
   )
 }

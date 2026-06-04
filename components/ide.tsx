@@ -11,9 +11,19 @@ import Spinner from './ui/spinner'
 
 interface IDEProps {
   sandboxId?: string // Optional sandbox ID for viewing sandbox files
+  onSave?: (path: string, content: string) => Promise<void>
+  githubSaveRequired?: boolean
+  githubWorkspaceConnected?: boolean
+  onSaveBlocked?: () => void
 }
 
-export function IDE({ sandboxId }: IDEProps = {}) {
+export function IDE({
+  sandboxId,
+  onSave,
+  githubSaveRequired = false,
+  githubWorkspaceConnected = false,
+  onSaveBlocked,
+}: IDEProps = {}) {
   const { session, loading } = useAuth(() => {}, () => {})
   const [files, setFiles] = useState<FileSystemNode[]>([])
   const [selectedFile, setSelectedFile] = useState<{
@@ -22,6 +32,11 @@ export function IDE({ sandboxId }: IDEProps = {}) {
   } | null>(null)
   const [showGitHubImport, setShowGitHubImport] = useState(false)
   const isSandboxMode = !!sandboxId
+  const isGitHubSaveBlocked = githubSaveRequired && !githubWorkspaceConnected
+
+  function blockGitHubSave() {
+    onSaveBlocked?.()
+  }
 
   const fetchFiles = useCallback(async () => {
     if (isSandboxMode && sandboxId) {
@@ -86,6 +101,17 @@ export function IDE({ sandboxId }: IDEProps = {}) {
   }
 
   async function handleSaveFile(path: string, content: string) {
+    if (isGitHubSaveBlocked) {
+      blockGitHubSave()
+      return
+    }
+
+    if (onSave) {
+      await onSave(path, content)
+      setSelectedFile({ path, content })
+      return
+    }
+
     if (isSandboxMode && sandboxId) {
       // Save file to sandbox
       await fetch(`/api/sandbox/${sandboxId}/files/content`, {
@@ -108,6 +134,11 @@ export function IDE({ sandboxId }: IDEProps = {}) {
   }
 
   async function handleCreateFile(path: string, isDirectory: boolean) {
+    if (isGitHubSaveBlocked) {
+      blockGitHubSave()
+      return
+    }
+
     // File creation in sandbox mode is not supported via this UI
     if (isSandboxMode) {
       console.log('File creation in sandbox mode not supported')
@@ -116,6 +147,14 @@ export function IDE({ sandboxId }: IDEProps = {}) {
 
     if (!session) return
     try {
+      const content = isDirectory ? '' : '// New file\n'
+
+      if (onSave && !isDirectory) {
+        await onSave(path, content)
+        await fetchFiles()
+        return
+      }
+
       const response = await fetch('/api/files', {
         method: 'POST',
         headers: {
@@ -124,7 +163,7 @@ export function IDE({ sandboxId }: IDEProps = {}) {
         body: JSON.stringify({
           path,
           isDirectory,
-          content: isDirectory ? '' : '// New file\n'
+          content,
         }),
       })
       if (response.ok) {
@@ -136,6 +175,11 @@ export function IDE({ sandboxId }: IDEProps = {}) {
   }
 
   async function handleDeleteFile(path: string) {
+    if (isGitHubSaveBlocked) {
+      blockGitHubSave()
+      return
+    }
+
     if (isSandboxMode && sandboxId) {
       try {
         const response = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
@@ -181,6 +225,11 @@ export function IDE({ sandboxId }: IDEProps = {}) {
   }
 
   async function handleRenameFile(oldPath: string, newPath: string) {
+    if (isGitHubSaveBlocked) {
+      blockGitHubSave()
+      return
+    }
+
     if (isSandboxMode && sandboxId) {
       try {
         const response = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
@@ -283,12 +332,26 @@ export function IDE({ sandboxId }: IDEProps = {}) {
       </div>
       <div className="w-3/4">
         {selectedFile ? (
-          <CodeEditor
-            key={selectedFile.path}
-            code={selectedFile.content}
-            lang={selectedFile.path.split('.').pop() || 'typescript'}
-            onChange={(content) => handleSaveFile(selectedFile.path, content || '')}
-          />
+          isGitHubSaveBlocked ? (
+            <div className="flex h-full items-center justify-center p-6 text-center">
+              <div className="max-w-sm space-y-3 rounded-lg border bg-background/70 p-5 shadow-sm">
+                <div className="text-sm font-medium">GitHub save required</div>
+                <p className="text-sm text-muted-foreground">
+                  Save this project to GitHub before editing files. Use the Save to GitHub button in the preview toolbar.
+                </p>
+                <Button type="button" variant="outline" size="sm" onClick={blockGitHubSave}>
+                  Use Save to GitHub
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <CodeEditor
+              key={selectedFile.path}
+              code={selectedFile.content}
+              lang={selectedFile.path.split('.').pop() || 'typescript'}
+              onChange={(content) => handleSaveFile(selectedFile.path, content || '')}
+            />
+          )
         ) : (
           <div className="flex items-center justify-center h-full">
             <p>Select a file to view its content</p>

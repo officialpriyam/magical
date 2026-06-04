@@ -30,6 +30,9 @@ export function Preview({
   fragment,
   projectTitle,
   onGitHubWorkspaceSaved,
+  githubSaveRequired = false,
+  isGitHubWorkspaceConnected = false,
+  onSaveBlocked,
   result,
   onClose,
   code,
@@ -47,6 +50,9 @@ export function Preview({
   fragment?: DeepPartial<FragmentSchema>
   projectTitle?: string
   onGitHubWorkspaceSaved?: (workspace: GitHubWorkspace) => Promise<void> | void
+  githubSaveRequired?: boolean
+  isGitHubWorkspaceConnected?: boolean
+  onSaveBlocked?: () => void
   result?: ExecutionResult
   onClose: () => void
   code?: string
@@ -57,6 +63,8 @@ export function Preview({
 }) {
   const [isRefreshingFiles, setIsRefreshingFiles] = useState(false)
   const [sandboxFiles, setSandboxFiles] = useState(result?.files || [])
+  const [isGitHubSaveOpen, setIsGitHubSaveOpen] = useState(false)
+  const isGitHubSaveBlocked = githubSaveRequired && !isGitHubWorkspaceConnected
 
   useEffect(() => {
     setSandboxFiles(result?.files || [])
@@ -145,6 +153,11 @@ export function Preview({
     } catch (error) {
       console.error('Error deleting sandbox file:', error)
     }
+  }
+
+  function handleOpenRequiredGitHubSave() {
+    onSaveBlocked?.()
+    setIsGitHubSaveOpen(true)
   }
 
   return (
@@ -248,9 +261,16 @@ export function Preview({
               projectTitle={projectTitle}
               sandboxFiles={sandboxFiles}
               onWorkspaceSaved={onGitHubWorkspaceSaved}
+              open={isGitHubSaveOpen}
+              onOpenChange={setIsGitHubSaveOpen}
             />
           </div>
         </div>
+        {isGitHubSaveBlocked && (
+          <div className="w-full border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-600 dark:text-amber-300">
+            Save this project to GitHub before editing files. Use the Save to GitHub button above to connect a repository.
+          </div>
+        )}
         <div className="overflow-y-auto w-full h-full">
             <TabsContent value="code" className="h-full">
               {fragment?.code ? (
@@ -313,15 +333,19 @@ export function Preview({
             </TabsContent>
             <TabsContent value="editor" className="h-full">
               {selectedFile && onSave ? (
-                <CodeEditor
-                  code={selectedFile.content}
-                  lang={selectedFile.path.split('.').pop() || 'txt'}
-                  onChange={(value) => {
-                    if (value !== undefined) {
-                      onSave(selectedFile.path, value)
-                    }
-                  }}
-                />
+                isGitHubSaveBlocked ? (
+                  <GitHubRequiredNotice onOpenGitHubSave={handleOpenRequiredGitHubSave} />
+                ) : (
+                  <CodeEditor
+                    code={selectedFile.content}
+                    lang={selectedFile.path.split('.').pop() || 'txt'}
+                    onChange={(value) => {
+                      if (value !== undefined) {
+                        onSave(selectedFile.path, value)
+                      }
+                    }}
+                  />
+                )
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   Select a file from the file tree to edit
@@ -346,11 +370,33 @@ export function Preview({
             </TabsContent>
             <TabsContent value="ide" className="h-full m-0 p-0">
               <div className="h-full w-full">
-                <IDE sandboxId={result?.sbxId} />
+                <IDE
+                  sandboxId={result?.sbxId}
+                  onSave={onSave}
+                  githubSaveRequired={githubSaveRequired}
+                  githubWorkspaceConnected={isGitHubWorkspaceConnected}
+                  onSaveBlocked={handleOpenRequiredGitHubSave}
+                />
               </div>
             </TabsContent>
           </div>
       </Tabs>
+    </div>
+  )
+}
+
+function GitHubRequiredNotice({ onOpenGitHubSave }: { onOpenGitHubSave: () => void }) {
+  return (
+    <div className="flex h-full items-center justify-center p-6 text-center">
+      <div className="max-w-sm space-y-3 rounded-lg border bg-background/70 p-5 shadow-sm">
+        <div className="text-sm font-medium">GitHub save required</div>
+        <p className="text-sm text-muted-foreground">
+          Save this project to a GitHub repository before editing files. This keeps project changes synced to the user&apos;s GitHub account.
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={onOpenGitHubSave}>
+          Use Save to GitHub
+        </Button>
+      </div>
     </div>
   )
 }

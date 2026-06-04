@@ -24,7 +24,7 @@ export function TaskPageHeader({ task }: TaskPageHeaderProps) {
   }
 
   return (
-    <div className="border-b bg-background px-6 py-4">
+    <div className="border-b border-white/10 bg-white/[0.04] px-6 py-4 backdrop-blur">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">

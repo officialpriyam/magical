@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTask } from '@/hooks/use-task'
 import { TaskDetails } from '@/components/task-details'
 import { TaskPageHeader } from '@/components/task-page-header'
+import { MagicalPageShell } from '@/components/magical-page-shell'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ListTodo, X } from 'lucide-react'
@@ -19,7 +20,7 @@ export function TaskPageClient({ taskId }: TaskPageClientProps) {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen bg-background">
+      <MagicalPageShell className="h-screen" contentClassName="flex h-screen">
         {/* Main content */}
         <div className="flex-1 relative">
           {/* Task toggle button */}
@@ -53,7 +54,7 @@ export function TaskPageClient({ taskId }: TaskPageClientProps) {
 
         {/* Right sidebar */}
         <div className={cn(
-          "fixed top-0 right-0 h-full w-80 bg-background border-l shadow-lg transform transition-transform duration-300 ease-in-out z-40",
+          "fixed top-0 right-0 h-full w-80 bg-[#0d100d]/95 border-l border-white/10 shadow-lg backdrop-blur transform transition-transform duration-300 ease-in-out z-40",
           isSidebarOpen ? "translate-x-0" : "translate-x-full"
         )}>
           <div className="flex items-center justify-between p-4 border-b">
@@ -70,13 +71,13 @@ export function TaskPageClient({ taskId }: TaskPageClientProps) {
             <div className="text-sm text-muted-foreground">Loading task details...</div>
           </div>
         </div>
-      </div>
+      </MagicalPageShell>
     )
   }
 
   if (error || !task) {
     return (
-      <div className="flex h-screen bg-background">
+      <MagicalPageShell className="h-screen" contentClassName="flex h-screen">
         {/* Main content */}
         <div className="flex-1 relative">
           {/* Task toggle button */}
@@ -101,7 +102,7 @@ export function TaskPageClient({ taskId }: TaskPageClientProps) {
 
         {/* Right sidebar */}
         <div className={cn(
-          "fixed top-0 right-0 h-full w-80 bg-background border-l shadow-lg transform transition-transform duration-300 ease-in-out z-40",
+          "fixed top-0 right-0 h-full w-80 bg-[#0d100d]/95 border-l border-white/10 shadow-lg backdrop-blur transform transition-transform duration-300 ease-in-out z-40",
           isSidebarOpen ? "translate-x-0" : "translate-x-full"
         )}>
           <div className="flex items-center justify-between p-4 border-b">
@@ -118,12 +119,12 @@ export function TaskPageClient({ taskId }: TaskPageClientProps) {
             <div className="text-sm text-muted-foreground">No task data available</div>
           </div>
         </div>
-      </div>
+      </MagicalPageShell>
     )
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <MagicalPageShell className="h-screen" contentClassName="flex h-screen">
       {/* Main content */}
       <div className="flex-1 relative">
         {/* Task toggle button */}
@@ -148,7 +149,7 @@ export function TaskPageClient({ taskId }: TaskPageClientProps) {
 
       {/* Right sidebar */}
       <div className={cn(
-        "fixed top-0 right-0 h-full w-80 bg-background border-l shadow-lg transform transition-transform duration-300 ease-in-out z-40",
+        "fixed top-0 right-0 h-full w-80 bg-[#0d100d]/95 border-l border-white/10 shadow-lg backdrop-blur transform transition-transform duration-300 ease-in-out z-40",
         isSidebarOpen ? "translate-x-0" : "translate-x-full"
       )}>
         <div className="flex items-center justify-between p-4 border-b">
@@ -203,6 +204,6 @@ export function TaskPageClient({ taskId }: TaskPageClientProps) {
           )}
         </div>
       </div>
-    </div>
+    </MagicalPageShell>
   )
 }

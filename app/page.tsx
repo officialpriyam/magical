@@ -177,13 +177,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const [magicCursor, setMagicCursor] = useState({ x: 50, y: 24 })
-  const [isLoadingProject, setIsLoadingProject] = useState(false)
+  const [isLoadingProject, setIsLoadingProject] = useState(Boolean(initialProjectId))
   const [chatHistoryRefreshKey, setChatHistoryRefreshKey] = useState(0)
   const [projectMessagesRefreshKey, setProjectMessagesRefreshKey] = useState(0)
 
-  const { session } = useAuth(setAuthDialogCallback, setAuthViewCallback)
+  const { session, loading: authLoading } = useAuth(setAuthDialogCallback, setAuthViewCallback)
   const { userTeam } = useUserTeam()
   const currentProjectId = currentProject?.id
+  const currentProjectGitHubWorkspace = useMemo(
+    () => getProjectGitHubWorkspace(currentProject),
+    [currentProject],
+  )
+  const isGitHubWorkspaceConnected = Boolean(currentProjectGitHubWorkspace)
 
   useEffect(() => {
     messagesRef.current = messages
@@ -251,20 +256,38 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   useEffect(() => {
     const projectId = initialProjectId
-    if (!projectId || !session?.user?.id) return
+
+    if (!projectId) {
+      setIsLoadingProject(false)
+      return
+    }
+
+    if (authLoading) {
+      setIsLoadingProject(true)
+      return
+    }
+
+    if (!session?.user?.id) {
+      setCurrentProject(null)
+      setIsLoadingProject(false)
+      setErrorMessage('Sign in to open this chat.')
+      setAuthDialog(true)
+      return
+    }
 
     let isMounted = true
 
     async function loadInitialProject(projectId: string) {
       setIsLoadingProject(true)
+      setErrorMessage('')
       const project = await getProject(supabase, projectId)
 
       if (!isMounted) return
 
       if (!project) {
         setIsLoadingProject(false)
+        setCurrentProject(null)
         setErrorMessage('Chat not found or you do not have access.')
-        router.replace('/')
         return
       }
 
@@ -283,7 +306,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       isMounted = false
     }
-  }, [initialProjectId, router, session?.user?.id, supabase])
+  }, [authLoading, initialProjectId, session?.user?.id, supabase])
 
   useEffect(() => {
     let isMounted = true
@@ -1174,6 +1197,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   async function handleSaveFile(path: string, content: string) {
     if (!session) return
 
+    const workspace = currentProjectGitHubWorkspace
+    if (!workspace) {
+      setErrorMessage('Save this project to GitHub before editing files. Use Save to GitHub in the preview panel.')
+      setIsPreviewPanelOpen(true)
+      return
+    }
+
     try {
       // Check if this is a sandbox file (when result.sbxId exists)
       if (result?.sbxId) {
@@ -1194,6 +1224,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           if (selectedFile?.path === path) {
             setSelectedFile({ path, content })
           }
+          setErrorMessage('')
           scheduleGitHubFileSync(path, content)
         } else {
           console.error('Failed to save sandbox file:', response.statusText)
@@ -1216,6 +1247,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           if (selectedFile?.path === path) {
             setSelectedFile({ path, content })
           }
+          setErrorMessage('')
+          scheduleGitHubFileSync(path, content)
         } else {
           console.error('Failed to save file:', response.statusText)
         }
@@ -1548,6 +1581,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               fragment={fragment}
               projectTitle={currentProject?.title}
               onGitHubWorkspaceSaved={handleGitHubWorkspaceSaved}
+              githubSaveRequired
+              isGitHubWorkspaceConnected={isGitHubWorkspaceConnected}
+              onSaveBlocked={() => {
+                setErrorMessage('Save this project to GitHub before editing files. Use Save to GitHub in the preview panel.')
+                setIsPreviewPanelOpen(true)
+              }}
               result={result as ExecutionResult}
               onClose={() => {
                 setFragment(undefined)

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
+import { MagicalPageShell } from '@/components/magical-page-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -122,12 +123,11 @@ export default function TasksPage() {
   const failedTasks = tasks.filter(t => t.status === 'error')
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6 max-w-7xl">
+    <MagicalPageShell contentClassName="container mx-auto p-6 max-w-7xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
+            <h1 className="text-3xl font-bold flex items-center gap-2 text-white">
               <ListTodo className="h-8 w-8" />
               Tasks Dashboard
             </h1>
@@ -489,7 +489,6 @@ export default function TasksPage() {
             </div>
           </>
         )}
-      </div>
-    </div>
+    </MagicalPageShell>
   )
 }

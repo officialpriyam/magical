@@ -1,5 +1,6 @@
 'use client'
 
+import { MagicalPageShell } from '@/components/magical-page-shell'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MoreHorizontal } from 'lucide-react'
@@ -36,7 +37,7 @@ export default function TaskLoading() {
   )
 
   return (
-    <div className="flex-1 bg-background">
+    <MagicalPageShell>
       <div className="mx-auto p-3">
         <div className="max-w-4xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -92,6 +93,6 @@ export default function TaskLoading() {
           </div>
         </div>
       </div>
-    </div>
+    </MagicalPageShell>
   )
 }

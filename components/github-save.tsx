@@ -60,15 +60,19 @@ export function GitHubSave({
   projectTitle,
   sandboxFiles,
   onWorkspaceSaved,
+  open,
+  onOpenChange,
 }: {
   fragment?: DeepPartial<FragmentSchema>
   result?: ExecutionResult
   projectTitle?: string
   sandboxFiles?: FileSystemNode[]
   onWorkspaceSaved?: (workspace: GitHubWorkspace) => Promise<void> | void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   const { toast } = useToast()
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
   const [status, setStatus] = useState<GitHubStatus | null>(null)
   const [repositories, setRepositories] = useState<GitHubRepo[]>([])
   const [saveMode, setSaveMode] = useState<'new' | 'existing'>('new')
@@ -86,6 +90,8 @@ export function GitHubSave({
     () => Boolean(fragment?.code || (result?.sbxId && generatedFiles.length)),
     [fragment?.code, generatedFiles.length, result?.sbxId],
   )
+  const isOpen = open ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
 
   const loadGitHub = useCallback(async () => {
     setIsLoading(true)
@@ -149,11 +155,11 @@ export function GitHubSave({
   }, [toast])
 
   useEffect(() => {
-    if (!open) return
+    if (!isOpen) return
 
     setNewRepoName((current) => current || getDefaultRepoName(projectTitle || fragment?.title))
     loadGitHub()
-  }, [fragment?.title, loadGitHub, open, projectTitle])
+  }, [fragment?.title, isOpen, loadGitHub, projectTitle])
 
   async function saveToGitHub() {
     if (saveMode === 'existing' && !selectedRepo) return
@@ -303,7 +309,7 @@ export function GitHubSave({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <UploadCloud className="mr-2 h-4 w-4" />
