@@ -435,6 +435,18 @@ export default function IntegrationsSettings() {
                         )}
                         Disconnect
                       </Button>
+                    ) : service.id === 'github' ? (
+                      <Button
+                        asChild
+                        variant="default"
+                        size="sm"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+                        <a href="/api/github/connect">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Connect
+                        </a>
+                      </Button>
                     ) : (
                       <Button
                         variant="default"
