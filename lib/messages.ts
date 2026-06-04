@@ -17,11 +17,35 @@ export type MessageImage = {
   image: string
 }
 
+export type MessagePlan = {
+  type: 'plan'
+  plan: string
+  question?: string
+  options?: string[]
+  allowCustomInput?: boolean
+}
+
+export type MessageContent = MessageText | MessageCode | MessageImage | MessagePlan
+
 export type Message = {
   role: 'assistant' | 'user'
-  content: Array<MessageText | MessageCode | MessageImage>
+  content: MessageContent[]
   object?: DeepPartial<FragmentSchema>
   result?: ExecutionResult
+}
+
+export function formatPlanForModel(plan: MessagePlan) {
+  const parts = [`Plan:\n${plan.plan}`]
+
+  if (plan.question) {
+    parts.push(`Question:\n${plan.question}`)
+  }
+
+  if (plan.options?.length) {
+    parts.push(`Options:\n${plan.options.map((option, index) => `${index + 1}. ${option}`).join('\n')}`)
+  }
+
+  return parts.join('\n\n')
 }
 
 export function toAISDKMessages(messages: Message[]) {
@@ -32,6 +56,13 @@ export function toAISDKMessages(messages: Message[]) {
         return {
           type: 'text',
           text: content.text,
+        }
+      }
+
+      if (content.type === 'plan') {
+        return {
+          type: 'text',
+          text: formatPlanForModel(content),
         }
       }
 

@@ -11,6 +11,67 @@ import { generateText, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
 
+type PlanPayload = {
+  plan: string
+  question?: string
+  options?: string[]
+  allowCustomInput?: boolean
+}
+
+function cleanString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizePlanPayload(value: unknown, fallbackText: string): PlanPayload {
+  if (!value || typeof value !== 'object') {
+    return {
+      plan: fallbackText.trim() || 'I could not create a plan for that request.',
+      options: [],
+      allowCustomInput: true,
+    }
+  }
+
+  const payload = value as Record<string, unknown>
+  const plan = cleanString(payload.plan) || fallbackText.trim() || 'I could not create a plan for that request.'
+  const question = cleanString(payload.question)
+  const options = Array.isArray(payload.options)
+    ? payload.options
+        .map(cleanString)
+        .filter(Boolean)
+        .slice(0, 4)
+    : []
+
+  return {
+    plan,
+    ...(question ? { question } : {}),
+    options,
+    allowCustomInput: payload.allowCustomInput === false ? false : true,
+  }
+}
+
+function parsePlanPayload(text: string): PlanPayload {
+  const trimmed = text.trim()
+  const jsonText = trimmed
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
+
+  try {
+    return normalizePlanPayload(JSON.parse(jsonText), text)
+  } catch {
+    const jsonMatch = trimmed.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      try {
+        return normalizePlanPayload(JSON.parse(jsonMatch[0]), text)
+      } catch {
+        // Fall through to plain text.
+      }
+    }
+  }
+
+  return normalizePlanPayload(undefined, text)
+}
+
 export async function POST(req: Request) {
   const {
     messages,
@@ -57,16 +118,19 @@ export async function POST(req: Request) {
       system: [
         'You are Magical AI in Plan mode.',
         'Use the existing chat history as project memory.',
-        'Return a concise implementation plan, not code.',
+        'Return JSON only with keys: plan, question, options, allowCustomInput.',
+        'The plan must be a concise implementation plan, not code.',
         'Mention important files, UI states, data/storage changes, and verification steps when relevant.',
-        'Ask at most one blocking question only when the work cannot proceed safely without it.',
+        'Set question only when the work cannot proceed safely without one blocking answer.',
+        'When question is set, include 2 to 4 short option strings when likely answers exist.',
+        'Set allowCustomInput to true unless the listed options are exhaustive.',
       ].join(' '),
       messages,
       maxRetries: 0,
       ...modelParams,
     })
 
-    return Response.json({ plan: result.text })
+    return Response.json(parsePlanPayload(result.text))
   } catch (error: any) {
     return handleAPIError(error, { hasOwnApiKey: !!config.apiKey })
   }

@@ -1,9 +1,9 @@
-import { Message } from '@/lib/messages'
+import { Message, MessagePlan } from '@/lib/messages'
 import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
 import { DeepPartial } from 'ai'
-import { LoaderIcon, Terminal, Sparkles, Square } from 'lucide-react'
-import { useEffect } from 'react'
+import { Check, LoaderIcon, Terminal, Sparkles, Square } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 export function Chat({
   messages,
@@ -12,6 +12,7 @@ export function Chat({
   currentFragment,
   autoFixMessage,
   onStop,
+  onAcceptPlan,
   setCurrentPreview,
 }: {
   messages: Message[]
@@ -20,6 +21,7 @@ export function Chat({
   currentFragment?: DeepPartial<FragmentSchema>
   autoFixMessage?: string
   onStop?: () => void
+  onAcceptPlan?: (plan: MessagePlan, answer?: string) => void
   setCurrentPreview: (preview: {
     fragment: DeepPartial<FragmentSchema> | undefined
     result: ExecutionResult | undefined
@@ -65,6 +67,16 @@ export function Chat({
                   src={content.image}
                   alt="fragment"
                   className="mr-2 inline-block w-12 h-12 object-cover rounded-lg bg-white mb-2"
+                />
+              )
+            }
+            if (content.type === 'plan') {
+              return (
+                <PlanActionCard
+                  key={id}
+                  plan={content}
+                  disabled={isLoading || isPreviewLoading}
+                  onAcceptPlan={onAcceptPlan}
                 />
               )
             }
@@ -118,6 +130,104 @@ export function Chat({
           onStop={onStop}
         />
       )}
+    </div>
+  )
+}
+
+function PlanActionCard({
+  plan,
+  disabled,
+  onAcceptPlan,
+}: {
+  plan: MessagePlan
+  disabled?: boolean
+  onAcceptPlan?: (plan: MessagePlan, answer?: string) => void
+}) {
+  const [selectedAnswer, setSelectedAnswer] = useState('')
+  const [customAnswer, setCustomAnswer] = useState('')
+
+  const hasQuestion = Boolean(plan.question)
+  const options = plan.options || []
+  const allowCustomInput = plan.allowCustomInput !== false
+  const answer = (customAnswer || selectedAnswer).trim()
+  const isContinueDisabled = disabled || !onAcceptPlan || (hasQuestion && !answer)
+
+  return (
+    <div className="w-full max-w-[36rem] whitespace-normal rounded-2xl border border-[#FFB84D]/25 bg-[#151410] p-4 shadow-[0_0_0_1px_rgba(255,184,77,0.08)]">
+      <div className="mb-3 flex items-start gap-2">
+        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#FFB84D]/30 bg-[#FFB84D]/10 text-[#FFB84D]">
+          <Sparkles className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-white">Plan ready</div>
+          <div className="mt-0.5 text-xs text-white/50">Review it, answer if needed, then continue.</div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm leading-6 text-white/82">
+        {plan.plan}
+      </div>
+
+      {plan.question && (
+        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#FFB84D]/85">
+            Question
+          </div>
+          <div className="text-sm leading-6 text-white/85">{plan.question}</div>
+
+          {options.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {options.map((option) => {
+                const selected = selectedAnswer === option && !customAnswer
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAnswer(option)
+                      setCustomAnswer('')
+                    }}
+                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition ${
+                      selected
+                        ? 'border-[#FFB84D]/70 bg-[#FFB84D]/15 text-white'
+                        : 'border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white'
+                    }`}
+                  >
+                    {selected && <Check className="h-3 w-3" />}
+                    {option}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {allowCustomInput && (
+            <input
+              value={customAnswer}
+              onChange={(event) => {
+                setCustomAnswer(event.target.value)
+                if (event.target.value) {
+                  setSelectedAnswer('')
+                }
+              }}
+              placeholder="Type your answer..."
+              className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-[#FFB84D]/45"
+            />
+          )}
+        </div>
+      )}
+
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => onAcceptPlan?.(plan, answer || undefined)}
+          disabled={isContinueDisabled}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#FFB84D]/40 bg-[#FFB84D]/15 px-3 text-sm font-semibold text-white transition hover:bg-[#FFB84D]/25 disabled:pointer-events-none disabled:opacity-45"
+        >
+          <Check className="h-4 w-4" />
+          {hasQuestion ? 'Continue with answer' : 'Accept and continue'}
+        </button>
+      </div>
     </div>
   )
 }

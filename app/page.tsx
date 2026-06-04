@@ -7,7 +7,7 @@ import { PromptInputBox } from '@/components/ui/ai-prompt-box';
 import { useAuth } from '@/lib/auth';
 import dynamic from 'next/dynamic';
 import { Project, saveMessage, getProjectMessages, generateProjectTitle, getProject, updateProject, getProjects } from '@/lib/database';
-import { Message, toAISDKMessages, toMessageImage } from '@/lib/messages';
+import { Message, MessagePlan, formatPlanForModel, toAISDKMessages, toMessageImage } from '@/lib/messages';
 import type { LLMModel, LLMModelConfig } from '@/lib/models';
 import { FragmentSchema, fragmentSchema as schema } from '@/lib/schema';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
@@ -808,8 +808,19 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         role: 'assistant',
         content: [
           {
-            type: 'text',
-            text: data.plan || 'I could not create a plan for that request.',
+            type: 'plan',
+            plan: typeof data.plan === 'string' && data.plan.trim()
+              ? data.plan.trim()
+              : 'I could not create a plan for that request.',
+            question: typeof data.question === 'string' && data.question.trim()
+              ? data.question.trim()
+              : undefined,
+            options: Array.isArray(data.options)
+              ? data.options
+                  .filter((option: unknown): option is string => typeof option === 'string' && option.trim().length > 0)
+                  .map((option: string) => option.trim())
+              : [],
+            allowCustomInput: data.allowCustomInput !== false,
           },
         ],
       }
@@ -837,6 +848,74 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setIsPlanLoading(false)
     setIsPreviewLoading(false)
     setAutoFixMessage('')
+  }
+
+  function handleAcceptPlan(plan: MessagePlan, answer?: string) {
+    if (!session) {
+      setAuthDialog(true)
+      return
+    }
+
+    autoFixAttemptsRef.current = 0
+    lastAutoFixSignatureRef.current = ''
+    setErrorMessage('')
+    setAutoFixMessage('')
+    setChatMode('build')
+
+    if (isPromptLoading) {
+      handleStopGeneration()
+    }
+
+    if (!currentModel) {
+      setErrorMessage('No AI model is available. Check your model list and provider configuration.')
+      return
+    }
+
+    const answerText = answer?.trim()
+    const continuePrompt = [
+      'Accept this plan and continue building the project.',
+      answerText ? `User answer: ${answerText}` : '',
+      'Use the accepted plan as the implementation direction.',
+      '',
+      formatPlanForModel(plan),
+    ]
+      .filter(Boolean)
+      .join('\n')
+
+    const updatedMessages: Message[] = [
+      ...messagesRef.current,
+      {
+        role: 'user',
+        content: [{ type: 'text', text: continuePrompt }],
+      },
+    ]
+
+    messagesRef.current = updatedMessages
+    setMessages(updatedMessages)
+    setCurrentTab('code')
+    setIsPreviewPanelOpen(true)
+
+    try {
+      submit({
+        userID: session.user.id,
+        teamID: userTeam?.id,
+        messages: toAISDKMessages(updatedMessages),
+        template: getTemplateForSubmission(fragment?.template),
+        model: currentModel,
+        config: languageModel,
+        ...(shouldUseMorph && fragment ? { currentFragment: fragment } : {}),
+      })
+
+      setMessagesCount(prev => prev + 1)
+      posthog.capture('chat_plan_accepted', {
+        template: selectedTemplate,
+        model: languageModel.model,
+        answeredQuestion: Boolean(answerText),
+      })
+    } catch (error) {
+      console.error('Plan continuation failed:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Plan continuation failed.')
+    }
   }
 
   async function handleSendPrompt(message: string, files: File[] = [], mode: ChatMode = chatMode) {
@@ -1593,6 +1672,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     currentFragment={fragment}
                     autoFixMessage={autoFixMessage}
                     onStop={handleStopGeneration}
+                    onAcceptPlan={handleAcceptPlan}
                     setCurrentPreview={setCurrentPreview}
                   />
                 )}
