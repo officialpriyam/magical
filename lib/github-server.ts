@@ -3,6 +3,7 @@ import 'server-only'
 import crypto from 'node:crypto'
 import { NextRequest } from 'next/server'
 import type { User } from '@supabase/supabase-js'
+import { kv } from '@vercel/kv'
 import { createServerClient } from '@/lib/supabase-server'
 import { supabaseServiceRoleKey } from '@/lib/supabase-credentials'
 
@@ -27,6 +28,7 @@ export type GitHubConnectionStatus = {
 }
 
 const GITHUB_TOKEN_PREFIX = 'enc:v1:'
+const GITHUB_KV_PREFIX = 'github:integration:'
 
 export function getGitHubScopes() {
   return ['repo', 'read:org', 'user:email']
@@ -146,6 +148,16 @@ export async function storeGitHubAccessToken({
 }) {
   const supabase = await createServerClient(true)
   const now = new Date().toISOString()
+  const connectionData: GitHubConnectionData = {
+    access_token: encryptGitHubToken(accessToken),
+    token_type: tokenType || 'bearer',
+    scope: scope || getGitHubScopes().join(','),
+    github_user_id: githubUser.id,
+    username: githubUser.login,
+    name: githubUser.name || null,
+    avatar_url: githubUser.avatar_url,
+    connected_at: now,
+  }
 
   const { error } = await supabase
     .from('user_integrations')
@@ -153,22 +165,23 @@ export async function storeGitHubAccessToken({
       user_id: userId,
       service_name: 'github',
       is_connected: true,
-      connection_data: {
-        access_token: encryptGitHubToken(accessToken),
-        token_type: tokenType || 'bearer',
-        scope: scope || getGitHubScopes().join(','),
-        github_user_id: githubUser.id,
-        username: githubUser.login,
-        name: githubUser.name || null,
-        avatar_url: githubUser.avatar_url,
-        connected_at: now,
-      },
+      connection_data: connectionData,
       updated_at: now,
     } as never)
 
   if (error) {
+    if (isMissingUserIntegrationsTable(error)) {
+      await storeGitHubIntegrationInKV(userId, {
+        is_connected: true,
+        connection_data: connectionData,
+      })
+      return
+    }
+
     throw error
   }
+
+  await deleteGitHubIntegrationFromKV(userId)
 }
 
 export async function disconnectGitHub(userId: string) {
@@ -185,8 +198,18 @@ export async function disconnectGitHub(userId: string) {
     .eq('service_name', 'github')
 
   if (error) {
+    if (isMissingUserIntegrationsTable(error)) {
+      await storeGitHubIntegrationInKV(userId, {
+        is_connected: false,
+        connection_data: null,
+      })
+      return
+    }
+
     throw error
   }
+
+  await deleteGitHubIntegrationFromKV(userId)
 }
 
 async function getGitHubIntegration(userId: string) {
@@ -199,10 +222,61 @@ async function getGitHubIntegration(userId: string) {
     .maybeSingle()
 
   if (error) {
+    if (isMissingUserIntegrationsTable(error)) {
+      return getGitHubIntegrationFromKV(userId)
+    }
+
     throw error
   }
 
   return data as { is_connected: boolean; connection_data: GitHubConnectionData | null } | null
+}
+
+function isMissingUserIntegrationsTable(error: { code?: string; message?: string }) {
+  const message = error.message || ''
+
+  return (
+    error.code === 'PGRST205' ||
+    message.includes("Could not find the table 'public.user_integrations'") ||
+    message.includes('relation "public.user_integrations" does not exist')
+  )
+}
+
+function hasKVConfig() {
+  return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+}
+
+function getGitHubKVKey(userId: string) {
+  return `${GITHUB_KV_PREFIX}${userId}`
+}
+
+async function storeGitHubIntegrationInKV(
+  userId: string,
+  integration: { is_connected: boolean; connection_data: GitHubConnectionData | null },
+) {
+  if (!hasKVConfig()) {
+    throw new Error('user_integrations table is missing and Vercel KV is not configured')
+  }
+
+  await kv.set(getGitHubKVKey(userId), integration)
+}
+
+async function getGitHubIntegrationFromKV(userId: string) {
+  if (!hasKVConfig()) {
+    return null
+  }
+
+  return kv.get<{ is_connected: boolean; connection_data: GitHubConnectionData | null }>(
+    getGitHubKVKey(userId),
+  )
+}
+
+async function deleteGitHubIntegrationFromKV(userId: string) {
+  if (!hasKVConfig()) {
+    return
+  }
+
+  await kv.del(getGitHubKVKey(userId))
 }
 
 function getEncryptionKey() {
