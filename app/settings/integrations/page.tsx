@@ -154,7 +154,7 @@ const supabaseStatusMessages: Record<string, GitHubNotice> = {
   },
   token_exchange_failed: {
     title: 'Supabase token exchange failed',
-    description: 'Check the Supabase OAuth client secret, scopes, and callback URL.',
+    description: 'Check the exact callback URL and client secret. Magical retries Basic and body client auth by default; set SUPABASE_OAUTH_TOKEN_AUTH_METHOD only if your OAuth app requires one.',
     variant: 'destructive',
   },
   organization_lookup_failed: {

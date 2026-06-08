@@ -5,6 +5,7 @@ import { Sandbox } from '@e2b/code-interpreter'
 import { kv } from '@vercel/kv'
 import { customAlphabet } from 'nanoid'
 import { getConfiguredAppBaseUrl } from '@/lib/github-server'
+import { decodeSandboxId } from '@/lib/sandbox-provider'
 
 const nanoid = customAlphabet('1234567890abcdef', 7)
 
@@ -15,6 +16,12 @@ export async function publish(
   teamID: string | undefined,
   accessToken: string | undefined,
 ) {
+  const sandboxRef = decodeSandboxId(sbxId)
+
+  if (sandboxRef.provider !== 'e2b') {
+    throw new Error('Publishing is currently available for E2B preview URLs only')
+  }
+
   const parsedUrl = new URL(url)
   if (!parsedUrl.hostname.endsWith('.e2b.app')) {
     throw new Error('URL must be on *.e2b.app domain')
@@ -25,7 +32,7 @@ export async function publish(
     throw new Error('Expiration must be 24 hours or less')
   }
 
-  await Sandbox.setTimeout(sbxId, expiration, {
+  await Sandbox.setTimeout(sandboxRef.id, expiration, {
     ...(teamID && accessToken
       ? {
           headers: {

@@ -7,6 +7,14 @@ import {
   renameProjectFileInR2,
   saveProjectFileToR2,
 } from '@/lib/r2-workspace'
+import { decodeSandboxId } from '@/lib/sandbox-provider'
+import {
+  deleteVercelSandboxFile,
+  getVercelSandbox,
+  readVercelSandboxFile,
+  renameVercelSandboxFile,
+  writeVercelSandboxFile,
+} from '@/lib/vercel-sandbox'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -40,6 +48,21 @@ export async function GET(
       )
     }
 
+    const sandboxRef = decodeSandboxId(sbxId)
+
+    if (sandboxRef.provider === 'vercel') {
+      const sbx = await getVercelSandbox(sandboxRef.id)
+      const content = await readVercelSandboxFile(sbx, filePath)
+
+      return new Response(
+        JSON.stringify({
+          content,
+          path: filePath
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     if (!process.env.E2B_API_KEY) {
       return new Response(
         JSON.stringify({ error: 'E2B_API_KEY not configured' }),
@@ -48,7 +71,7 @@ export async function GET(
     }
 
     // Connect to existing sandbox
-    const sbx = await Sandbox.connect(sbxId)
+    const sbx = await Sandbox.connect(sandboxRef.id)
 
     // Sanitize path to prevent path traversal attacks
     const userDir = '/home/user'
@@ -105,11 +128,21 @@ export async function PATCH(
       return jsonResponse({ error: 'Missing old path or new path' }, 400)
     }
 
+    const sandboxRef = decodeSandboxId(sbxId)
+
+    if (sandboxRef.provider === 'vercel') {
+      const sbx = await getVercelSandbox(sandboxRef.id)
+      await renameVercelSandboxFile(sbx, oldPath, newPath)
+      await persistR2Rename(projectID, oldPath, newPath)
+
+      return jsonResponse({ success: true, path: newPath })
+    }
+
     if (!process.env.E2B_API_KEY) {
       return jsonResponse({ error: 'E2B_API_KEY not configured' }, 503)
     }
 
-    const sbx = await Sandbox.connect(sbxId)
+    const sbx = await Sandbox.connect(sandboxRef.id)
     await sbx.files.rename(toSandboxRelativePath(oldPath), toSandboxRelativePath(newPath))
     await persistR2Rename(projectID, oldPath, newPath)
 
@@ -139,11 +172,21 @@ export async function DELETE(
       return jsonResponse({ error: 'Missing file path' }, 400)
     }
 
+    const sandboxRef = decodeSandboxId(sbxId)
+
+    if (sandboxRef.provider === 'vercel') {
+      const sbx = await getVercelSandbox(sandboxRef.id)
+      await deleteVercelSandboxFile(sbx, filePath)
+      await persistR2Delete(projectID, filePath)
+
+      return jsonResponse({ success: true })
+    }
+
     if (!process.env.E2B_API_KEY) {
       return jsonResponse({ error: 'E2B_API_KEY not configured' }, 503)
     }
 
-    const sbx = await Sandbox.connect(sbxId)
+    const sbx = await Sandbox.connect(sandboxRef.id)
     await sbx.files.remove(toSandboxRelativePath(filePath))
     await persistR2Delete(projectID, filePath)
 
@@ -183,6 +226,22 @@ export async function POST(
       )
     }
 
+    const sandboxRef = decodeSandboxId(sbxId)
+
+    if (sandboxRef.provider === 'vercel') {
+      const sbx = await getVercelSandbox(sandboxRef.id)
+      await writeVercelSandboxFile(sbx, filePath, content)
+      await persistR2File(projectID, filePath, content)
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          path: filePath
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     if (!process.env.E2B_API_KEY) {
       return new Response(
         JSON.stringify({ error: 'E2B_API_KEY not configured' }),
@@ -191,7 +250,7 @@ export async function POST(
     }
 
     // Connect to existing sandbox
-    const sbx = await Sandbox.connect(sbxId)
+    const sbx = await Sandbox.connect(sandboxRef.id)
 
     // Sanitize path to prevent path traversal attacks
     const userDir = '/home/user'

@@ -2,12 +2,12 @@
 
 Magical AI is an AI app builder and coding workspace developed by priyx.
 
-It uses Next.js 16, shadcn/ui, Tailwind CSS, the Vercel AI SDK, Supabase, and E2B sandboxes to generate and execute code from chat.
+It uses Next.js 16, shadcn/ui, Tailwind CSS, the Vercel AI SDK, Supabase, and E2B or Vercel sandboxes to generate and execute code from chat.
 
 ## Features
 
 - AI chat for generating runnable apps and code artifacts.
-- Secure code execution with E2B sandboxes.
+- Secure code execution with selectable E2B or Vercel sandboxes.
 - Support for npm and pip package installation inside generated projects.
 - Built-in templates for Python data analysis, Next.js, Vue.js, Streamlit, and Gradio.
 - Multiple AI providers, including OpenAI, Anthropic, Google, Groq, Fireworks, Together AI, OpenRouter, Mistral, xAI, DeepSeek, and Ollama.
@@ -29,11 +29,22 @@ cp .env.example .env.local
 
 Fill in the keys you need. Never commit real secrets.
 
-Required for sandbox execution:
+Configure at least one sandbox provider. E2B is still required for the Python code-interpreter template:
 
 ```sh
 E2B_API_KEY=
 ```
+
+Vercel Sandbox is optional and works for app preview templates. On Vercel, OIDC is preferred. Locally, run `vercel link` and `vercel env pull`, or use access-token auth:
+
+```sh
+VERCEL_OIDC_TOKEN=
+VERCEL_TEAM_ID=
+VERCEL_PROJECT_ID=
+VERCEL_TOKEN=
+```
+
+The prompt box lets users choose `Let AI choose`, `Vercel`, or `E2B`. If the user skips this or chooses `Let AI choose`, the server randomly selects one configured provider that supports the generated template.
 
 At least one hosted AI provider key is recommended:
 
@@ -63,6 +74,8 @@ Optional Supabase OAuth connector for AI database migrations in users' Supabase 
 ```sh
 SUPABASE_OAUTH_CLIENT_ID=
 SUPABASE_OAUTH_CLIENT_SECRET=
+# optional; blank means retry client_secret_basic then client_secret_post
+SUPABASE_OAUTH_TOKEN_AUTH_METHOD=
 ```
 
 Create the OAuth app in the Supabase Dashboard and set this callback URL:
@@ -99,7 +112,7 @@ Run the bundled Supabase schema or at least `supabase/migrations/20260603000600_
 
 ### Cloudflare R2 Workspace Backup
 
-Cloudflare R2 is used as private object storage for generated project files when a signed-in user has not connected that project to GitHub. The app stores files under an owner-scoped key prefix, checks Supabase project ownership before saving or restoring, and does not expose public R2 URLs.
+Cloudflare R2 is optional private object storage for generated project files when a signed-in user has not connected that project to GitHub. If these variables are blank, the app still runs; projects without GitHub just will not have the R2 restore fallback. The app stores files under an owner-scoped key prefix, checks Supabase project ownership before saving or restoring, and does not expose public R2 URLs.
 
 Set these variables:
 
@@ -144,7 +157,7 @@ Use these project settings on Vercel:
 - Build command: `pnpm build`
 - Output directory: `.next`
 
-Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set `E2B_API_KEY`, one AI provider key, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL=https://magicalai.iampriyam.me`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. For non-GitHub workspace recovery, also set the `CLOUDFLARE_R2_*` variables.
+Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set one sandbox provider (`E2B_API_KEY` or Vercel Sandbox OIDC/access-token envs), one AI provider key, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL=https://magicalai.iampriyam.me`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. For non-GitHub workspace recovery, optionally set the `CLOUDFLARE_R2_*` variables.
 
 Use this GitHub OAuth callback URL:
 

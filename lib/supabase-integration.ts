@@ -139,7 +139,6 @@ export async function exchangeSupabaseOAuthCode({
     code,
     redirect_uri: redirectUri,
     code_verifier: codeVerifier,
-    scope: getSupabaseOAuthScopes().join(' '),
   })
 }
 
@@ -519,28 +518,101 @@ async function requestSupabaseOAuthToken(body: Record<string, string>) {
     throw new Error('Supabase OAuth is not configured.')
   }
 
+  const authMethods = getSupabaseOAuthTokenAuthMethods()
+  let lastFailure: {
+    method: SupabaseOAuthTokenAuthMethod
+    status: number
+    data: SupabaseOAuthTokenResponse
+  } | null = null
+
+  for (const method of authMethods) {
+    const { response, data } = await requestSupabaseOAuthTokenWithMethod(body, method)
+
+    if (response.ok && !data.error) {
+      return data
+    }
+
+    lastFailure = {
+      method,
+      status: response.status,
+      data,
+    }
+
+    console.warn('Supabase OAuth token exchange failed:', {
+      method,
+      status: response.status,
+      error: data.error,
+      message: data.error_description || (data as { message?: string }).message,
+    })
+
+    if (!isSupabaseOAuthClientAuthError(data)) {
+      break
+    }
+  }
+
+  if (lastFailure) {
+    throw new Error(
+      `${getSupabaseApiError(lastFailure.data, 'Supabase OAuth token exchange failed.')} (HTTP ${lastFailure.status}, ${lastFailure.method})`,
+    )
+  }
+
+  throw new Error('Supabase OAuth token exchange failed.')
+}
+
+type SupabaseOAuthTokenAuthMethod = 'client_secret_basic' | 'client_secret_post'
+
+async function requestSupabaseOAuthTokenWithMethod(
+  body: Record<string, string>,
+  method: SupabaseOAuthTokenAuthMethod,
+) {
+  const params = new URLSearchParams(body)
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/x-www-form-urlencoded',
+  }
+
+  if (method === 'client_secret_basic') {
+    headers.Authorization = `Basic ${Buffer.from(
+      `${process.env.SUPABASE_OAUTH_CLIENT_ID}:${process.env.SUPABASE_OAUTH_CLIENT_SECRET}`,
+    ).toString('base64')}`
+  } else {
+    params.set('client_id', process.env.SUPABASE_OAUTH_CLIENT_ID!)
+    params.set('client_secret', process.env.SUPABASE_OAUTH_CLIENT_SECRET!)
+  }
+
   const response = await fetch(`${SUPABASE_API_BASE_URL}/v1/oauth/token`, {
     method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${Buffer.from(
-        `${process.env.SUPABASE_OAUTH_CLIENT_ID}:${process.env.SUPABASE_OAUTH_CLIENT_SECRET}`,
-      ).toString('base64')}`,
-    },
-    body: new URLSearchParams({
-      client_id: process.env.SUPABASE_OAUTH_CLIENT_ID,
-      client_secret: process.env.SUPABASE_OAUTH_CLIENT_SECRET,
-      ...body,
-    }),
+    headers,
+    body: params,
   })
   const data = (await readSupabaseApiResponse(response)) as SupabaseOAuthTokenResponse
 
-  if (!response.ok || data.error) {
-    throw new Error(getSupabaseApiError(data, 'Supabase OAuth token exchange failed.'))
+  return { response, data }
+}
+
+function getSupabaseOAuthTokenAuthMethods(): SupabaseOAuthTokenAuthMethod[] {
+  const configured = process.env.SUPABASE_OAUTH_TOKEN_AUTH_METHOD?.trim()
+
+  if (configured === 'client_secret_post') {
+    return ['client_secret_post']
   }
 
-  return data
+  if (configured === 'client_secret_basic') {
+    return ['client_secret_basic']
+  }
+
+  return ['client_secret_basic', 'client_secret_post']
+}
+
+function isSupabaseOAuthClientAuthError(data: SupabaseOAuthTokenResponse) {
+  const value = `${data.error || ''} ${data.error_description || ''}`.toLowerCase()
+
+  return (
+    value.includes('invalid_client') ||
+    value.includes('unauthorized_client') ||
+    value.includes('client authentication') ||
+    value.includes('authentication method')
+  )
 }
 
 async function revokeSupabaseOAuthToken(encryptedRefreshToken: string) {

@@ -1,13 +1,14 @@
 import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowUp, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCog } from "lucide-react";
+import { ArrowUp, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCog, Server, Shuffle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ChatSettings } from '../chat-settings'
 import { ChatPicker } from '../chat-picker'
 import type { LLMModel, LLMModelConfig } from '@/lib/models'
 import type { TemplateId, Templates } from '@/lib/templates'
+import { SANDBOX_PROVIDER_OPTIONS, type SandboxProviderMode } from '@/lib/sandbox-provider'
 import { getMatchingCommands, isSlashCommand, extractCommand, SlashCommand } from '@/lib/slash-commands'
 import { SlashCommandMenu } from '../slash-command-menu'
 
@@ -493,6 +494,8 @@ interface PromptInputBoxProps {
   onUseMorphApplyChange?: (value: boolean) => void
   chatMode?: ChatMode
   onChatModeChange?: (mode: ChatMode) => void
+  sandboxProvider?: SandboxProviderMode
+  onSandboxProviderChange?: (provider: SandboxProviderMode) => void
   onStop?: () => void
 }
 type ChatMode = 'plan' | 'build'
@@ -505,7 +508,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       document.head.removeChild(styleSheet);
     };
   }, []);
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange, onStop } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
   const [input, setInput] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
@@ -776,10 +779,10 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
           />
         )}
 
-        <PromptInputActions className="flex items-center justify-between gap-2 p-0 pt-2">
+        <PromptInputActions className="flex flex-wrap items-center justify-between gap-2 p-0 pt-2">
           <div
             className={cn(
-              "flex items-center gap-1 transition-opacity duration-300",
+              "flex min-w-0 flex-wrap items-center gap-1 transition-opacity duration-300",
               isRecording ? "opacity-0 invisible h-0" : "opacity-100 visible"
             )}
           >
@@ -912,7 +915,36 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <PromptInputAction
+              tooltip="Choose the sandbox provider for this chat"
+            >
+              <div className="flex h-8 items-center rounded-full border bg-muted/50 p-0.5">
+                {SANDBOX_PROVIDER_OPTIONS.map((option) => {
+                  const isActive = sandboxProvider === option.value;
+                  const Icon = option.value === 'auto' ? Shuffle : Server;
+                  const label = option.value === 'auto' ? 'AI choose' : option.label;
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => onSandboxProviderChange?.(option.value)}
+                      className={cn(
+                        "flex h-7 items-center gap-1 rounded-full px-2 text-xs transition-colors",
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-primary"
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </PromptInputAction>
+
             <PromptInputAction
               tooltip="Choose whether Magical AI should plan first or build now"
             >

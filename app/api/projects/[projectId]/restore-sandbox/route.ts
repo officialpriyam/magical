@@ -4,14 +4,31 @@ import { createE2BSandbox } from '@/lib/e2b-sandbox'
 import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import { createServerClient } from '@/lib/supabase-server'
+import { getSupabaseProjectRuntimeEnv } from '@/lib/supabase-integration'
 import { getGitHubAccessToken, githubHeaders } from '@/lib/github-server'
 import {
   getProjectFilesFromR2,
   getR2WorkspaceMetadata,
   hasR2WorkspaceConfig,
 } from '@/lib/r2-workspace'
+import {
+  chooseSandboxProvider,
+  encodeSandboxId,
+  normalizeSandboxProviderMode,
+  type SandboxProvider,
+  type SandboxProviderMode,
+} from '@/lib/sandbox-provider'
+import {
+  createVercelSandbox,
+  getVercelSandboxUrl,
+  hasVercelSandboxConfig,
+  installAndStartVercelProject,
+  listVercelSandboxFiles,
+  writeVercelProjectFiles,
+} from '@/lib/vercel-sandbox'
 import { validateGitHubIdentifier } from '@/lib/security'
 import type { FileSystemNode } from '@/components/file-tree'
+import type { TemplateId } from '@/lib/templates'
 
 export const maxDuration = 120
 export const runtime = 'nodejs'
@@ -38,7 +55,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
-  let sbx: SandboxInstance | null = null
+  let sbx: SandboxInstance | Awaited<ReturnType<typeof createVercelSandbox>> | null = null
+  let selectedProvider: SandboxProvider | null = null
 
   try {
     const { projectId } = await params
@@ -47,10 +65,6 @@ export async function POST(
 
     if (!fragment?.template) {
       return NextResponse.json({ error: 'Missing saved project fragment.' }, { status: 400 })
-    }
-
-    if (!process.env.E2B_API_KEY) {
-      return NextResponse.json({ error: 'E2B_API_KEY not configured.' }, { status: 503 })
     }
 
     const supabase = await createServerClient()
@@ -78,6 +92,16 @@ export async function POST(
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
+    }
+
+    const providerMode = normalizeSandboxProviderMode(body.sandboxProvider)
+    selectedProvider = resolveSandboxProviderForFragment(providerMode, fragment)
+
+    if (!selectedProvider) {
+      return NextResponse.json(
+        { error: getNoSandboxProviderMessage(providerMode, fragment) },
+        { status: 503 },
+      )
     }
 
     const workspace = getGitHubWorkspace(project.metadata)
@@ -143,35 +167,55 @@ export async function POST(
       }
     }
 
-    sbx = await createE2BSandbox(fragment.template, {
-      metadata: {
-        template: fragment.template,
-        userID: user.id,
-        teamID: typeof body.teamID === 'string' ? body.teamID : '',
-        restoredFrom,
-      },
-      timeoutMs: sandboxTimeout,
-      ...(body.teamID && body.accessToken
-        ? {
-            headers: {
-              'X-Supabase-Team': body.teamID,
-              'X-Supabase-Token': body.accessToken,
-            },
-          }
-        : {}),
-    })
+    const supabaseRuntimeEnv = await getSupabaseProjectRuntimeEnv(user.id, projectId)
 
-    for (const file of files) {
-      await sbx.files.write(file.path, file.content)
+    if (selectedProvider === 'vercel') {
+      sbx = await createVercelSandbox({
+        template: fragment.template as TemplateId,
+        userId: user.id,
+        teamId: typeof body.teamID === 'string' ? body.teamID : '',
+        projectId,
+        port: fragment.port,
+        env: supabaseRuntimeEnv,
+        timeoutMs: sandboxTimeout,
+      })
+      await writeVercelProjectFiles(
+        sbx as Awaited<ReturnType<typeof createVercelSandbox>>,
+        files,
+        fragment.template as TemplateId,
+      )
+    } else {
+      sbx = await createE2BSandbox(fragment.template, {
+        metadata: {
+          template: fragment.template,
+          userID: user.id,
+          teamID: typeof body.teamID === 'string' ? body.teamID : '',
+          restoredFrom,
+        },
+        timeoutMs: sandboxTimeout,
+        ...(body.teamID && body.accessToken
+          ? {
+              headers: {
+                'X-Supabase-Team': body.teamID,
+                'X-Supabase-Token': body.accessToken,
+              },
+            }
+          : {}),
+      })
+
+      for (const file of files) {
+        await (sbx as SandboxInstance).files.write(file.path, file.content)
+      }
     }
 
     const installCommand = cleanCommand(fragment.install_dependencies_command)
 
     if (fragment.template === 'code-interpreter-v1') {
-      const tree = await fetchSandboxFiles(sbx)
+      const tree = await fetchSandboxFiles(sbx as SandboxInstance)
 
       return NextResponse.json({
-        sbxId: sbx.sandboxId,
+        sbxId: encodeSandboxId('e2b', (sbx as SandboxInstance).sandboxId),
+        sandboxProvider: selectedProvider,
         template: fragment.template,
         stdout: [],
         stderr: [],
@@ -180,27 +224,53 @@ export async function POST(
       } as ExecutionResultInterpreter)
     }
 
+    if (selectedProvider === 'vercel') {
+      const vercelSandbox = sbx as Awaited<ReturnType<typeof createVercelSandbox>>
+
+      await installAndStartVercelProject({
+        sandbox: vercelSandbox,
+        fragment,
+        env: supabaseRuntimeEnv,
+      })
+
+      const tree = await listVercelSandboxFiles(vercelSandbox)
+
+      return NextResponse.json({
+        sbxId: encodeSandboxId('vercel', vercelSandbox.name),
+        sandboxProvider: selectedProvider,
+        template: fragment.template,
+        url: getVercelSandboxUrl(vercelSandbox, fragment.port || 3000),
+        files: tree,
+      } as ExecutionResultWeb)
+    }
+
     if (installCommand) {
-      await sbx.commands.run(installCommand, {
+      await (sbx as SandboxInstance).commands.run(installCommand, {
         envs: {
           PORT: (fragment.port || 80).toString(),
+          ...supabaseRuntimeEnv,
         },
       })
     }
 
-    const tree = await fetchSandboxFiles(sbx)
+    const tree = await fetchSandboxFiles(sbx as SandboxInstance)
 
     return NextResponse.json({
-      sbxId: sbx.sandboxId,
+      sbxId: encodeSandboxId('e2b', (sbx as SandboxInstance).sandboxId),
+      sandboxProvider: selectedProvider,
       template: fragment.template,
-      url: `https://${sbx.getHost(fragment.port || 80)}`,
+      url: `https://${(sbx as SandboxInstance).getHost(fragment.port || 80)}`,
       files: tree,
     } as ExecutionResultWeb)
   } catch (error: any) {
     console.error('Failed to restore project sandbox from saved workspace:', error)
 
     try {
-      await sbx?.kill()
+      if (selectedProvider === 'vercel') {
+        await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
+      } else {
+        await (sbx as SandboxInstance | null)?.kill()
+      }
     } catch {}
 
     return NextResponse.json(
@@ -211,6 +281,42 @@ export async function POST(
       { status: 500 },
     )
   }
+}
+
+function resolveSandboxProviderForFragment(
+  mode: SandboxProviderMode,
+  fragment: FragmentSchema,
+): SandboxProvider | null {
+  const available: SandboxProvider[] = []
+
+  if (process.env.E2B_API_KEY) {
+    available.push('e2b')
+  }
+
+  if (fragment.template !== 'code-interpreter-v1' && hasVercelSandboxConfig()) {
+    available.push('vercel')
+  }
+
+  return chooseSandboxProvider({ mode, available })
+}
+
+function getNoSandboxProviderMessage(
+  mode: SandboxProviderMode,
+  fragment: FragmentSchema,
+) {
+  if (mode === 'vercel' && fragment.template === 'code-interpreter-v1') {
+    return 'Vercel Sandbox is only available for app previews. Python code interpreter requires E2B_API_KEY.'
+  }
+
+  if (mode === 'vercel') {
+    return 'Vercel Sandbox is not configured. Set VERCEL_OIDC_TOKEN or VERCEL_TEAM_ID, VERCEL_PROJECT_ID, and VERCEL_TOKEN.'
+  }
+
+  if (mode === 'e2b') {
+    return 'E2B is not configured. Set E2B_API_KEY or choose Vercel Sandbox.'
+  }
+
+  return 'No sandbox provider is configured. Set E2B_API_KEY or configure Vercel Sandbox.'
 }
 
 async function fetchGitHubFiles({

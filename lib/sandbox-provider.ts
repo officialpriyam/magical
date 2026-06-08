@@ -1,0 +1,75 @@
+export type SandboxProvider = 'e2b' | 'vercel'
+export type SandboxProviderMode = 'auto' | SandboxProvider
+
+export const SANDBOX_PROVIDER_OPTIONS: {
+  value: SandboxProviderMode
+  label: string
+  description: string
+}[] = [
+  {
+    value: 'auto',
+    label: 'Let AI choose',
+    description: 'Randomly uses one configured sandbox provider.',
+  },
+  {
+    value: 'vercel',
+    label: 'Vercel',
+    description: 'Run the project in Vercel Sandbox.',
+  },
+  {
+    value: 'e2b',
+    label: 'E2B',
+    description: 'Run the project in E2B.',
+  },
+]
+
+export function normalizeSandboxProviderMode(value: unknown): SandboxProviderMode {
+  return value === 'e2b' || value === 'vercel' || value === 'auto'
+    ? value
+    : 'auto'
+}
+
+export function encodeSandboxId(provider: SandboxProvider, id: string) {
+  return id.includes(':') ? `${provider}:${encodeURIComponent(id)}` : `${provider}:${id}`
+}
+
+export function decodeSandboxId(value: string): {
+  provider: SandboxProvider
+  id: string
+} {
+  const separatorIndex = value.indexOf(':')
+
+  if (separatorIndex <= 0) {
+    return { provider: 'e2b', id: value }
+  }
+
+  const provider = value.slice(0, separatorIndex)
+  const rawId = value.slice(separatorIndex + 1)
+
+  if (provider !== 'e2b' && provider !== 'vercel') {
+    return { provider: 'e2b', id: value }
+  }
+
+  return {
+    provider,
+    id: decodeURIComponent(rawId),
+  }
+}
+
+export function chooseSandboxProvider({
+  mode,
+  available,
+}: {
+  mode: SandboxProviderMode
+  available: SandboxProvider[]
+}): SandboxProvider | null {
+  if (mode !== 'auto') {
+    return available.includes(mode) ? mode : null
+  }
+
+  if (available.length === 0) {
+    return null
+  }
+
+  return available[Math.floor(Math.random() * available.length)]
+}

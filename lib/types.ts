@@ -1,9 +1,11 @@
 import { TemplateId } from './templates'
 import { ExecutionError, Result } from '@e2b/code-interpreter'
 import { FileSystemNode } from '@/components/file-tree'
+import type { SandboxProvider } from '@/lib/sandbox-provider'
 
 type ExecutionResultBase = {
   sbxId: string
+  sandboxProvider?: SandboxProvider
   files?: FileSystemNode[]
 }
 

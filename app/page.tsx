@@ -14,6 +14,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import templates, { TemplateId } from '@/lib/templates';
 import { ExecutionResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import type { SandboxProviderMode } from '@/lib/sandbox-provider';
 import { DeepPartial } from 'ai';
 import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { useRouter } from 'next/navigation';
@@ -42,7 +43,7 @@ type ProjectShelfView = 'all' | 'recent' | 'github'
 
 function getSandboxErrorMessage(errorResult: { error?: string; type?: string }) {
   if (errorResult.type === 'config_error') {
-    return 'AI generated the code, but preview cannot start because E2B_API_KEY is missing in Vercel.'
+    return errorResult.error || 'AI generated the code, but preview cannot start because no sandbox provider is configured.'
   }
 
   return errorResult.error || 'AI generated the code, but preview setup failed.'
@@ -146,6 +147,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     process.env.NEXT_PUBLIC_USE_MORPH_APPLY === 'true',
   )
   const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'build')
+  const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
 
   const posthog = usePostHog()
 
@@ -482,13 +484,14 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               teamID: userTeam?.id,
               accessToken: session?.access_token,
               projectID: currentProjectRef.current?.id,
+              sandboxProvider,
             }),
           })
           result = await response.json()
         } catch (sandboxError) {
           console.error('Sandbox request failed:', sandboxError)
           setAutoFixMessage('')
-          setErrorMessage('AI generated the code, but preview setup failed. Check E2B configuration on Vercel.')
+          setErrorMessage('AI generated the code, but preview setup failed. Check the selected sandbox provider configuration on Vercel.')
           setIsPreviewLoading(false)
           return
         }
@@ -704,6 +707,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           fragment: savedFragment,
           teamID: userTeam?.id,
           accessToken: session?.access_token,
+          sandboxProvider,
         }),
       })
       const data = await response.json().catch(() => ({}))
@@ -728,7 +732,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     } finally {
       setIsPreviewLoading(false)
     }
-  }, [session?.access_token, userTeam?.id])
+  }, [sandboxProvider, session?.access_token, userTeam?.id])
 
   useEffect(() => {
     let isMounted = true
@@ -1581,6 +1585,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       isLoading={isPromptLoading}
       chatMode={chatMode}
       onChatModeChange={setChatMode}
+      sandboxProvider={sandboxProvider}
+      onSandboxProviderChange={setSandboxProvider}
       onStop={handleStopGeneration}
       placeholder={
         chatMode === 'plan'

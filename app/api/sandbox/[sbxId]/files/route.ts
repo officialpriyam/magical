@@ -1,5 +1,7 @@
 import { Sandbox } from '@e2b/code-interpreter'
 import { FileSystemNode } from '@/components/file-tree'
+import { decodeSandboxId } from '@/lib/sandbox-provider'
+import { getVercelSandbox, listVercelSandboxFiles } from '@/lib/vercel-sandbox'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -24,6 +26,18 @@ export async function GET(
       )
     }
 
+    const sandboxRef = decodeSandboxId(sbxId)
+
+    if (sandboxRef.provider === 'vercel') {
+      const sbx = await getVercelSandbox(sandboxRef.id)
+      const files = await listVercelSandboxFiles(sbx)
+
+      return new Response(
+        JSON.stringify({ files }),
+        { headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     if (!process.env.E2B_API_KEY) {
       return new Response(
         JSON.stringify({ error: 'E2B_API_KEY not configured' }),
@@ -32,7 +46,7 @@ export async function GET(
     }
 
     // Connect to existing sandbox
-    const sbx = await Sandbox.connect(sbxId)
+    const sbx = await Sandbox.connect(sandboxRef.id)
 
     // Use E2B SDK's files.list() method for robust file listing
     const filesList = await sbx.files.list('/home/user')
