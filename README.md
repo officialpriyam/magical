@@ -21,7 +21,13 @@ Install dependencies:
 pnpm install
 ```
 
-Create a `.env.local` file in the project root. This repository includes a placeholder `.env.local`; fill in the keys you need.
+Create a `.env.local` file in the project root from the example file:
+
+```sh
+cp .env.example .env.local
+```
+
+Fill in the keys you need. Never commit real secrets.
 
 Required for sandbox execution:
 
@@ -68,6 +74,26 @@ https://your-domain.com/api/supabase/callback
 Configure the OAuth app with Management API scopes for `organizations:read`, `projects:read`, `projects:write`, `database:write`, and `secrets:read`. Magical uses OAuth to connect a user's Supabase account, automatically creates or reuses one Supabase project per Magical project, applies generated migrations there, and injects the project's public Supabase env values into the preview sandbox.
 
 For server-owned fallback deployments, `SUPABASE_MANAGEMENT_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are still supported.
+
+### Supabase OAuth Client ID and Secret
+
+To get `SUPABASE_OAUTH_CLIENT_ID` and `SUPABASE_OAUTH_CLIENT_SECRET`:
+
+1. Sign in to the Supabase Dashboard.
+2. Open your organization settings.
+3. Go to **OAuth Apps**.
+4. Click **Add application**.
+5. Add the callback URL for each environment:
+
+```txt
+http://localhost:3000/api/supabase/callback
+https://your-domain.com/api/supabase/callback
+```
+
+6. Select the required Management API scopes: `organizations:read`, `projects:read`, `projects:write`, `database:write`, and `secrets:read`.
+7. Save the app, then copy the generated client ID and client secret into `.env.local` or Vercel environment variables.
+
+Supabase documents this as an OAuth integration created from organization settings. Their docs also note that scopes are configured on the OAuth app, and existing users must re-authorize if scopes change.
 
 Start the app only when you are ready:
 
