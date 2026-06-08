@@ -11,11 +11,14 @@ export type SupabaseConnectionData = {
   connected_at?: string
 }
 
+export type SupabaseConnectionSource = 'user' | 'environment'
+
 export type SupabaseConnectionStatus = {
   connected: boolean
   projectRef?: string
   projectName?: string | null
   connected_at?: string
+  source?: SupabaseConnectionSource
 }
 
 export type SupabaseMigrationInput = {
@@ -26,21 +29,20 @@ export type SupabaseMigrationInput = {
 const SUPABASE_TOKEN_PREFIX = 'enc:supabase:v1:'
 
 export async function getSupabaseConnectionStatus(
-  userId: string,
+  userId?: string,
 ): Promise<SupabaseConnectionStatus> {
-  const integration = await getSupabaseIntegration(userId)
+  const credentials = await getSupabaseCredentials(userId)
 
-  if (!integration?.is_connected || !integration.connection_data) {
+  if (!credentials) {
     return { connected: false }
   }
 
-  const data = integration.connection_data
-
   return {
     connected: true,
-    projectRef: data.project_ref,
-    projectName: data.project_name,
-    connected_at: data.connected_at,
+    projectRef: credentials.projectRef,
+    projectName: credentials.projectName,
+    connected_at: credentials.connectedAt,
+    source: credentials.source,
   }
 }
 
@@ -99,29 +101,22 @@ export async function disconnectSupabase(userId: string) {
 }
 
 export async function applySupabaseMigration(
-  userId: string,
+  userId: string | undefined,
   migration: SupabaseMigrationInput,
 ) {
-  const integration = await getSupabaseIntegration(userId)
+  const credentials = await getSupabaseCredentials(userId)
 
-  if (!integration?.is_connected || !integration.connection_data) {
-    throw new Error('Supabase is not connected.')
-  }
-
-  const token = integration.connection_data.access_token
-    ? decryptSupabaseToken(integration.connection_data.access_token)
-    : ''
-  const projectRef = integration.connection_data.project_ref
-
-  if (!token || !projectRef) {
-    throw new Error('Supabase connection is missing a token or project ref.')
+  if (!credentials) {
+    throw new Error(
+      'Supabase is not connected. Connect it in Settings or configure SUPABASE_MANAGEMENT_ACCESS_TOKEN and SUPABASE_PROJECT_REF in the server environment.',
+    )
   }
 
   const response = await fetch(
-    `https://api.supabase.com/v1/projects/${encodeURIComponent(projectRef)}/database/migrations`,
+    `https://api.supabase.com/v1/projects/${encodeURIComponent(credentials.projectRef)}/database/migrations`,
     {
       method: 'POST',
-      headers: supabaseManagementHeaders(token),
+      headers: supabaseManagementHeaders(credentials.accessToken),
       body: JSON.stringify({
         name: migration.name,
         query: migration.query,
@@ -136,6 +131,59 @@ export async function applySupabaseMigration(
   }
 
   return body
+}
+
+async function getSupabaseCredentials(userId?: string) {
+  const integration = await getSupabaseIntegration(userId)
+
+  if (integration?.is_connected && integration.connection_data) {
+    const token = integration.connection_data.access_token
+      ? decryptSupabaseToken(integration.connection_data.access_token)
+      : ''
+    const projectRef = integration.connection_data.project_ref
+
+    if (token && projectRef) {
+      return {
+        accessToken: token,
+        projectRef,
+        projectName: integration.connection_data.project_name,
+        connectedAt: integration.connection_data.connected_at,
+        source: 'user' as const,
+      }
+    }
+  }
+
+  return getEnvSupabaseCredentials()
+}
+
+function getEnvSupabaseCredentials() {
+  const accessToken = readFirstEnvValue([
+    'SUPABASE_MANAGEMENT_ACCESS_TOKEN',
+    'SUPABASE_ACCESS_TOKEN',
+  ])
+  const projectRef =
+    readFirstEnvValue([
+      'SUPABASE_PROJECT_REF',
+      'SUPABASE_MANAGEMENT_PROJECT_REF',
+    ]) || getProjectRefFromUrl(readFirstEnvValue([
+      'NEXT_PUBLIC_SUPABASE_URL',
+      'SUPABASE_URL',
+    ]))
+
+  if (!accessToken || !projectRef) {
+    return null
+  }
+
+  return {
+    accessToken,
+    projectRef,
+    projectName: readFirstEnvValue([
+      'SUPABASE_PROJECT_NAME',
+      'SUPABASE_MANAGEMENT_PROJECT_NAME',
+    ]) || null,
+    connectedAt: undefined,
+    source: 'environment' as const,
+  }
 }
 
 async function fetchSupabaseProject(accessToken: string, projectRef: string) {
@@ -154,7 +202,11 @@ async function fetchSupabaseProject(accessToken: string, projectRef: string) {
   return body
 }
 
-async function getSupabaseIntegration(userId: string) {
+async function getSupabaseIntegration(userId?: string) {
+  if (!userId) {
+    return null
+  }
+
   const supabase = await createServerClient(true)
   const { data, error } = await supabase
     .from('user_integrations')
@@ -177,6 +229,37 @@ function supabaseManagementHeaders(accessToken: string) {
   return {
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
+  }
+}
+
+function readFirstEnvValue(names: string[]) {
+  for (const name of names) {
+    const value = process.env[name]?.trim()
+
+    if (value) {
+      return value
+    }
+  }
+
+  return ''
+}
+
+function getProjectRefFromUrl(value: string) {
+  if (!value) {
+    return ''
+  }
+
+  try {
+    const hostname = new URL(value).hostname
+    const suffix = '.supabase.co'
+
+    if (!hostname.endsWith(suffix)) {
+      return ''
+    }
+
+    return hostname.slice(0, -suffix.length)
+  } catch {
+    return ''
   }
 }
 

@@ -52,6 +52,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
+Optional Supabase Management API connector for AI database migrations:
+
+```sh
+SUPABASE_MANAGEMENT_ACCESS_TOKEN=
+SUPABASE_PROJECT_REF=
+```
+
+`SUPABASE_ACCESS_TOKEN` also works as an alias for the management token. If `SUPABASE_PROJECT_REF` is omitted, the app tries to derive it from `NEXT_PUBLIC_SUPABASE_URL`.
+
 Start the app only when you are ready:
 
 ```sh

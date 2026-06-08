@@ -459,6 +459,11 @@ export default function IntegrationsSettings() {
                 typeof integration.connection_data === 'object'
                 ? integration.connection_data
                 : null
+              const isEnvironmentSupabase =
+                service.id === 'supabase' &&
+                connectionData &&
+                'source' in connectionData &&
+                connectionData.source === 'environment'
               
               return (
                 <div
@@ -474,7 +479,11 @@ export default function IntegrationsSettings() {
                         <h4 className="font-medium">{service.name}</h4>
                         {isConnected ? (
                           <Badge variant={isHealthy ? "default" : "secondary"}>
-                            {isHealthy ? "Connected" : "Needs Attention"}
+                            {isEnvironmentSupabase
+                              ? "Environment"
+                              : isHealthy
+                                ? "Connected"
+                                : "Needs Attention"}
                           </Badge>
                         ) : (
                           <Badge variant="outline">Not connected</Badge>
@@ -505,6 +514,11 @@ export default function IntegrationsSettings() {
                             Project {connectionData.projectRef as string}
                           </p>
                         )}
+                      {isEnvironmentSupabase && (
+                        <p className="text-xs text-muted-foreground">
+                          Configured through server environment variables.
+                        </p>
+                      )}
                       {connectionData &&
                        'simulated' in connectionData &&
                        connectionData.simulated && (
@@ -516,7 +530,8 @@ export default function IntegrationsSettings() {
                   </div>
                   
                   <div className="flex flex-col gap-3 lg:min-w-72 lg:items-end">
-                    {service.id === 'supabase' && !isConnected && (
+                    {service.id === 'supabase' &&
+                      (!isConnected || isEnvironmentSupabase) && (
                       <div className="grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-1">
                         <Input
                           value={supabaseProjectRef}
@@ -532,12 +547,14 @@ export default function IntegrationsSettings() {
                           disabled={isProcessing}
                         />
                         <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-1">
-                          Create a token in Supabase account settings, then paste the project ref from your project URL.
+                          {isEnvironmentSupabase
+                            ? 'Server env is active. Add a personal token here only if this user should override it.'
+                            : 'Create a token in Supabase account settings, then paste the project ref from your project URL.'}
                         </p>
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                    {isConnected ? (
+                    {isConnected && !isEnvironmentSupabase ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -550,6 +567,24 @@ export default function IntegrationsSettings() {
                           <Unlink className="h-4 w-4 mr-2" />
                         )}
                         Disconnect
+                      </Button>
+                    ) : isEnvironmentSupabase ? (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleConnect(service.id)}
+                        disabled={
+                          isProcessing ||
+                          !supabaseProjectRef.trim() ||
+                          !supabaseAccessToken.trim()
+                        }
+                      >
+                        {isConnecting ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Plus className="h-4 w-4 mr-2" />
+                        )}
+                        Use personal token
                       </Button>
                     ) : service.id === 'github' ? (
                       <Button

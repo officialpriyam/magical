@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/auth-utils'
-import { disconnectSupabase } from '@/lib/supabase-integration'
+import {
+  disconnectSupabase,
+  getSupabaseConnectionStatus,
+} from '@/lib/supabase-integration'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -14,7 +17,7 @@ export async function POST() {
 
   try {
     await disconnectSupabase(user.id)
-    return NextResponse.json({ connected: false })
+    return NextResponse.json(await getSupabaseConnectionStatus(user.id))
   } catch (error) {
     console.error('Failed to disconnect Supabase:', error)
     return NextResponse.json(

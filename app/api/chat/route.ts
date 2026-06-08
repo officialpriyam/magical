@@ -57,9 +57,7 @@ export async function POST(req: Request) {
     delete modelParams.apiKey
     delete modelParams.baseURL
     const modelClient = getModelClient(resolvedModel, config)
-    const supabaseStatus = userID
-      ? await getSupabaseConnectionStatus(userID)
-      : { connected: false }
+    const supabaseStatus = await getSupabaseConnectionStatus(userID)
 
     const result = await generateObject({
       model: modelClient as LanguageModel,
@@ -68,6 +66,7 @@ export async function POST(req: Request) {
         supabase: {
           connected: supabaseStatus.connected,
           projectRef: supabaseStatus.projectRef,
+          source: supabaseStatus.source,
         },
       }),
       messages,
