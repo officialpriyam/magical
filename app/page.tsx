@@ -19,7 +19,7 @@ import { DeepPartial } from 'ai';
 import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { useRouter } from 'next/navigation';
 import { usePostHog } from 'posthog-js/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalStorage } from 'usehooks-ts';
 import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
@@ -192,6 +192,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const currentProjectRef = useRef<Project | null>(null)
+  const magicGlowRef = useRef<HTMLDivElement | null>(null)
+  const magicAnimationFrameRef = useRef<number | null>(null)
   const [isLoadingProject, setIsLoadingProject] = useState(Boolean(initialProjectId))
   const [chatHistoryRefreshKey, setChatHistoryRefreshKey] = useState(0)
   const [projectMessagesRefreshKey, setProjectMessagesRefreshKey] = useState(0)
@@ -242,6 +244,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       planAbortControllerRef.current?.abort()
       Object.values(syncTimers).forEach(clearTimeout)
+      if (magicAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(magicAnimationFrameRef.current)
+      }
     }
   }, [])
 
@@ -1557,6 +1562,30 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setIsPricingModalOpen(true)
   }
 
+  function handleMagicPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType === 'touch') {
+      return
+    }
+
+    const glow = magicGlowRef.current
+
+    if (!glow) return
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = ((event.clientX - rect.left) / rect.width) * 100
+    const y = ((event.clientY - rect.top) / rect.height) * 100
+
+    if (magicAnimationFrameRef.current !== null) {
+      return
+    }
+
+    magicAnimationFrameRef.current = requestAnimationFrame(() => {
+      glow.style.setProperty('--magic-x', `${x}%`)
+      glow.style.setProperty('--magic-y', `${y}%`)
+      magicAnimationFrameRef.current = null
+    })
+  }
+
   const isDashboardMode =
     !initialProjectId &&
     !currentProject &&
@@ -1744,11 +1773,19 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
           {isDashboardMode ? (
             <div
-              className="relative flex min-h-0 flex-1 overflow-hidden rounded-3xl border border-white/10 bg-[#0d0f10] text-white shadow-2xl"
+              className="relative flex min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b0d0b] text-white shadow-2xl"
+              onPointerMove={handleMagicPointerMove}
             >
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,#121615_0%,#0d0f10_58%,#0a0b0d_100%)]" />
-              <div className="absolute inset-0 opacity-[0.16] [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:32px_32px]" />
-              <div className="absolute inset-x-0 top-0 h-28 border-b border-white/10 bg-white/[0.035]" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,196,87,0.30),transparent_28%),radial-gradient(circle_at_18%_75%,rgba(40,127,96,0.20),transparent_28%),linear-gradient(180deg,#151913_0%,#0b0d0b_52%,#100d08_100%)]" />
+              <div
+                ref={magicGlowRef}
+                className="pointer-events-none absolute inset-0 hidden opacity-90 transition-opacity duration-200 md:block"
+                style={{
+                  background: 'radial-gradient(circle at var(--magic-x, 50%) var(--magic-y, 24%), rgba(255, 219, 122, 0.34), rgba(255, 176, 65, 0.12) 12%, transparent 26%)',
+                }}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,8,9,0.16),rgba(8,8,9,0)_48%,rgba(8,8,9,0.24))]" />
+              <div className="absolute inset-x-0 top-0 h-28 border-b border-white/10 bg-white/[0.025]" />
 
               <div className="relative z-10 flex w-full flex-col">
                 <div className="flex flex-1 flex-col items-center justify-center px-4 pt-16 text-center">
