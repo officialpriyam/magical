@@ -5,13 +5,16 @@ export type PromptContext = {
   supabase?: {
     connected: boolean
     projectRef?: string
-    source?: 'user' | 'environment'
+    source?: 'user' | 'environment' | 'oauth'
+    projectsMode?: 'single' | 'per_project'
   }
 }
 
 export function toPrompt(template: Templates, context: PromptContext = {}) {
   const supabaseContext = context.supabase?.connected
-    ? `Supabase is connected for project ref ${context.supabase.projectRef || 'unknown'} via ${context.supabase.source === 'environment' ? 'server environment variables' : 'the user integration'}. If the request needs database schema changes, include supabase_migrations[].`
+    ? context.supabase.projectsMode === 'per_project'
+      ? 'Supabase is connected by OAuth. Do not ask the user for a Supabase project ref. If the request needs database schema changes, include supabase_migrations[]; Magical will create or reuse a separate Supabase project for this Magical project and apply the migrations there.'
+      : `Supabase is connected for project ref ${context.supabase.projectRef || 'unknown'} via ${context.supabase.source === 'environment' ? 'server environment variables' : 'the user integration'}. If the request needs database schema changes, include supabase_migrations[].`
     : 'Supabase is not connected. If the request needs a database, explain that Supabase should be connected or use local/mock data until connected.'
 
   return `

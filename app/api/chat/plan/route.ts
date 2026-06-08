@@ -79,12 +79,14 @@ export async function POST(req: Request) {
     messages,
     userID,
     teamID,
+    projectID,
     model,
     config,
   }: {
     messages: ModelMessage[]
     userID: string | undefined
     teamID: string | undefined
+    projectID: string | undefined
     model: LLMModel
     config: LLMModelConfig
   } = await req.json()
@@ -114,9 +116,11 @@ export async function POST(req: Request) {
     delete modelParams.apiKey
     delete modelParams.baseURL
     const modelClient = getModelClient(resolvedModel, config)
-    const supabaseStatus = await getSupabaseConnectionStatus(userID)
+    const supabaseStatus = await getSupabaseConnectionStatus(userID, projectID)
     const supabaseInstruction = supabaseStatus.connected
-      ? `Supabase is connected for project ref ${supabaseStatus.projectRef || 'unknown'} via ${supabaseStatus.source === 'environment' ? 'server environment variables' : 'the user integration'}. If schema changes are needed, mention the migration files/SQL the build step should generate.`
+      ? supabaseStatus.projectsMode === 'per_project'
+        ? 'Supabase is connected by OAuth. If schema changes are needed, mention the migration files/SQL; Magical will create or reuse one Supabase project for this Magical project.'
+        : `Supabase is connected for project ref ${supabaseStatus.projectRef || 'unknown'} via ${supabaseStatus.source === 'environment' ? 'server environment variables' : 'the user integration'}. If schema changes are needed, mention the migration files/SQL the build step should generate.`
       : 'Supabase is not connected. If the request needs auth, persistence, relational data, or migrations, ask whether the user wants to connect Supabase or proceed with mock/local data.'
 
     const result = await generateText({

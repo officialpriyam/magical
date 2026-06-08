@@ -22,7 +22,8 @@ This guide is used by Magical AI to produce better artifacts.
 
 - Ask about Supabase in Plan mode when the requested app needs auth, persistence, relational data, bookings, dashboards, uploads metadata, or user accounts.
 - If Supabase is connected and schema changes are needed, include `supabase_migrations[]`.
-- Supabase can be connected by a user integration or by server environment variables: `SUPABASE_MANAGEMENT_ACCESS_TOKEN` plus `SUPABASE_PROJECT_REF`.
+- Supabase can be connected by user OAuth, legacy user token, or server environment variables.
+- When Supabase is connected by OAuth, do not ask for a Supabase project ref; Magical creates or reuses one Supabase project per Magical project.
 - Migrations should be additive by default and include RLS, policies, indexes, and triggers when needed.
 - Never invent secrets. Generated code should read Supabase URL and anon key from environment variables.
 - Avoid destructive SQL unless the user explicitly asks for it.

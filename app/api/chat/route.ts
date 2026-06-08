@@ -20,6 +20,7 @@ export async function POST(req: Request) {
     messages,
     userID,
     teamID,
+    projectID,
     template,
     model,
     config,
@@ -27,6 +28,7 @@ export async function POST(req: Request) {
     messages: ModelMessage[]
     userID: string | undefined
     teamID: string | undefined
+    projectID: string | undefined
     template: Templates
     model: LLMModel
     config: LLMModelConfig
@@ -57,7 +59,7 @@ export async function POST(req: Request) {
     delete modelParams.apiKey
     delete modelParams.baseURL
     const modelClient = getModelClient(resolvedModel, config)
-    const supabaseStatus = await getSupabaseConnectionStatus(userID)
+    const supabaseStatus = await getSupabaseConnectionStatus(userID, projectID)
 
     const result = await generateObject({
       model: modelClient as LanguageModel,
@@ -67,6 +69,7 @@ export async function POST(req: Request) {
           connected: supabaseStatus.connected,
           projectRef: supabaseStatus.projectRef,
           source: supabaseStatus.source,
+          projectsMode: supabaseStatus.projectsMode,
         },
       }),
       messages,

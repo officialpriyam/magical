@@ -186,6 +186,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
+  const currentProjectRef = useRef<Project | null>(null)
   const magicGlowRef = useRef<HTMLDivElement | null>(null)
   const magicAnimationFrameRef = useRef<number | null>(null)
   const [isLoadingProject, setIsLoadingProject] = useState(Boolean(initialProjectId))
@@ -204,6 +205,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  useEffect(() => {
+    currentProjectRef.current = currentProject
+  }, [currentProject])
 
   useEffect(() => {
     const syncTimers = githubSyncTimersRef.current
@@ -244,6 +249,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     const project = await getProject(supabase, chatId);
     if (project) {
       setErrorMessage('')
+      currentProjectRef.current = project
       setCurrentProject(project);
       setProjectMessagesRefreshKey((key) => key + 1)
       router.push(`/chat/${project.id}`)
@@ -306,6 +312,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       }
 
       setCurrentProject(project)
+      currentProjectRef.current = project
       setResult(undefined)
       setFragment(undefined)
       setCurrentTab('code')
@@ -437,6 +444,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           template: fragment?.template,
         })
 
+        if (!(await applyGeneratedSupabaseMigrations(fragment))) {
+          setIsPreviewLoading(false)
+          return
+        }
+
         let response: Response
         let result: any
 
@@ -448,6 +460,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               userID: session?.user?.id,
               teamID: userTeam?.id,
               accessToken: session?.access_token,
+              projectID: currentProjectRef.current?.id,
             }),
           })
           result = await response.json()
@@ -506,8 +519,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           setIsPreviewLoading(false);
           return;
         }
-
-        await applyGeneratedSupabaseMigrations(fragment)
 
         autoFixAttemptsRef.current = 0
         lastAutoFixSignatureRef.current = ''
@@ -622,6 +633,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       submit({
         userID: session.user.id,
         teamID: userTeam?.id,
+        projectID: currentProjectRef.current?.id,
         messages: toAISDKMessages(updatedMessages),
         template: getTemplateForSubmission(fragmentToFix.template),
         model: currentModel,
@@ -794,7 +806,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }, [session?.user?.id, sessionStartTime, fragmentsGenerated, messagesCount, errorsEncountered])
 
-  async function submitPlanResponse(updatedMessages: Message[]) {
+  async function submitPlanResponse(updatedMessages: Message[], projectId?: string) {
     setIsPlanLoading(true)
     const abortController = new AbortController()
     planAbortControllerRef.current = abortController
@@ -809,6 +821,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         body: JSON.stringify({
           userID: session?.user?.id,
           teamID: userTeam?.id,
+          projectID: projectId,
           messages: toAISDKMessages(updatedMessages),
           model: currentModel,
           config: languageModel,
@@ -951,6 +964,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         submit({
           userID: session.user.id,
           teamID: userTeam?.id,
+          projectID: currentProjectRef.current?.id,
           messages: toAISDKMessages(updatedMessages),
           template: getTemplateForSubmission(fragment?.template),
           model: currentModel,
@@ -1029,7 +1043,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
 
     if (mode === 'plan') {
-      await submitPlanResponse(updatedMessages)
+      await submitPlanResponse(updatedMessages, projectForPrompt.id)
       setMessagesCount(prev => prev + 1)
       posthog.capture('chat_plan_submit', {
         template: selectedTemplate,
@@ -1046,6 +1060,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       submit({
       userID: session?.user?.id,
       teamID: userTeam?.id,
+      projectID: projectForPrompt.id,
       messages: toAISDKMessages(updatedMessages),
       template: getTemplateForSubmission(),
       model: currentModel,
@@ -1086,6 +1101,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     submit({
       userID: session?.user?.id,
       teamID: userTeam?.id,
+      projectID: currentProjectRef.current?.id,
       messages: toAISDKMessages(messagesRef.current),
       template: getTemplateForSubmission(fragment?.template),
       model: currentModel,
@@ -1167,6 +1183,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
     skipNextProjectMessagesLoadRef.current = newProject.id
     invalidateCache(new RegExp(`^projects:${session.user.id}:`))
+    currentProjectRef.current = newProject
     setCurrentProject(newProject)
     setChatHistoryRefreshKey((key) => key + 1)
     if (navigate) {
@@ -1306,6 +1323,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setIsPreviewLoading(false)
     setAutoFixMessage('')
     setCurrentProject(null)
+    currentProjectRef.current = null
     setIsPreviewPanelOpen(false)
   }
 
@@ -1389,7 +1407,14 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       : []
 
     if (migrations.length === 0) {
-      return
+      return true
+    }
+
+    const project = currentProjectRef.current
+
+    if (!project?.id) {
+      setErrorMessage('Create or open a Magical project before applying Supabase migrations.')
+      return false
     }
 
     setAutoFixMessage(
@@ -1406,6 +1431,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           body: JSON.stringify({
             name: migration.name,
             query: migration.query,
+            projectId: project.id,
+            projectTitle: project.title,
           }),
         })
         const data = await response.json().catch(() => ({}))
@@ -1414,12 +1441,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           throw new Error(data.error || `Failed to apply ${migration.name}.`)
         }
       }
+
+      return true
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
           : 'Generated Supabase migrations could not be applied.',
       )
+      return false
     } finally {
       setAutoFixMessage('')
     }

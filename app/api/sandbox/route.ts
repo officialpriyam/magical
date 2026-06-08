@@ -2,6 +2,7 @@ import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import { createE2BSandbox } from '@/lib/e2b-sandbox'
 import { getFragmentFiles } from '@/lib/fragment-files'
+import { getSupabaseProjectRuntimeEnv } from '@/lib/supabase-integration'
 import type { Sandbox } from '@e2b/code-interpreter'
 import { FileSystemNode } from '@/components/file-tree'
 
@@ -48,11 +49,13 @@ export async function POST(req: Request) {
       userID,
       teamID,
       accessToken,
+      projectID,
     }: {
       fragment: FragmentSchema
       userID: string | undefined
       teamID: string | undefined
       accessToken: string | undefined
+      projectID: string | undefined
     } = await req.json()
 
     if (!fragment) {
@@ -75,6 +78,8 @@ export async function POST(req: Request) {
         { status: 503, headers: { 'Content-Type': 'application/json' } }
       )
     }
+
+    const supabaseRuntimeEnv = await getSupabaseProjectRuntimeEnv(userID, projectID)
 
     let sbx
     try {
@@ -153,6 +158,7 @@ export async function POST(req: Request) {
       await sbx.commands.run(fragment.install_dependencies_command, {
         envs: {
           PORT: (fragment.port || 80).toString(),
+          ...supabaseRuntimeEnv,
         },
       })
 

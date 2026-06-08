@@ -52,14 +52,22 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-Optional Supabase Management API connector for AI database migrations:
+Optional Supabase OAuth connector for AI database migrations in users' Supabase accounts:
 
 ```sh
-SUPABASE_MANAGEMENT_ACCESS_TOKEN=
-SUPABASE_PROJECT_REF=
+SUPABASE_OAUTH_CLIENT_ID=
+SUPABASE_OAUTH_CLIENT_SECRET=
 ```
 
-`SUPABASE_ACCESS_TOKEN` also works as an alias for the management token. If `SUPABASE_PROJECT_REF` is omitted, the app tries to derive it from `NEXT_PUBLIC_SUPABASE_URL`.
+Create the OAuth app in the Supabase Dashboard and set this callback URL:
+
+```txt
+https://your-domain.com/api/supabase/callback
+```
+
+Configure the OAuth app with Management API scopes for `organizations:read`, `projects:read`, `projects:write`, `database:write`, and `secrets:read`. Magical uses OAuth to connect a user's Supabase account, automatically creates or reuses one Supabase project per Magical project, applies generated migrations there, and injects the project's public Supabase env values into the preview sandbox.
+
+For server-owned fallback deployments, `SUPABASE_MANAGEMENT_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are still supported.
 
 Start the app only when you are ready:
 

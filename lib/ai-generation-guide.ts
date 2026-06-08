@@ -22,6 +22,7 @@ Design quality:
 Supabase/database behavior:
 - If the user asks for auth, accounts, persistence, dashboards, user data, uploads metadata, orders, bookings, or relational data, consider whether Supabase is needed.
 - If Supabase is needed and not connected, ask in Plan mode whether to connect Supabase or proceed with local/mock data.
+- If Supabase is connected by OAuth, do not ask for a Supabase project ref; Magical creates or reuses one Supabase project per Magical project.
 - If Supabase is connected and a schema change is needed, include supabase_migrations[] with complete PostgreSQL SQL. Keep migrations additive and reversible where practical.
 - Migration SQL must include RLS decisions, policies, indexes for foreign keys, updated_at triggers when needed, and grants only when appropriate.
 - Never invent secret keys. Use environment variables in generated code.

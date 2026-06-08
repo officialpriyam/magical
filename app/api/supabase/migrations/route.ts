@@ -18,6 +18,8 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}))
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   const query = typeof body.query === 'string' ? body.query.trim() : ''
+  const projectId = typeof body.projectId === 'string' ? body.projectId.trim() : ''
+  const projectTitle = typeof body.projectTitle === 'string' ? body.projectTitle.trim() : ''
   const allowDestructive = body.allowDestructive === true
 
   if (!name || !query) {
@@ -42,6 +44,9 @@ export async function POST(req: Request) {
       await applySupabaseMigration(user.id, {
         name,
         query,
+      }, {
+        projectId,
+        projectTitle,
       }),
     )
   } catch (error) {

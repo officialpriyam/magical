@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import { 
   Mail, 
@@ -123,6 +122,53 @@ const githubStatusMessages: Record<string, GitHubNotice> = {
   },
 }
 
+const supabaseStatusMessages: Record<string, GitHubNotice> = {
+  connected: {
+    title: 'Supabase connected',
+    description: 'AI can create one Supabase project per Magical project and apply generated migrations.',
+  },
+  invalid_state: {
+    title: 'Supabase connection expired',
+    description: 'Start the Supabase connection again from this page.',
+    variant: 'destructive',
+  },
+  login_required: {
+    title: 'Sign in required',
+    description: 'Sign in to Magical AI before connecting Supabase.',
+    variant: 'destructive',
+  },
+  not_configured: {
+    title: 'Supabase OAuth is not configured',
+    description: 'Add SUPABASE_OAUTH_CLIENT_ID and SUPABASE_OAUTH_CLIENT_SECRET in Vercel, then redeploy.',
+    variant: 'destructive',
+  },
+  access_denied: {
+    title: 'Supabase connection cancelled',
+    description: 'Approve the Supabase OAuth request to connect your account.',
+    variant: 'destructive',
+  },
+  authorization_failed: {
+    title: 'Supabase authorization failed',
+    description: 'Start the Supabase connection again and check the OAuth app settings.',
+    variant: 'destructive',
+  },
+  token_exchange_failed: {
+    title: 'Supabase token exchange failed',
+    description: 'Check the Supabase OAuth client secret, scopes, and callback URL.',
+    variant: 'destructive',
+  },
+  organization_lookup_failed: {
+    title: 'Supabase organization lookup failed',
+    description: 'The OAuth app needs organizations:read so Magical can choose where to create projects.',
+    variant: 'destructive',
+  },
+  error: {
+    title: 'Supabase connection failed',
+    description: 'Check Vercel logs for the Supabase OAuth callback.',
+    variant: 'destructive',
+  },
+}
+
 function upsertLoadedIntegration(
   integrations: UserIntegration[],
   integration: UserIntegration,
@@ -143,15 +189,15 @@ export default function IntegrationsSettings() {
   const { session } = useAuth(() => {}, () => {})
   const { toast } = useToast()
   const handledGitHubStatusRef = useRef(false)
+  const handledSupabaseStatusRef = useRef(false)
   
   const [integrations, setIntegrations] = useState<UserIntegration[]>([])
   const [githubNotice, setGitHubNotice] = useState<GitHubNotice | null>(null)
+  const [supabaseNotice, setSupabaseNotice] = useState<GitHubNotice | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [connecting, setConnecting] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [supabaseProjectRef, setSupabaseProjectRef] = useState('')
-  const [supabaseAccessToken, setSupabaseAccessToken] = useState('')
 
   const loadIntegrations = useCallback(async () => {
     if (!session?.user?.id) return
@@ -246,6 +292,30 @@ export default function IntegrationsSettings() {
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
   }, [loadIntegrations, toast])
 
+  useEffect(() => {
+    if (handledSupabaseStatusRef.current || typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+    const supabaseStatus = url.searchParams.get('supabase')
+
+    if (!supabaseStatus) return
+
+    handledSupabaseStatusRef.current = true
+
+    const message =
+      supabaseStatusMessages[supabaseStatus] || supabaseStatusMessages.error
+
+    setSupabaseNotice(message)
+    toast(message)
+
+    if (supabaseStatus === 'connected') {
+      void loadIntegrations()
+    }
+
+    url.searchParams.delete('supabase')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [loadIntegrations, toast])
+
 
   const getIntegrationStatus = useCallback((serviceId: string) => {
     const integration = integrations.find(integration => integration.service_name === serviceId)
@@ -273,40 +343,12 @@ export default function IntegrationsSettings() {
     }
 
     try {
-      if (serviceId === 'github') {
-        window.location.assign('/api/github/connect')
+      if (serviceId === 'github' || serviceId === 'supabase') {
+        window.location.assign(`/api/${serviceId}/connect`)
         return
       }
 
       setConnecting(serviceId)
-
-      if (serviceId === 'supabase') {
-        const response = await fetch('/api/supabase/connect', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            accessToken: supabaseAccessToken,
-            projectRef: supabaseProjectRef,
-          }),
-        })
-
-        const data = await response.json().catch(() => ({}))
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to connect Supabase.')
-        }
-
-        setSupabaseAccessToken('')
-        await loadIntegrations()
-
-        toast({
-          title: 'Supabase connected',
-          description: 'AI can now prepare and apply Supabase migrations for generated apps.',
-        })
-        return
-      }
       
       const success = await upsertUserIntegration(session.user.id, serviceId, {
         is_connected: true,
@@ -438,6 +480,19 @@ export default function IntegrationsSettings() {
         </div>
       )}
 
+      {supabaseNotice && (
+        <div
+          className={`rounded-lg border p-4 text-sm ${
+            supabaseNotice.variant === 'destructive'
+              ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
+              : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+          }`}
+        >
+          <div className="font-medium">{supabaseNotice.title}</div>
+          <div className="mt-1 opacity-90">{supabaseNotice.description}</div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Connected Services</CardTitle>
@@ -464,6 +519,11 @@ export default function IntegrationsSettings() {
                 connectionData &&
                 'source' in connectionData &&
                 connectionData.source === 'environment'
+              const isOAuthSupabase =
+                service.id === 'supabase' &&
+                connectionData &&
+                'source' in connectionData &&
+                connectionData.source === 'oauth'
               
               return (
                 <div
@@ -481,6 +541,8 @@ export default function IntegrationsSettings() {
                           <Badge variant={isHealthy ? "default" : "secondary"}>
                             {isEnvironmentSupabase
                               ? "Environment"
+                              : isOAuthSupabase
+                                ? "OAuth"
                               : isHealthy
                                 ? "Connected"
                                 : "Needs Attention"}
@@ -519,6 +581,19 @@ export default function IntegrationsSettings() {
                           Configured through server environment variables.
                         </p>
                       )}
+                      {isOAuthSupabase && (
+                        <p className="text-xs text-muted-foreground">
+                          Creates a separate Supabase project for each Magical project.
+                        </p>
+                      )}
+                      {service.id === 'supabase' &&
+                        connectionData &&
+                        'organizationSlug' in connectionData &&
+                        connectionData.organizationSlug && (
+                          <p className="text-xs text-muted-foreground">
+                            Organization {connectionData.organizationSlug as string}
+                          </p>
+                        )}
                       {connectionData &&
                        'simulated' in connectionData &&
                        connectionData.simulated && (
@@ -530,29 +605,6 @@ export default function IntegrationsSettings() {
                   </div>
                   
                   <div className="flex flex-col gap-3 lg:min-w-72 lg:items-end">
-                    {service.id === 'supabase' &&
-                      (!isConnected || isEnvironmentSupabase) && (
-                      <div className="grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                        <Input
-                          value={supabaseProjectRef}
-                          onChange={(event) => setSupabaseProjectRef(event.target.value)}
-                          placeholder="Project ref"
-                          disabled={isProcessing}
-                        />
-                        <Input
-                          value={supabaseAccessToken}
-                          onChange={(event) => setSupabaseAccessToken(event.target.value)}
-                          placeholder="Personal access token"
-                          type="password"
-                          disabled={isProcessing}
-                        />
-                        <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-1">
-                          {isEnvironmentSupabase
-                            ? 'Server env is active. Add a personal token here only if this user should override it.'
-                            : 'Create a token in Supabase account settings, then paste the project ref from your project URL.'}
-                        </p>
-                      </div>
-                    )}
                     <div className="flex items-center gap-2">
                     {isConnected && !isEnvironmentSupabase ? (
                       <Button
@@ -573,27 +625,18 @@ export default function IntegrationsSettings() {
                         variant="default"
                         size="sm"
                         onClick={() => handleConnect(service.id)}
-                        disabled={
-                          isProcessing ||
-                          !supabaseProjectRef.trim() ||
-                          !supabaseAccessToken.trim()
-                        }
+                        disabled={isProcessing}
                       >
-                        {isConnecting ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Plus className="h-4 w-4 mr-2" />
-                        )}
-                        Use personal token
+                        <Plus className="h-4 w-4 mr-2" />
+                        Connect account
                       </Button>
-                    ) : service.id === 'github' ? (
+                    ) : service.id === 'github' || service.id === 'supabase' ? (
                       <Button
                         asChild
                         variant="default"
                         size="sm"
                       >
-                        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-                        <a href="/api/github/connect">
+                        <a href={`/api/${service.id}/connect`}>
                           <Plus className="h-4 w-4 mr-2" />
                           Connect
                         </a>
@@ -604,9 +647,7 @@ export default function IntegrationsSettings() {
                         size="sm"
                         onClick={() => handleConnect(service.id)}
                         disabled={
-                          isProcessing ||
-                          (service.id === 'supabase' &&
-                            (!supabaseProjectRef.trim() || !supabaseAccessToken.trim()))
+                          isProcessing
                         }
                       >
                         {isConnecting ? (

@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/auth-utils'
 import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { user, error } = await authenticateUser()
 
   if (error) {
@@ -13,7 +13,8 @@ export async function GET() {
   }
 
   try {
-    return NextResponse.json(await getSupabaseConnectionStatus(user.id))
+    const projectId = request.nextUrl.searchParams.get('projectId') || undefined
+    return NextResponse.json(await getSupabaseConnectionStatus(user.id, projectId))
   } catch (error) {
     console.error('Failed to read Supabase connection status:', error)
     return NextResponse.json(
