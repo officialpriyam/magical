@@ -26,6 +26,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import models from '@/lib/models.json';
 import { invalidateCache } from '@/lib/caching';
 import type { GitHubWorkspace } from '@/components/github-save';
+import type { PreviewTab } from '@/components/preview';
 import { Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo } from 'lucide-react';
 
 const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
@@ -99,6 +100,12 @@ Keep the user's original request and the current template unless the error requi
 
 Template: ${fragment.template || 'unknown'}
 File: ${fragment.file_path || 'unknown'}
+Files: ${Array.isArray(fragment.files) && fragment.files.length > 0
+  ? fragment.files.map((file) => file?.path).filter(Boolean).join(', ')
+  : fragment.file_path || 'unknown'}
+Supabase migrations: ${Array.isArray(fragment.supabase_migrations) && fragment.supabase_migrations.length > 0
+  ? fragment.supabase_migrations.map((migration) => migration?.name).filter(Boolean).join(', ')
+  : 'none'}
 Attempt: ${attempt}/${MAX_AUTO_FIX_ATTEMPTS}
 
 Sandbox error:
@@ -158,8 +165,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const isHydratingProjectMessagesRef = useRef(false)
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
   const [availableModels, setAvailableModels] = useState<LLMModel[]>(models.models as LLMModel[])
-  const [currentTab, setCurrentTab] = useState<'code' | 'fragment' | 'terminal' | 'interpreter' | 'editor' | 'files' | 'ide'>('code');
-  const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null);
+  const [currentTab, setCurrentTab] = useState<PreviewTab>('code');
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isPlanLoading, setIsPlanLoading] = useState(false);
   const [isPreviewPanelOpen, setIsPreviewPanelOpen] = useState(false);
@@ -180,7 +186,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
-  const [magicCursor, setMagicCursor] = useState({ x: 50, y: 24 })
+  const magicGlowRef = useRef<HTMLDivElement | null>(null)
+  const magicAnimationFrameRef = useRef<number | null>(null)
   const [isLoadingProject, setIsLoadingProject] = useState(Boolean(initialProjectId))
   const [chatHistoryRefreshKey, setChatHistoryRefreshKey] = useState(0)
   const [projectMessagesRefreshKey, setProjectMessagesRefreshKey] = useState(0)
@@ -204,6 +211,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       planAbortControllerRef.current?.abort()
       Object.values(syncTimers).forEach(clearTimeout)
+      if (magicAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(magicAnimationFrameRef.current)
+      }
     }
   }, [])
 
@@ -298,7 +308,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setCurrentProject(project)
       setResult(undefined)
       setFragment(undefined)
-      setSelectedFile(null)
       setCurrentTab('code')
       setIsPreviewLoading(false)
       setIsPreviewPanelOpen(false)
@@ -486,17 +495,19 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         const executionErrorDetails = getExecutionErrorDetails(executionResult)
         if (executionErrorDetails) {
           if (startAutoFix(fragment, executionErrorDetails, executionResult)) {
-            setCurrentTab('interpreter');
+            setCurrentTab('fragment');
             setIsPreviewLoading(false);
             return;
           }
 
           setAutoFixMessage('')
-          setErrorMessage('Generated code still has runtime errors. Review the interpreter output or try a different prompt.')
-          setCurrentTab('interpreter');
+          setErrorMessage('Generated code still has runtime errors. Review the preview output or try a different prompt.')
+          setCurrentTab('fragment');
           setIsPreviewLoading(false);
           return;
         }
+
+        await applyGeneratedSupabaseMigrations(fragment)
 
         autoFixAttemptsRef.current = 0
         lastAutoFixSignatureRef.current = ''
@@ -557,7 +568,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     errorDetails: string,
     executionResult?: ExecutionResult,
   ) {
-    if (!session || !currentModel || !fragmentToFix?.code) {
+    if (!session || !currentModel || (!fragmentToFix?.code && !fragmentToFix?.files?.length)) {
       return false
     }
 
@@ -565,6 +576,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       fragmentToFix.template,
       fragmentToFix.file_path,
       fragmentToFix.code,
+      JSON.stringify(fragmentToFix.files || []),
+      JSON.stringify(fragmentToFix.supabase_migrations || []),
       errorDetails,
     ].join('|')
 
@@ -714,7 +727,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
       setFragment(latestPreviewMessage?.object)
       setResult(latestPreviewMessage?.result)
-      setSelectedFile(null)
       setCurrentTab(latestPreviewMessage?.object ? 'fragment' : 'code')
       setIsLoadingProject(false)
 
@@ -1294,7 +1306,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setIsPreviewLoading(false)
     setAutoFixMessage('')
     setCurrentProject(null)
-    setSelectedFile(null)
     setIsPreviewPanelOpen(false)
   }
 
@@ -1337,10 +1348,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         })
 
         if (response.ok) {
-          // Update selected file only if it's the same file being edited
-          if (selectedFile?.path === path) {
-            setSelectedFile({ path, content })
-          }
           setErrorMessage('')
           scheduleGitHubFileSync(path, content)
         } else {
@@ -1360,10 +1367,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         })
 
         if (response.ok) {
-          // Update selected file only if it's the same file being edited
-          if (selectedFile?.path === path) {
-            setSelectedFile({ path, content })
-          }
           setErrorMessage('')
           scheduleGitHubFileSync(path, content)
         } else {
@@ -1372,6 +1375,53 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       }
     } catch (error) {
       console.error('Error saving file:', error)
+    }
+  }
+
+  async function applyGeneratedSupabaseMigrations(fragmentToApply: DeepPartial<FragmentSchema>) {
+    const migrations = Array.isArray(fragmentToApply.supabase_migrations)
+      ? fragmentToApply.supabase_migrations
+          .map((migration) => ({
+            name: typeof migration?.name === 'string' ? migration.name.trim() : '',
+            query: typeof migration?.query === 'string' ? migration.query.trim() : '',
+          }))
+          .filter((migration) => migration.name && migration.query)
+      : []
+
+    if (migrations.length === 0) {
+      return
+    }
+
+    setAutoFixMessage(
+      `Applying ${migrations.length} Supabase migration${migrations.length === 1 ? '' : 's'}...`,
+    )
+
+    try {
+      for (const migration of migrations) {
+        const response = await fetch('/api/supabase/migrations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: migration.name,
+            query: migration.query,
+          }),
+        })
+        const data = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(data.error || `Failed to apply ${migration.name}.`)
+        }
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Generated Supabase migrations could not be applied.',
+      )
+    } finally {
+      setAutoFixMessage('')
     }
   }
 
@@ -1439,10 +1489,22 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }
 
   function handleMagicPointerMove(event: PointerEvent<HTMLDivElement>) {
+    const glow = magicGlowRef.current
+
+    if (!glow) return
+
     const rect = event.currentTarget.getBoundingClientRect()
-    setMagicCursor({
-      x: ((event.clientX - rect.left) / rect.width) * 100,
-      y: ((event.clientY - rect.top) / rect.height) * 100,
+    const x = ((event.clientX - rect.left) / rect.width) * 100
+    const y = ((event.clientY - rect.top) / rect.height) * 100
+
+    if (magicAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(magicAnimationFrameRef.current)
+    }
+
+    magicAnimationFrameRef.current = requestAnimationFrame(() => {
+      glow.style.setProperty('--magic-x', `${x}%`)
+      glow.style.setProperty('--magic-y', `${y}%`)
+      magicAnimationFrameRef.current = null
     })
   }
 
@@ -1453,6 +1515,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     messages.length === 0 &&
     !fragment &&
     !isPreviewPanelOpen
+  const shouldShowPreviewPanel =
+    !isDashboardMode && (isPreviewPanelOpen || Boolean(fragment) || Boolean(result))
   const projectHeaderTitle = currentProject?.title || 'Magical AI'
   const projectHeaderSubtitle = currentProjectGitHubWorkspace
     ? `Synced to ${currentProjectGitHubWorkspace.fullName}`
@@ -1507,7 +1571,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   )
 
   return (
-    <main className="flex min-h-screen max-h-screen bg-[#080809]">
+    <main className="flex h-dvh min-h-dvh overflow-hidden bg-[#080809]">
       {supabase && (
         <AuthDialog
           open={isAuthDialogOpen}
@@ -1540,7 +1604,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           "grid min-w-0 flex-1 transition-all duration-300",
           isDashboardMode
             ? "w-full md:grid-cols-2"
-            : "w-full grid-cols-1 xl:grid-cols-[minmax(380px,480px)_minmax(0,1fr)]",
+            : shouldShowPreviewPanel
+              ? "w-full grid-cols-1 xl:grid-cols-[minmax(380px,480px)_minmax(0,1fr)]"
+              : "w-full grid-cols-1",
         )}
       >
         <div
@@ -1602,15 +1668,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 <button
                   type="button"
                   onClick={() => {
-                    setIsPreviewPanelOpen(!isPreviewPanelOpen)
-                    if (!isPreviewPanelOpen) {
+                    if (shouldShowPreviewPanel) {
+                      setCurrentPreview({ fragment: undefined, result: undefined })
+                      setIsPreviewPanelOpen(false)
+                    } else {
+                      setIsPreviewPanelOpen(true)
                       setCurrentTab('ide')
                     }
                   }}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/65 transition hover:bg-white/[0.08] hover:text-white"
-                  title={isPreviewPanelOpen || !!fragment ? 'Close panel' : 'Open IDE panel'}
+                  title={shouldShowPreviewPanel ? 'Close panel' : 'Open IDE panel'}
                 >
-                  {isPreviewPanelOpen || !!fragment ? (
+                  {shouldShowPreviewPanel ? (
                     <PanelRightClose className="h-4 w-4" />
                   ) : (
                     <PanelRightOpen className="h-4 w-4" />
@@ -1627,9 +1696,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,196,87,0.30),transparent_28%),radial-gradient(circle_at_18%_75%,rgba(40,127,96,0.20),transparent_28%),linear-gradient(180deg,#151913_0%,#0b0d0b_52%,#100d08_100%)]" />
               <div
+                ref={magicGlowRef}
                 className="pointer-events-none absolute inset-0 opacity-90 transition-opacity duration-200"
                 style={{
-                  background: `radial-gradient(circle at ${magicCursor.x}% ${magicCursor.y}%, rgba(255, 219, 122, 0.34), rgba(255, 176, 65, 0.12) 12%, transparent 26%)`,
+                  background: 'radial-gradient(circle at var(--magic-x, 50%) var(--magic-y, 24%), rgba(255, 219, 122, 0.34), rgba(255, 176, 65, 0.12) 12%, transparent 26%)',
                 }}
               />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,8,9,0.16),rgba(8,8,9,0)_48%,rgba(8,8,9,0.24))]" />
@@ -1734,7 +1804,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             </>
             )}
         </div>
-          {!isDashboardMode && (
+          {shouldShowPreviewPanel && (
             <Preview
               teamID={userTeam?.id}
               accessToken={session?.access_token}
@@ -1753,12 +1823,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               }}
               result={result as ExecutionResult}
               onClose={() => {
-                setFragment(undefined)
+                setCurrentPreview({ fragment: undefined, result: undefined })
                 setIsPreviewPanelOpen(false)
               }}
               code={fragment?.code || ''}
-              selectedFile={selectedFile}
-              onSelectFile={setSelectedFile}
               onSave={handleSaveFile}
               executeCode={handleExecuteCode}
             />

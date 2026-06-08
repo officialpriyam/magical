@@ -1,9 +1,6 @@
 import { FragmentCode } from './fragment-code'
 import { FragmentPreview } from './fragment-preview'
 import { FragmentTerminal } from './fragment-terminal'
-import { FragmentInterpreter } from './fragment-interpreter'
-import { CodeEditor } from './code-editor'
-import { SandboxFileTree } from './sandbox-file-tree'
 import { IDE } from './ide'
 import { GitHubSave, type GitHubWorkspace } from './github-save'
 import { Button } from '@/components/ui/button'
@@ -16,9 +13,14 @@ import {
 } from '@/components/ui/tooltip'
 import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
+import { getFragmentFiles } from '@/lib/fragment-files'
 import { DeepPartial } from 'ai'
-import { ChevronsRight, LoaderCircle, Terminal, Code, FileCode, FolderTree, Folder } from 'lucide-react'
+import { ChevronsRight, LoaderCircle, Terminal, Code, Folder } from 'lucide-react'
 import { Dispatch, SetStateAction, useEffect, useState } from 'react'
+
+export type PreviewTab = 'code' | 'fragment' | 'terminal' | 'ide'
+
+const PREVIEW_TABS: PreviewTab[] = ['code', 'fragment', 'terminal', 'ide']
 
 export function Preview({
   teamID,
@@ -36,15 +38,13 @@ export function Preview({
   result,
   onClose,
   code,
-  selectedFile,
-  onSelectFile,
   onSave,
   executeCode,
 }: {
   teamID: string | undefined
   accessToken: string | undefined
-  selectedTab: 'code' | 'fragment' | 'terminal' | 'interpreter' | 'editor' | 'files' | 'ide'
-  onSelectedTabChange: Dispatch<SetStateAction<'code' | 'fragment' | 'terminal' | 'interpreter' | 'editor' | 'files' | 'ide'>>
+  selectedTab: PreviewTab
+  onSelectedTabChange: Dispatch<SetStateAction<PreviewTab>>
   isChatLoading: boolean
   isPreviewLoading: boolean
   fragment?: DeepPartial<FragmentSchema>
@@ -56,12 +56,9 @@ export function Preview({
   result?: ExecutionResult
   onClose: () => void
   code?: string
-  selectedFile?: { path: string; content: string } | null
-  onSelectFile?: (file: { path: string; content: string } | null) => void
   onSave?: (path: string, content: string) => Promise<void>
   executeCode?: (code: string) => Promise<any>
 }) {
-  const [isRefreshingFiles, setIsRefreshingFiles] = useState(false)
   const [sandboxFiles, setSandboxFiles] = useState(result?.files || [])
   const [isGitHubSaveOpen, setIsGitHubSaveOpen] = useState(false)
   const isGitHubSaveBlocked = githubSaveRequired && !isGitHubWorkspaceConnected
@@ -69,91 +66,6 @@ export function Preview({
   useEffect(() => {
     setSandboxFiles(result?.files || [])
   }, [result?.files, result?.sbxId])
-
-  async function handleSelectSandboxFile(path: string) {
-    if (!result?.sbxId) return
-
-    try {
-      const response = await fetch(`/api/sandbox/${result.sbxId}/files/content?path=${encodeURIComponent(path)}`)
-      const data = await response.json()
-
-      if (response.ok && data.content !== undefined) {
-        // Update the selected file in the parent component
-        if (onSelectFile) {
-          onSelectFile({ path: data.path, content: data.content })
-        }
-        // Switch to editor tab
-        onSelectedTabChange('editor')
-      }
-    } catch (error) {
-      console.error('Error loading sandbox file:', error)
-    }
-  }
-
-  async function handleRefreshFiles() {
-    if (!result?.sbxId) return
-
-    setIsRefreshingFiles(true)
-    try {
-      const response = await fetch(`/api/sandbox/${result.sbxId}/files`)
-      const data = await response.json()
-
-      if (response.ok && data.files) {
-        setSandboxFiles(data.files)
-      }
-    } catch (error) {
-      console.error('Error refreshing files:', error)
-    } finally {
-      setIsRefreshingFiles(false)
-    }
-  }
-
-  async function handleRenameSandboxFile(oldPath: string, newPath: string) {
-    if (!result?.sbxId) return
-
-    try {
-      const response = await fetch(`/api/sandbox/${result.sbxId}/files/content`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ oldPath, newPath }),
-      })
-
-      if (response.ok) {
-        await handleRefreshFiles()
-        if (selectedFile?.path === oldPath && onSelectFile) {
-          onSelectFile({ path: newPath, content: selectedFile.content })
-        }
-      }
-    } catch (error) {
-      console.error('Error renaming sandbox file:', error)
-    }
-  }
-
-  async function handleDeleteSandboxFile(path: string) {
-    if (!result?.sbxId) return
-
-    try {
-      const response = await fetch(`/api/sandbox/${result.sbxId}/files/content`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ path }),
-      })
-
-      if (response.ok) {
-        await handleRefreshFiles()
-        if (selectedFile?.path === path && onSelectFile) {
-          onSelectFile(null)
-          onSelectedTabChange('files')
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting sandbox file:', error)
-    }
-  }
 
   function handleOpenRequiredGitHubSave() {
     onSaveBlocked?.()
@@ -165,12 +77,13 @@ export function Preview({
       <Tabs
         value={selectedTab}
         onValueChange={(value) => {
-          console.log('Tab changed to:', value)
-          onSelectedTabChange(value as 'code' | 'fragment' | 'terminal' | 'interpreter' | 'editor' | 'files' | 'ide')
+          if (PREVIEW_TABS.includes(value as PreviewTab)) {
+            onSelectedTabChange(value as PreviewTab)
+          }
         }}
         className="h-full flex flex-col items-start justify-start"
       >
-        <div className="relative z-10 grid w-full grid-cols-3 items-center border-b border-white/10 bg-white/[0.03] p-2">
+        <div className="relative z-10 grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/10 bg-white/[0.03] p-2">
           <TooltipProvider>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
@@ -186,8 +99,8 @@ export function Preview({
               <TooltipContent>Close sidebar</TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <div className="flex justify-center relative z-20">
-            <TabsList className="px-1 py-0 border h-8 relative z-30">
+          <div className="relative z-20 flex min-w-0 justify-center overflow-x-auto">
+            <TabsList className="relative z-30 h-8 w-max border px-1 py-0">
               <TabsTrigger
                 className="font-normal text-xs py-1 px-2 gap-1 flex items-center"
                 value="code"
@@ -223,29 +136,6 @@ export function Preview({
                 Terminal
               </TabsTrigger>
               <TabsTrigger
-                disabled={!result || result.template !== 'code-interpreter-v1'}
-                className="font-normal text-xs py-1 px-2 gap-1 flex items-center"
-                value="interpreter"
-              >
-                <Code className="h-3 w-3" />
-                Interpreter
-              </TabsTrigger>
-              <TabsTrigger
-                className="font-normal text-xs py-1 px-2 gap-1 flex items-center"
-                value="editor"
-              >
-                <FileCode className="h-3 w-3" />
-                Editor
-              </TabsTrigger>
-              <TabsTrigger
-                disabled={!result || sandboxFiles.length === 0}
-                className="font-normal text-xs py-1 px-2 gap-1 flex items-center"
-                value="files"
-              >
-                <FolderTree className="h-3 w-3" />
-                Files
-              </TabsTrigger>
-              <TabsTrigger
                 className="font-normal text-xs py-1 px-2 gap-1 flex items-center"
                 value="ide"
               >
@@ -271,16 +161,14 @@ export function Preview({
             Save this project to GitHub before editing files. Use the Save to GitHub button above to connect a repository.
           </div>
         )}
-        <div className="overflow-y-auto w-full h-full">
+        <div className="min-h-0 w-full flex-1 overflow-hidden">
             <TabsContent value="code" className="h-full">
-              {fragment?.code ? (
+              {getFragmentFiles(fragment).length > 0 ? (
                 <FragmentCode
-                  files={[
-                    {
-                      name: fragment?.file_path || 'code.txt',
-                      content: fragment?.code || '',
-                    },
-                  ]}
+                  files={getFragmentFiles(fragment).map((file) => ({
+                    name: file.path,
+                    content: file.content,
+                  }))}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -314,64 +202,11 @@ export function Preview({
                 </div>
               )}
             </TabsContent>
-            <TabsContent value="interpreter" className="h-full">
-              {result && result.template === 'code-interpreter-v1' ? (
-                <FragmentInterpreter
-                  result={result}
-                  code={code || fragment?.code || ''}
-                  executeCode={executeCode || (async () => {})}
-                />
-              ) : result ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  Interpreter only available for code-interpreter-v1 template
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  Interpreter will appear here once the sandbox is created
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="editor" className="h-full">
-              {selectedFile && onSave ? (
-                isGitHubSaveBlocked ? (
-                  <GitHubRequiredNotice onOpenGitHubSave={handleOpenRequiredGitHubSave} />
-                ) : (
-                  <CodeEditor
-                    code={selectedFile.content}
-                    lang={selectedFile.path.split('.').pop() || 'txt'}
-                    onChange={(value) => {
-                      if (value !== undefined) {
-                        onSave(selectedFile.path, value)
-                      }
-                    }}
-                  />
-                )
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  Select a file from the file tree to edit
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="files" className="h-full">
-              {result && sandboxFiles.length > 0 ? (
-                <SandboxFileTree
-                  files={sandboxFiles}
-                  onSelectFile={handleSelectSandboxFile}
-                  onRenameFile={handleRenameSandboxFile}
-                  onDeleteFile={handleDeleteSandboxFile}
-                  onRefresh={handleRefreshFiles}
-                  isLoading={isRefreshingFiles}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No sandbox files available
-                </div>
-              )}
-            </TabsContent>
             <TabsContent value="ide" className="h-full m-0 p-0">
               <div className="h-full w-full">
                 <IDE
                   sandboxId={result?.sbxId}
+                  initialFiles={sandboxFiles}
                   onSave={onSave}
                   githubSaveRequired={githubSaveRequired}
                   githubWorkspaceConnected={isGitHubWorkspaceConnected}
@@ -381,22 +216,6 @@ export function Preview({
             </TabsContent>
           </div>
       </Tabs>
-    </div>
-  )
-}
-
-function GitHubRequiredNotice({ onOpenGitHubSave }: { onOpenGitHubSave: () => void }) {
-  return (
-    <div className="flex h-full items-center justify-center p-6 text-center">
-      <div className="max-w-sm space-y-3 rounded-lg border bg-background/70 p-5 shadow-sm">
-        <div className="text-sm font-medium">GitHub save required</div>
-        <p className="text-sm text-muted-foreground">
-          Save this project to a GitHub repository before editing files. This keeps project changes synced to the user&apos;s GitHub account.
-        </p>
-        <Button type="button" variant="outline" size="sm" onClick={onOpenGitHubSave}>
-          Use Save to GitHub
-        </Button>
-      </div>
     </div>
   )
 }

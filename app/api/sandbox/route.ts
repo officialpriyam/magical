@@ -1,6 +1,7 @@
 import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import { createE2BSandbox } from '@/lib/e2b-sandbox'
+import { getFragmentFiles } from '@/lib/fragment-files'
 import type { Sandbox } from '@e2b/code-interpreter'
 import { FileSystemNode } from '@/components/file-tree'
 
@@ -110,12 +111,14 @@ export async function POST(req: Request) {
         await sbx.commands.run(fragment.install_dependencies_command)
       }
 
-      if (fragment.code && Array.isArray(fragment.code)) {
-        await Promise.all(fragment.code.map(async (file) => {
-          await sbx.files.write(file.file_path, file.file_content)
-        }))
-      } else if (fragment.code !== null && fragment.code !== undefined) {
-        await sbx.files.write(fragment.file_path, fragment.code)
+      const generatedFiles = getFragmentFiles(fragment)
+
+      if (generatedFiles.length > 0) {
+        await Promise.all(
+          generatedFiles.map(async (file) => {
+            await sbx.files.write(file.path, file.content)
+          }),
+        )
       } else {
         return new Response(
           JSON.stringify({
@@ -127,7 +130,8 @@ export async function POST(req: Request) {
       }
 
       if (fragment.template === 'code-interpreter-v1') {
-        const { logs, error, results } = await sbx.runCode(fragment.code || '')
+        const interpreterCode = fragment.code || generatedFiles[0]?.content || ''
+        const { logs, error, results } = await sbx.runCode(interpreterCode)
 
         // Fetch file tree after execution
         const files = await fetchSandboxFiles(sbx)

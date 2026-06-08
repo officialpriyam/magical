@@ -5,18 +5,22 @@ import { type ThemeProviderProps } from 'next-themes'
 import posthog from 'posthog-js'
 import { PostHogProvider as PostHogProviderJS } from 'posthog-js/react'
 
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ENABLE_POSTHOG) {
+const isPostHogEnabled =
+  process.env.NEXT_PUBLIC_ENABLE_POSTHOG === 'true' &&
+  Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY)
+
+if (typeof window !== 'undefined' && isPostHogEnabled) {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '', {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     person_profiles: 'identified_only',
     session_recording: {
-      recordCrossOriginIframes: true,
+      recordCrossOriginIframes: false,
     }
   })
 }
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
-  return process.env.NEXT_PUBLIC_ENABLE_POSTHOG ? (
+  return isPostHogEnabled ? (
     <PostHogProviderJS client={posthog}>{children}</PostHogProviderJS>
   ) : (
     children

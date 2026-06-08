@@ -24,6 +24,7 @@ import { useToast } from '@/components/ui/use-toast'
 import type { FileSystemNode } from '@/components/file-tree'
 import type { FragmentSchema } from '@/lib/schema'
 import type { ExecutionResult } from '@/lib/types'
+import { getFragmentFiles } from '@/lib/fragment-files'
 import { DeepPartial } from 'ai'
 import { GitBranch, Loader2, UploadCloud } from 'lucide-react'
 
@@ -86,9 +87,10 @@ export function GitHubSave({
   const [isSaving, setIsSaving] = useState(false)
 
   const generatedFiles = sandboxFiles || result?.files || []
+  const fragmentFiles = useMemo(() => getFragmentFiles(fragment), [fragment])
   const hasGeneratedFiles = useMemo(
-    () => Boolean(fragment?.code || (result?.sbxId && generatedFiles.length)),
-    [fragment?.code, generatedFiles.length, result?.sbxId],
+    () => Boolean(fragmentFiles.length || (result?.sbxId && generatedFiles.length)),
+    [fragmentFiles.length, generatedFiles.length, result?.sbxId],
   )
   const isOpen = open ?? internalOpen
   const setOpen = onOpenChange ?? setInternalOpen
@@ -283,6 +285,13 @@ export function GitHubSave({
       }
 
       return files
+    }
+
+    if (fragmentFiles.length > 0) {
+      return fragmentFiles.map((file) => ({
+        path: withPathPrefix(file.path),
+        content: file.content,
+      }))
     }
 
     if (!fragment?.code) {

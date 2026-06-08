@@ -9,6 +9,7 @@ import {
 import { toPrompt } from '@/lib/prompt'
 import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { fragmentSchema as schema } from '@/lib/schema'
+import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
 import { Templates } from '@/lib/templates'
 import { generateObject, type LanguageModel, type ModelMessage } from 'ai'
 
@@ -41,12 +42,6 @@ export async function POST(req: Request) {
     return createRateLimitResponse(limit)
   }
 
-  console.log('userID', userID)
-  console.log('teamID', teamID)
-  // console.log('template', template)
-  console.log('model', model)
-  // console.log('config', config)
-
   try {
     const resolvedModel = resolveGenerationModel(model, config)
 
@@ -62,11 +57,19 @@ export async function POST(req: Request) {
     delete modelParams.apiKey
     delete modelParams.baseURL
     const modelClient = getModelClient(resolvedModel, config)
+    const supabaseStatus = userID
+      ? await getSupabaseConnectionStatus(userID)
+      : { connected: false }
 
     const result = await generateObject({
       model: modelClient as LanguageModel,
       schema,
-      system: toPrompt(template),
+      system: toPrompt(template, {
+        supabase: {
+          connected: supabaseStatus.connected,
+          projectRef: supabaseStatus.projectRef,
+        },
+      }),
       messages,
       maxRetries: 0, // do not retry on errors
       ...modelParams,

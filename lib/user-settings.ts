@@ -305,7 +305,7 @@ export async function getUserIntegrations(userId: string): Promise<UserIntegrati
 }
 
 function getDefaultIntegrations(userId: string): UserIntegration[] {
-  const services = ['github', 'google_drive', 'gmail', 'google_calendar', 'artifacts']
+  const services = ['github', 'supabase', 'google_drive', 'gmail', 'google_calendar', 'artifacts']
   const now = new Date().toISOString()
   
   return services.map(service => ({

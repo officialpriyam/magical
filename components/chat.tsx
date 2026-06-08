@@ -1,8 +1,9 @@
 import { Message, MessagePlan } from '@/lib/messages'
 import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
+import { getFragmentFiles } from '@/lib/fragment-files'
 import { DeepPartial } from 'ai'
-import { Check, LoaderIcon, Terminal, Sparkles, Square } from 'lucide-react'
+import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 export function Chat({
@@ -82,41 +83,10 @@ export function Chat({
             }
           })}
           {message.object && (
-            <div
-              onClick={() =>
-                setCurrentPreview({
-                  fragment: message.object,
-                  result: message.result,
-                })
-              }
-              className="w-full max-w-[22rem] rounded-xl border border-blue-500/70 bg-white/[0.035] p-3 shadow-[0_0_0_1px_rgba(37,99,235,0.18)] transition hover:bg-white/[0.055] hover:cursor-pointer"
-            >
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-white">
-                    {message.object.title || 'Generated project'}
-                  </div>
-                  <div className="mt-1 truncate text-xs text-white/45">
-                    {message.object.file_path || message.object.template || 'Artifact ready'}
-                  </div>
-                </div>
-                <Terminal strokeWidth={2} className="h-4 w-4 shrink-0 text-[#FFB84D]" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className="h-8 rounded-md border border-white/15 bg-white/[0.04] text-xs font-medium text-white transition hover:bg-white/[0.08]"
-                >
-                  Details
-                </button>
-                <button
-                  type="button"
-                  className="h-8 rounded-md border border-white/10 bg-white/[0.08] text-xs font-medium text-white/70 transition hover:bg-white/[0.12] hover:text-white"
-                >
-                  Preview
-                </button>
-              </div>
-            </div>
+            <GeneratedArtifactCard
+              message={message}
+              setCurrentPreview={setCurrentPreview}
+            />
           )}
         </div>
       ))}
@@ -130,6 +100,84 @@ export function Chat({
           onStop={onStop}
         />
       )}
+    </div>
+  )
+}
+
+function GeneratedArtifactCard({
+  message,
+  setCurrentPreview,
+}: {
+  message: Message
+  setCurrentPreview: (preview: {
+    fragment: DeepPartial<FragmentSchema> | undefined
+    result: ExecutionResult | undefined
+  }) => void
+}) {
+  const files = getFragmentFiles(message.object)
+  const migrations = Array.isArray(message.object?.supabase_migrations)
+    ? message.object.supabase_migrations
+    : []
+
+  return (
+    <div
+      onClick={() =>
+        setCurrentPreview({
+          fragment: message.object,
+          result: message.result,
+        })
+      }
+      className="w-full max-w-[24rem] rounded-xl border border-blue-500/70 bg-white/[0.035] p-3 shadow-[0_0_0_1px_rgba(37,99,235,0.18)] transition hover:bg-white/[0.055] hover:cursor-pointer"
+    >
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-white">
+            {message.object?.title || 'Generated project'}
+          </div>
+          <div className="mt-1 truncate text-xs text-white/45">
+            {files.length > 0
+              ? `${files.length} file${files.length === 1 ? '' : 's'} generated`
+              : message.object?.template || 'Artifact ready'}
+          </div>
+        </div>
+        <Terminal strokeWidth={2} className="h-4 w-4 shrink-0 text-[#FFB84D]" />
+      </div>
+
+      {files.length > 0 && (
+        <div className="mb-4 space-y-1.5">
+          {files.slice(0, 5).map((file) => (
+            <div key={file.path} className="flex min-w-0 items-center gap-2 text-xs text-white/68">
+              <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/42" />
+              <span className="truncate">{file.path}</span>
+            </div>
+          ))}
+          {files.length > 5 && (
+            <div className="text-xs text-white/42">+{files.length - 5} more files</div>
+          )}
+        </div>
+      )}
+
+      {migrations.length > 0 && (
+        <div className="mb-4 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-200">
+          <Database className="h-3.5 w-3.5" />
+          {migrations.length} Supabase migration{migrations.length === 1 ? '' : 's'} ready
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          className="h-8 rounded-md border border-white/15 bg-white/[0.04] text-xs font-medium text-white transition hover:bg-white/[0.08]"
+        >
+          Details
+        </button>
+        <button
+          type="button"
+          className="h-8 rounded-md border border-white/10 bg-white/[0.08] text-xs font-medium text-white/70 transition hover:bg-white/[0.12] hover:text-white"
+        >
+          Preview
+        </button>
+      </div>
     </div>
   )
 }
@@ -257,6 +305,11 @@ function GenerationStatusCard({
 
   if (!status) return null
 
+  const files = getFragmentFiles(currentFragment)
+  const migrations = Array.isArray(currentFragment?.supabase_migrations)
+    ? currentFragment.supabase_migrations
+    : []
+
   return (
     <div className="mt-2 w-full max-w-[36rem] rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 shadow-sm">
       <div className="flex items-center justify-between gap-3 text-sm font-medium text-white">
@@ -279,6 +332,25 @@ function GenerationStatusCard({
         <LoaderIcon strokeWidth={2} className="h-3.5 w-3.5 shrink-0 animate-spin" />
         <span className="min-w-0 break-words">{status.detail}</span>
       </div>
+      {files.length > 0 && (
+        <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+          {files.slice(0, 6).map((file) => (
+            <div
+              key={file.path}
+              className="flex min-w-0 items-center gap-2 rounded-md border border-white/10 bg-black/15 px-2 py-1.5 text-xs text-white/62"
+            >
+              <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/36" />
+              <span className="truncate">{file.path}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {migrations.length > 0 && (
+        <div className="mt-3 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-200">
+          <Database className="h-3.5 w-3.5" />
+          Preparing {migrations.length} Supabase migration{migrations.length === 1 ? '' : 's'}
+        </div>
+      )}
     </div>
   )
 }
@@ -321,6 +393,15 @@ function getGenerationStatus({
   }
 
   if (!isLoading) return null
+
+  const files = getFragmentFiles(latestObject)
+
+  if (files.length > 0) {
+    return {
+      title: 'Writing project files',
+      detail: `Generating ${files.length} file${files.length === 1 ? '' : 's'} for ${title || promptTarget}`,
+    }
+  }
 
   if (code || filePath || title || template) {
     return {

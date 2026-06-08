@@ -7,6 +7,8 @@ import {
   LLMModelConfig,
   resolveGenerationModel,
 } from '@/lib/models'
+import { AI_GENERATION_GUIDE } from '@/lib/ai-generation-guide'
+import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
 import { generateText, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
@@ -112,6 +114,12 @@ export async function POST(req: Request) {
     delete modelParams.apiKey
     delete modelParams.baseURL
     const modelClient = getModelClient(resolvedModel, config)
+    const supabaseStatus = userID
+      ? await getSupabaseConnectionStatus(userID)
+      : { connected: false }
+    const supabaseInstruction = supabaseStatus.connected
+      ? `Supabase is connected for project ref ${supabaseStatus.projectRef || 'unknown'}. If schema changes are needed, mention the migration files/SQL the build step should generate.`
+      : 'Supabase is not connected. If the request needs auth, persistence, relational data, or migrations, ask whether the user wants to connect Supabase or proceed with mock/local data.'
 
     const result = await generateText({
       model: modelClient as LanguageModel,
@@ -124,6 +132,8 @@ export async function POST(req: Request) {
         'Set question only when the work cannot proceed safely without one blocking answer.',
         'When question is set, include 2 to 4 short option strings when likely answers exist.',
         'Set allowCustomInput to true unless the listed options are exhaustive.',
+        AI_GENERATION_GUIDE,
+        supabaseInstruction,
       ].join(' '),
       messages,
       maxRetries: 0,

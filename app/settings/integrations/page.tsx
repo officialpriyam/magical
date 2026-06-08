@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import { 
   Mail, 
@@ -15,6 +16,7 @@ import {
   RefreshCw,
   GitBranch,
   ExternalLink,
+  Database,
 } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '@/lib/auth'
@@ -34,7 +36,14 @@ const availableIntegrations = [
     color: 'bg-neutral-900 text-white'
   },
   {
-    id: 'google-drive',
+    id: 'supabase',
+    name: 'Supabase',
+    description: 'Let AI create and apply database migrations for generated apps',
+    icon: Database,
+    color: 'bg-emerald-600 text-white'
+  },
+  {
+    id: 'google_drive',
     name: 'Google Drive', 
     description: 'Import and export files from your Drive',
     icon: FolderOpen,
@@ -48,7 +57,7 @@ const availableIntegrations = [
     color: 'bg-red-600 text-white'
   },
   {
-    id: 'google-calendar',
+    id: 'google_calendar',
     name: 'Google Calendar',
     description: 'Schedule meetings and manage your calendar',
     icon: Calendar,
@@ -114,6 +123,22 @@ const githubStatusMessages: Record<string, GitHubNotice> = {
   },
 }
 
+function upsertLoadedIntegration(
+  integrations: UserIntegration[],
+  integration: UserIntegration,
+) {
+  const index = integrations.findIndex(
+    (item) => item.service_name === integration.service_name,
+  )
+
+  if (index >= 0) {
+    integrations[index] = integration
+    return
+  }
+
+  integrations.push(integration)
+}
+
 export default function IntegrationsSettings() {
   const { session } = useAuth(() => {}, () => {})
   const { toast } = useToast()
@@ -125,24 +150,25 @@ export default function IntegrationsSettings() {
   const [connecting, setConnecting] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [supabaseProjectRef, setSupabaseProjectRef] = useState('')
+  const [supabaseAccessToken, setSupabaseAccessToken] = useState('')
 
   const loadIntegrations = useCallback(async () => {
     if (!session?.user?.id) return
 
     try {
-      console.log('Loading integrations for user:', session.user.id)
       const userIntegrations = await getUserIntegrations(session.user.id)
-      console.log('Loaded integrations:', userIntegrations)
+      const [githubStatusResponse, supabaseStatusResponse] = await Promise.all([
+        fetch('/api/github/status'),
+        fetch('/api/supabase/status'),
+      ])
 
-      const statusResponse = await fetch('/api/github/status')
-      if (statusResponse.ok) {
-        const githubStatus = await statusResponse.json()
-        const withoutGitHub = userIntegrations.filter(
-          (integration) => integration.service_name !== 'github',
-        )
+      const normalizedIntegrations = [...userIntegrations]
 
-        setIntegrations([
-          ...withoutGitHub,
+      if (githubStatusResponse.ok) {
+        const githubStatus = await githubStatusResponse.json()
+        upsertLoadedIntegration(
+          normalizedIntegrations,
           {
             id: 'github',
             user_id: session.user.id,
@@ -152,10 +178,26 @@ export default function IntegrationsSettings() {
             created_at: githubStatus.connected_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
-        ])
-      } else {
-        setIntegrations(userIntegrations)
+        )
       }
+
+      if (supabaseStatusResponse.ok) {
+        const supabaseStatus = await supabaseStatusResponse.json()
+        upsertLoadedIntegration(
+          normalizedIntegrations,
+          {
+            id: 'supabase',
+            user_id: session.user.id,
+            service_name: 'supabase',
+            is_connected: Boolean(supabaseStatus.connected),
+            connection_data: supabaseStatus,
+            created_at: supabaseStatus.connected_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        )
+      }
+
+      setIntegrations(normalizedIntegrations)
     } catch (error) {
       console.error('Error loading integrations:', error)
       toast({
@@ -207,7 +249,6 @@ export default function IntegrationsSettings() {
 
   const getIntegrationStatus = useCallback((serviceId: string) => {
     const integration = integrations.find(integration => integration.service_name === serviceId)
-    console.log(`Integration status for ${serviceId}:`, integration)
     return integration
   }, [integrations])
 
@@ -239,7 +280,33 @@ export default function IntegrationsSettings() {
 
       setConnecting(serviceId)
 
-      console.log(`Connecting ${serviceId} for user:`, session.user.id)
+      if (serviceId === 'supabase') {
+        const response = await fetch('/api/supabase/connect', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            accessToken: supabaseAccessToken,
+            projectRef: supabaseProjectRef,
+          }),
+        })
+
+        const data = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to connect Supabase.')
+        }
+
+        setSupabaseAccessToken('')
+        await loadIntegrations()
+
+        toast({
+          title: 'Supabase connected',
+          description: 'AI can now prepare and apply Supabase migrations for generated apps.',
+        })
+        return
+      }
       
       const success = await upsertUserIntegration(session.user.id, serviceId, {
         is_connected: true,
@@ -277,10 +344,10 @@ export default function IntegrationsSettings() {
     setDisconnecting(serviceId)
     
     try {
-      console.log(`Disconnecting ${serviceId} for user:`, session.user.id)
-
       const success = serviceId === 'github'
         ? await fetch('/api/github/disconnect', { method: 'POST' }).then(response => response.ok)
+        : serviceId === 'supabase'
+          ? await fetch('/api/supabase/disconnect', { method: 'POST' }).then(response => response.ok)
         : await disconnectUserIntegration(session.user.id, serviceId)
 
       if (success) {
@@ -388,13 +455,15 @@ export default function IntegrationsSettings() {
               const isDisconnecting = disconnecting === service.id
               const isProcessing = isConnecting || isDisconnecting
               const isHealthy = isConnected
-              
-              console.log(`Service ${service.id}: connected=${isConnected}, integration=`, integration)
+              const connectionData = integration?.connection_data &&
+                typeof integration.connection_data === 'object'
+                ? integration.connection_data
+                : null
               
               return (
                 <div
                   key={service.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
+                  className="flex flex-col gap-4 border rounded-lg p-4 lg:flex-row lg:items-center lg:justify-between"
                 >
                   <div className="flex items-center gap-4">
                     <div className={`p-2 rounded-lg ${service.color}`}>
@@ -414,26 +483,31 @@ export default function IntegrationsSettings() {
                       <p className="text-sm text-muted-foreground">
                         {service.description}
                       </p>
-                      {isConnected && integration?.connection_data &&
-                       typeof integration.connection_data === 'object' &&
-                       'connected_at' in integration.connection_data && (
+                      {isConnected && connectionData &&
+                       'connected_at' in connectionData && (
                         <p className="text-xs text-muted-foreground">
-                          Connected {new Date(integration.connection_data.connected_at as string).toLocaleDateString()}
+                          Connected {new Date(connectionData.connected_at as string).toLocaleDateString()}
                         </p>
                       )}
                       {service.id === 'github' &&
-                        integration?.connection_data &&
-                        typeof integration.connection_data === 'object' &&
-                        'username' in integration.connection_data &&
-                        integration.connection_data.username && (
+                        connectionData &&
+                        'username' in connectionData &&
+                        connectionData.username && (
                           <p className="text-xs text-muted-foreground">
-                            @{integration.connection_data.username as string}
+                            @{connectionData.username as string}
                           </p>
                         )}
-                      {integration?.connection_data &&
-                       typeof integration.connection_data === 'object' &&
-                       'simulated' in integration.connection_data &&
-                       integration.connection_data.simulated && (
+                      {service.id === 'supabase' &&
+                        connectionData &&
+                        'projectRef' in connectionData &&
+                        connectionData.projectRef && (
+                          <p className="text-xs text-muted-foreground">
+                            Project {connectionData.projectRef as string}
+                          </p>
+                        )}
+                      {connectionData &&
+                       'simulated' in connectionData &&
+                       connectionData.simulated && (
                         <p className="text-xs text-yellow-600">
                           Simulated connection
                         </p>
@@ -441,7 +515,28 @@ export default function IntegrationsSettings() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-3 lg:min-w-72 lg:items-end">
+                    {service.id === 'supabase' && !isConnected && (
+                      <div className="grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                        <Input
+                          value={supabaseProjectRef}
+                          onChange={(event) => setSupabaseProjectRef(event.target.value)}
+                          placeholder="Project ref"
+                          disabled={isProcessing}
+                        />
+                        <Input
+                          value={supabaseAccessToken}
+                          onChange={(event) => setSupabaseAccessToken(event.target.value)}
+                          placeholder="Personal access token"
+                          type="password"
+                          disabled={isProcessing}
+                        />
+                        <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-1">
+                          Create a token in Supabase account settings, then paste the project ref from your project URL.
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
                     {isConnected ? (
                       <Button
                         variant="outline"
@@ -473,7 +568,11 @@ export default function IntegrationsSettings() {
                         variant="default"
                         size="sm"
                         onClick={() => handleConnect(service.id)}
-                        disabled={isProcessing}
+                        disabled={
+                          isProcessing ||
+                          (service.id === 'supabase' &&
+                            (!supabaseProjectRef.trim() || !supabaseAccessToken.trim()))
+                        }
                       >
                         {isConnecting ? (
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -483,6 +582,7 @@ export default function IntegrationsSettings() {
                         Connect
                       </Button>
                     )}
+                    </div>
                   </div>
                 </div>
               )

@@ -1,16 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { FileTree, FileSystemNode } from '@/components/file-tree'
 import { CodeEditor } from '@/components/code-editor'
 import { GitHubImport } from '@/components/github-import'
 import { useAuth } from '@/lib/auth'
 import { Button } from './ui/button'
-import { GitBranch, FolderOpen } from 'lucide-react'
+import { GitBranch, RefreshCw, Search } from 'lucide-react'
 import Spinner from './ui/spinner'
 
 interface IDEProps {
   sandboxId?: string // Optional sandbox ID for viewing sandbox files
+  initialFiles?: FileSystemNode[]
   onSave?: (path: string, content: string) => Promise<void>
   githubSaveRequired?: boolean
   githubWorkspaceConnected?: boolean
@@ -19,24 +20,33 @@ interface IDEProps {
 
 export function IDE({
   sandboxId,
+  initialFiles,
   onSave,
   githubSaveRequired = false,
   githubWorkspaceConnected = false,
   onSaveBlocked,
 }: IDEProps = {}) {
   const { session, loading } = useAuth(() => {}, () => {})
-  const [files, setFiles] = useState<FileSystemNode[]>([])
+  const [files, setFiles] = useState<FileSystemNode[]>(initialFiles ?? [])
   const [selectedFile, setSelectedFile] = useState<{
     path: string
     content: string
   } | null>(null)
+  const [fileSearchQuery, setFileSearchQuery] = useState('')
   const [showGitHubImport, setShowGitHubImport] = useState(false)
   const isSandboxMode = !!sandboxId
   const isGitHubSaveBlocked = githubSaveRequired && !githubWorkspaceConnected
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSaveRef = useRef<{ path: string; content: string } | null>(null)
 
-  function blockGitHubSave() {
+  const blockGitHubSave = useCallback(() => {
     onSaveBlocked?.()
-  }
+  }, [onSaveBlocked])
+
+  const visibleFiles = useMemo(
+    () => filterFileTree(files, fileSearchQuery),
+    [files, fileSearchQuery],
+  )
 
   const fetchFiles = useCallback(async () => {
     if (isSandboxMode && sandboxId) {
@@ -72,35 +82,7 @@ export function IDE({
     }
   }, [session, isSandboxMode, sandboxId])
 
-  useEffect(() => {
-    if (isSandboxMode || session) {
-      fetchFiles()
-    }
-  }, [session, isSandboxMode, fetchFiles])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner />
-      </div>
-    )
-  }
-
-  async function handleSelectFile(path: string) {
-    if (isSandboxMode && sandboxId) {
-      // Load file from sandbox
-      const response = await fetch(`/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`)
-      const { content } = await response.json()
-      setSelectedFile({ path, content })
-    } else if (session) {
-      // Load file from Supabase
-      const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`)
-      const { content } = await response.json()
-      setSelectedFile({ path, content })
-    }
-  }
-
-  async function handleSaveFile(path: string, content: string) {
+  const persistFile = useCallback(async (path: string, content: string) => {
     if (isGitHubSaveBlocked) {
       blockGitHubSave()
       return
@@ -108,7 +90,9 @@ export function IDE({
 
     if (onSave) {
       await onSave(path, content)
-      setSelectedFile({ path, content })
+      setSelectedFile((current) =>
+        current?.path === path ? { path, content } : current,
+      )
       return
     }
 
@@ -131,6 +115,108 @@ export function IDE({
         body: JSON.stringify({ path, content }),
       })
     }
+  }, [
+    blockGitHubSave,
+    isGitHubSaveBlocked,
+    isSandboxMode,
+    onSave,
+    sandboxId,
+    session,
+  ])
+
+  const flushPendingSave = useCallback(async () => {
+    const pendingSave = pendingSaveRef.current
+
+    if (!pendingSave) return
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
+    }
+
+    pendingSaveRef.current = null
+    await persistFile(pendingSave.path, pendingSave.content)
+  }, [persistFile])
+
+  const scheduleFileSave = useCallback((path: string, content: string) => {
+    pendingSaveRef.current = { path, content }
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      void flushPendingSave()
+    }, 900)
+  }, [flushPendingSave])
+
+  useEffect(() => {
+    if (isSandboxMode || session) {
+      fetchFiles()
+    }
+  }, [session, isSandboxMode, fetchFiles])
+
+  useEffect(() => {
+    if (isSandboxMode && initialFiles) {
+      setFiles(initialFiles)
+    }
+  }, [initialFiles, isSandboxMode])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+
+      const pendingSave = pendingSaveRef.current
+      if (pendingSave) {
+        pendingSaveRef.current = null
+        void persistFile(pendingSave.path, pendingSave.content)
+      }
+    }
+  }, [persistFile])
+
+  if (loading && !isSandboxMode) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Spinner />
+      </div>
+    )
+  }
+
+  async function handleSelectFile(path: string) {
+    await flushPendingSave()
+
+    if (isSandboxMode && sandboxId) {
+      // Load file from sandbox
+      const response = await fetch(`/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`)
+      const { content } = await response.json()
+      setSelectedFile({ path, content })
+    } else if (session) {
+      // Load file from Supabase
+      const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`)
+      const { content } = await response.json()
+      setSelectedFile({ path, content })
+    }
+  }
+
+  function handleEditorChange(content: string | undefined) {
+    if (!selectedFile) return
+
+    const nextContent = content || ''
+    const path = selectedFile.path
+
+    setSelectedFile({ path, content: nextContent })
+    scheduleFileSave(path, nextContent)
+  }
+
+  function handleEditorSave(content: string) {
+    if (!selectedFile) return
+
+    const path = selectedFile.path
+    setSelectedFile({ path, content })
+    scheduleFileSave(path, content)
+    void flushPendingSave()
   }
 
   async function handleCreateFile(path: string, isDirectory: boolean) {
@@ -288,7 +374,7 @@ export function IDE({
 
   if (showGitHubImport) {
     return (
-      <div className="h-full p-4 overflow-auto">
+      <div className="h-full overflow-auto bg-[#181818] p-4 text-white">
         <GitHubImport
           onImport={handleImportRepository}
           onClose={() => setShowGitHubImport(false)}
@@ -298,45 +384,69 @@ export function IDE({
   }
 
   return (
-    <div className="flex h-full">
-      <div className="w-1/4 border-r overflow-auto">
-        <div className="p-2 border-b space-y-2">
-          <Button
-            onClick={fetchFiles}
-            className="w-full"
-            variant="outline"
-            size="sm"
-          >
-            <FolderOpen className="h-4 w-4 mr-2" />
-            {isSandboxMode ? 'Refresh Sandbox Files' : 'Refresh Files'}
-          </Button>
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#181818] text-[#d4d4d4] md:flex-row">
+      <aside className="flex h-56 min-h-0 shrink-0 flex-col border-b border-[#2b2b2b] bg-[#181818] md:h-full md:w-[268px] md:border-b-0 md:border-r">
+        <div className="shrink-0 border-b border-[#2b2b2b] p-2">
+          <div className="flex items-center gap-2">
+            <label className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/45" />
+              <input
+                value={fileSearchQuery}
+                onChange={(event) => setFileSearchQuery(event.target.value)}
+                placeholder="Search code"
+                className="h-8 w-full rounded-md border border-white/10 bg-[#1f1f1f] pl-8 pr-2 text-sm text-white outline-none transition placeholder:text-white/45 focus:border-white/25"
+              />
+            </label>
+            <Button
+              onClick={fetchFiles}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-white/70 hover:bg-white/10 hover:text-white"
+              title={isSandboxMode ? 'Refresh sandbox files' : 'Refresh files'}
+              aria-label={isSandboxMode ? 'Refresh sandbox files' : 'Refresh files'}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
           {!isSandboxMode && (
             <Button
               onClick={() => setShowGitHubImport(true)}
-              className="w-full"
+              className="mt-2 w-full justify-start gap-2 border-white/10 bg-white/[0.04] text-white/75 hover:bg-white/[0.08] hover:text-white"
               variant="outline"
               size="sm"
             >
-              <GitBranch className="h-4 w-4 mr-2" />
+              <GitBranch className="h-4 w-4" />
               Import from GitHub
             </Button>
           )}
         </div>
-        <FileTree 
-          files={files} 
+        <div className="min-h-0 flex-1 overflow-auto">
+        <FileTree
+          files={visibleFiles}
           onSelectFile={handleSelectFile}
           onCreateFile={isSandboxMode ? undefined : handleCreateFile}
           onDeleteFile={handleDeleteFile}
           onRenameFile={handleRenameFile}
         />
-      </div>
-      <div className="w-3/4">
+        </div>
+      </aside>
+      <section className="flex min-h-0 flex-1 flex-col bg-[#1e1e1e]">
+        <div className="flex h-9 shrink-0 items-center border-b border-[#2b2b2b] bg-[#252526]">
+          {selectedFile ? (
+            <div className="flex h-full max-w-full items-center border-r border-[#2b2b2b] bg-[#1e1e1e] px-3 text-xs font-medium text-white">
+              <span className="truncate">{selectedFile.path}</span>
+            </div>
+          ) : (
+            <div className="px-3 text-xs text-white/45">IDE</div>
+          )}
+        </div>
+        <div className="min-h-0 flex-1">
         {selectedFile ? (
           isGitHubSaveBlocked ? (
             <div className="flex h-full items-center justify-center p-6 text-center">
-              <div className="max-w-sm space-y-3 rounded-lg border bg-background/70 p-5 shadow-sm">
+              <div className="max-w-sm space-y-3 rounded-lg border border-white/10 bg-white/[0.04] p-5 shadow-sm">
                 <div className="text-sm font-medium">GitHub save required</div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-white/60">
                   Save this project to GitHub before editing files. Use the Save to GitHub button in the preview toolbar.
                 </p>
                 <Button type="button" variant="outline" size="sm" onClick={blockGitHubSave}>
@@ -349,15 +459,44 @@ export function IDE({
               key={selectedFile.path}
               code={selectedFile.content}
               lang={selectedFile.path.split('.').pop() || 'typescript'}
-              onChange={(content) => handleSaveFile(selectedFile.path, content || '')}
+              onChange={handleEditorChange}
+              onBlur={() => void flushPendingSave()}
+              onSave={handleEditorSave}
             />
           )
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <p>Select a file to view its content</p>
+          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/45">
+            <p>Select a file from the tree to open it here</p>
           </div>
         )}
-      </div>
+        </div>
+      </section>
     </div>
   )
+}
+
+function filterFileTree(files: FileSystemNode[], query: string): FileSystemNode[] {
+  const normalizedQuery = query.trim().toLowerCase()
+
+  if (!normalizedQuery) {
+    return files
+  }
+
+  const filteredFiles: FileSystemNode[] = []
+
+  for (const file of files) {
+    const children = file.children ? filterFileTree(file.children, normalizedQuery) : []
+    const matches =
+      file.name.toLowerCase().includes(normalizedQuery) ||
+      file.path?.toLowerCase().includes(normalizedQuery)
+
+    if (matches || children.length > 0) {
+      filteredFiles.push({
+        ...file,
+        children: file.children ? children : file.children,
+      })
+    }
+  }
+
+  return filteredFiles
 }

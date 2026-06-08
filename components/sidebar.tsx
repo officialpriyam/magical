@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { X, MessageCircle, Search, Gift, Settings, HelpCircle, CreditCard, User, LogOut, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch } from 'lucide-react';
+import { X, MessageCircle, Search, Gift, Settings, HelpCircle, CreditCard, LogOut, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { HelpModal } from '@/components/help-center';
 import { PricingModal } from '@/components/pricing';
-import { NewsArticles } from '@/components/ui/sidebar-articles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,7 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getProjects, Project, deleteProject } from '@/lib/database';
 import { formatDistanceToNow } from 'date-fns';
-import { News } from './ui/sidebar-news';
+import { useIsMobile } from '@/hooks/use-media-query';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -58,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [chatHistory, setChatHistory] = React.useState<ChatHistoryItem[]>([]);
   const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const leaveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const isMobile = useIsMobile();
 
   // Use external search query if provided, otherwise use internal state
   const activeSearchQuery = externalSearchQuery || searchQuery;
@@ -103,6 +103,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleMouseEnter = () => {
+    if (isMobile) return;
+
     if (leaveTimeoutRef.current) {
       clearTimeout(leaveTimeoutRef.current);
       leaveTimeoutRef.current = null;
@@ -116,6 +118,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleMouseLeave = () => {
+    if (isMobile) return;
+
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
@@ -127,6 +131,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }, 500);
     }
   };
+
+  React.useEffect(() => {
+    if (isMobile) {
+      setIsOpen(false);
+    } else {
+      setIsOpen(initialIsOpen);
+    }
+  }, [initialIsOpen, isMobile]);
 
   React.useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -176,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [refreshKey]);
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-dvh shrink-0 md:h-screen">
       {/* Always visible icons */}
       <div 
         className={`bg-[#0b0b0c] border-r border-white/10 flex flex-col items-center py-4 transition-all duration-300 ease-in-out ${
@@ -295,10 +307,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
+      {isMobile && isOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/55 md:hidden"
+          aria-label="Close sidebar"
+          onClick={handleCloseSidebar}
+        />
+      )}
+
       {/* Collapsible Sidebar Content */}
       <div
-        className={`h-screen bg-[#0b0b0c] border-r border-white/10 flex flex-col transition-all duration-300 ease-in-out ${
-          isOpen ? 'w-64 opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full overflow-hidden'
+        className={`h-dvh bg-[#0b0b0c] border-r border-white/10 flex flex-col transition-all duration-300 ease-in-out md:h-screen ${
+          isOpen
+            ? 'fixed inset-y-0 left-0 z-50 w-[min(82vw,18rem)] opacity-100 translate-x-0 md:relative md:z-auto md:w-64'
+            : 'w-0 opacity-0 -translate-x-full overflow-hidden'
         }`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -429,13 +452,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ))}
             </div>
           )}
-        </div>
-
-        <Separator />
-
-        {/* News Section */}
-        <div className="px-4 pb-4">
-          <NewsArticles />
         </div>
 
         <Separator />

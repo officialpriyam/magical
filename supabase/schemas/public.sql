@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS public.user_security_settings (
 CREATE TABLE IF NOT EXISTS public.user_integrations (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
-  service_name text NOT NULL CHECK (service_name = ANY (ARRAY['github'::text, 'google_drive'::text, 'gmail'::text, 'google_calendar'::text, 'artifacts'::text])),
+  service_name text NOT NULL CHECK (service_name = ANY (ARRAY['github'::text, 'google_drive'::text, 'gmail'::text, 'google_calendar'::text, 'artifacts'::text, 'supabase'::text])),
   is_connected boolean DEFAULT false,
   connection_data jsonb,
   created_at timestamp with time zone DEFAULT now(),
