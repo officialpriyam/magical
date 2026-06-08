@@ -1,7 +1,6 @@
 import { FragmentCode } from './fragment-code'
 import { FragmentPreview } from './fragment-preview'
 import { FragmentTerminal } from './fragment-terminal'
-import { IDE } from './ide'
 import { GitHubSave, type GitHubWorkspace } from './github-save'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -16,11 +15,20 @@ import { ExecutionResult } from '@/lib/types'
 import { getFragmentFiles } from '@/lib/fragment-files'
 import { DeepPartial } from 'ai'
 import { ChevronsRight, LoaderCircle, Terminal, Code, Folder } from 'lucide-react'
-import { Dispatch, SetStateAction, useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
+import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react'
 
 export type PreviewTab = 'code' | 'fragment' | 'terminal' | 'ide'
 
 const PREVIEW_TABS: PreviewTab[] = ['code', 'fragment', 'terminal', 'ide']
+const IDE = dynamic(() => import('./ide').then((mod) => mod.IDE), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center text-sm text-white/50">
+      Loading IDE...
+    </div>
+  ),
+})
 
 export function Preview({
   teamID,
@@ -64,6 +72,7 @@ export function Preview({
   const [sandboxFiles, setSandboxFiles] = useState(result?.files || [])
   const [isGitHubSaveOpen, setIsGitHubSaveOpen] = useState(false)
   const isGitHubSaveBlocked = githubSaveRequired && !isGitHubWorkspaceConnected
+  const fragmentFiles = useMemo(() => getFragmentFiles(fragment), [fragment])
 
   useEffect(() => {
     setSandboxFiles(result?.files || [])
@@ -165,9 +174,9 @@ export function Preview({
         )}
         <div className="min-h-0 w-full flex-1 overflow-hidden">
             <TabsContent value="code" className="h-full">
-              {getFragmentFiles(fragment).length > 0 ? (
+              {fragmentFiles.length > 0 ? (
                 <FragmentCode
-                  files={getFragmentFiles(fragment).map((file) => ({
+                  files={fragmentFiles.map((file) => ({
                     name: file.path,
                     content: file.content,
                   }))}

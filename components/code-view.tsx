@@ -7,12 +7,20 @@ import 'prismjs/components/prism-jsx'
 import 'prismjs/components/prism-python'
 import 'prismjs/components/prism-tsx'
 import 'prismjs/components/prism-typescript'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+
+const MAX_HIGHLIGHT_CHARS = 120_000
 
 export function CodeView({ code, lang }: { code: string; lang: string }) {
+  const codeRef = useRef<HTMLElement | null>(null)
+  const shouldHighlight = code.length <= MAX_HIGHLIGHT_CHARS
+  const language = useMemo(() => normalizePrismLanguage(lang), [lang])
+
   useEffect(() => {
-    Prism.highlightAll()
-  }, [code])
+    if (!shouldHighlight || !codeRef.current) return
+
+    Prism.highlightElement(codeRef.current)
+  }, [code, language, shouldHighlight])
 
   return (
     <pre
@@ -24,7 +32,19 @@ export function CodeView({ code, lang }: { code: string; lang: string }) {
         margin: 0,
       }}
     >
-      <code className={`language-${lang}`}>{code}</code>
+      <code ref={codeRef} className={shouldHighlight ? `language-${language}` : ''}>
+        {code}
+      </code>
     </pre>
   )
+}
+
+function normalizePrismLanguage(lang: string) {
+  if (lang === 'ts') return 'typescript'
+  if (lang === 'tsx') return 'tsx'
+  if (lang === 'js') return 'javascript'
+  if (lang === 'jsx') return 'jsx'
+  if (lang === 'py') return 'python'
+
+  return lang || 'text'
 }
