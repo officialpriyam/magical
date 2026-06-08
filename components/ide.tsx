@@ -11,6 +11,7 @@ import Spinner from './ui/spinner'
 
 interface IDEProps {
   sandboxId?: string // Optional sandbox ID for viewing sandbox files
+  projectId?: string
   initialFiles?: FileSystemNode[]
   onSave?: (path: string, content: string) => Promise<void>
   githubSaveRequired?: boolean
@@ -20,6 +21,7 @@ interface IDEProps {
 
 export function IDE({
   sandboxId,
+  projectId,
   initialFiles,
   onSave,
   githubSaveRequired = false,
@@ -103,7 +105,7 @@ export function IDE({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ path, content }),
+        body: JSON.stringify({ path, content, projectID: projectId }),
       })
     } else if (session) {
       // Save file to Supabase
@@ -120,6 +122,7 @@ export function IDE({
     isGitHubSaveBlocked,
     isSandboxMode,
     onSave,
+    projectId,
     sandboxId,
     session,
   ])
@@ -273,7 +276,7 @@ export function IDE({
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ path }),
+          body: JSON.stringify({ path, projectID: projectId }),
         })
 
         if (response.ok) {
@@ -323,7 +326,7 @@ export function IDE({
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ oldPath, newPath }),
+          body: JSON.stringify({ oldPath, newPath, projectID: projectId }),
         })
 
         if (response.ok) {

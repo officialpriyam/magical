@@ -1,6 +1,7 @@
 import 'server-only'
 
 import crypto from 'node:crypto'
+import { kv } from '@vercel/kv'
 import { createServerClient } from '@/lib/supabase-server'
 import { supabaseServiceRoleKey } from '@/lib/supabase-credentials'
 
@@ -76,6 +77,7 @@ type SupabaseCredentials = {
 
 const SUPABASE_TOKEN_PREFIX = 'enc:supabase:v1:'
 const SUPABASE_API_BASE_URL = 'https://api.supabase.com'
+const SUPABASE_KV_PREFIX = 'supabase:integration:'
 const SUPABASE_OAUTH_SCOPES = [
   'organizations:read',
   'projects:read',
@@ -227,8 +229,18 @@ export async function disconnectSupabase(userId: string) {
     .eq('service_name', 'supabase')
 
   if (error) {
+    if (isMissingUserIntegrationsTable(error)) {
+      await storeSupabaseIntegrationInKV(userId, {
+        is_connected: false,
+        connection_data: null,
+      })
+      return
+    }
+
     throw error
   }
+
+  await deleteSupabaseIntegrationFromKV(userId)
 }
 
 export async function applySupabaseMigration(
@@ -600,8 +612,18 @@ async function storeSupabaseIntegration(
     } as never)
 
   if (error) {
+    if (isMissingUserIntegrationsTable(error)) {
+      await storeSupabaseIntegrationInKV(userId, {
+        is_connected: true,
+        connection_data: connectionData,
+      })
+      return
+    }
+
     throw error
   }
+
+  await deleteSupabaseIntegrationFromKV(userId)
 }
 
 async function getSupabaseIntegration(userId?: string) {
@@ -618,6 +640,10 @@ async function getSupabaseIntegration(userId?: string) {
     .maybeSingle()
 
   if (error) {
+    if (isMissingUserIntegrationsTable(error)) {
+      return getSupabaseIntegrationFromKV(userId)
+    }
+
     return null
   }
 
@@ -625,6 +651,61 @@ async function getSupabaseIntegration(userId?: string) {
     is_connected: boolean
     connection_data: SupabaseConnectionData | null
   } | null
+}
+
+function isMissingUserIntegrationsTable(error: { code?: string; message?: string }) {
+  const message = error.message || ''
+
+  return (
+    error.code === 'PGRST205' ||
+    error.code === '42P01' ||
+    message.includes("Could not find the table 'public.user_integrations'") ||
+    message.includes('relation "public.user_integrations" does not exist') ||
+    /schema cache/i.test(message)
+  )
+}
+
+function hasKVConfig() {
+  return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+}
+
+function getSupabaseKVKey(userId: string) {
+  return `${SUPABASE_KV_PREFIX}${userId}`
+}
+
+async function storeSupabaseIntegrationInKV(
+  userId: string,
+  integration: {
+    is_connected: boolean
+    connection_data: SupabaseConnectionData | null
+  },
+) {
+  if (!hasKVConfig()) {
+    throw new Error(
+      'user_integrations table is missing and Vercel KV is not configured. Run supabase/migrations/20260603000600_ensure_user_integrations_table.sql or set KV_REST_API_URL and KV_REST_API_TOKEN.',
+    )
+  }
+
+  await kv.set(getSupabaseKVKey(userId), integration)
+}
+
+async function getSupabaseIntegrationFromKV(userId: string) {
+  if (!hasKVConfig()) {
+    return null
+  }
+
+  return kv.get<{
+    is_connected: boolean
+    connection_data: SupabaseConnectionData | null
+  }>(getSupabaseKVKey(userId))
+}
+
+async function deleteSupabaseIntegrationFromKV(userId: string) {
+  if (!hasKVConfig()) {
+    return
+  }
+
+  await kv.del(getSupabaseKVKey(userId))
 }
 
 async function getOwnedMagicalProject(userId: string, projectId: string) {

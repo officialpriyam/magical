@@ -200,6 +200,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     () => getProjectGitHubWorkspace(currentProject),
     [currentProject],
   )
+  const currentProjectR2Workspace = useMemo(
+    () => getProjectR2Workspace(currentProject),
+    [currentProject],
+  )
   const isGitHubWorkspaceConnected = Boolean(currentProjectGitHubWorkspace)
 
   useEffect(() => {
@@ -659,13 +663,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     savedFragment: DeepPartial<FragmentSchema>,
   ) => {
     const workspace = getProjectGitHubWorkspace(project)
+    const r2Workspace = getProjectR2Workspace(project)
 
-    if (!workspace || !savedFragment?.template || restoringProjectRef.current === project.id) {
+    if (
+      (!workspace && !r2Workspace) ||
+      !savedFragment?.template ||
+      restoringProjectRef.current === project.id
+    ) {
       return
     }
 
     restoringProjectRef.current = project.id
-    setAutoFixMessage('Restoring files from GitHub...')
+    setAutoFixMessage(workspace ? 'Restoring files from GitHub...' : 'Restoring files from private storage...')
     setIsPreviewLoading(true)
 
     try {
@@ -683,7 +692,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to restore GitHub workspace.')
+        throw new Error(data.error || 'Failed to restore saved workspace.')
       }
 
       const restoredResult = data as ExecutionResult
@@ -696,8 +705,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setCurrentTab('ide')
       setAutoFixMessage('')
     } catch (error) {
-      console.error('GitHub workspace restore failed:', error)
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to restore GitHub workspace.')
+      console.error('Workspace restore failed:', error)
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to restore saved workspace.')
       setAutoFixMessage('')
     } finally {
       setIsPreviewLoading(false)
@@ -744,7 +753,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
       if (skipNextWorkspaceRestoreRef.current === currentProject?.id) {
         skipNextWorkspaceRestoreRef.current = ''
-      } else if (currentProject && latestPreviewMessage?.object && getProjectGitHubWorkspace(currentProject)) {
+      } else if (currentProject && latestPreviewMessage?.object && hasRestorableWorkspace(currentProject)) {
         void restoreProjectWorkspace(currentProject, latestPreviewMessage.object)
       }
     }
@@ -1343,13 +1352,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   async function handleSaveFile(path: string, content: string) {
     if (!session) return
 
-    const workspace = currentProjectGitHubWorkspace
-    if (!workspace) {
-      setErrorMessage('Save this project to GitHub before editing files. Use Save to GitHub in the preview panel.')
-      setIsPreviewPanelOpen(true)
-      return
-    }
-
     try {
       // Check if this is a sandbox file (when result.sbxId exists)
       if (result?.sbxId) {
@@ -1361,7 +1363,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           },
           body: JSON.stringify({
             path,
-            content
+            content,
+            projectID: currentProject?.id,
           }),
         })
 
@@ -1550,6 +1553,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const projectHeaderTitle = currentProject?.title || 'Magical AI'
   const projectHeaderSubtitle = currentProjectGitHubWorkspace
     ? `Synced to ${currentProjectGitHubWorkspace.fullName}`
+    : currentProjectR2Workspace
+      ? 'Backed up to private storage'
     : currentProject
       ? 'Previewing last saved version'
       : 'Sign in to open this chat'
@@ -1843,9 +1848,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               isChatLoading={isPromptLoading}
               isPreviewLoading={isPreviewLoading}
               fragment={fragment}
+              projectId={currentProject?.id}
               projectTitle={currentProject?.title}
               onGitHubWorkspaceSaved={handleGitHubWorkspaceSaved}
-              githubSaveRequired
+              githubSaveRequired={false}
               isGitHubWorkspaceConnected={isGitHubWorkspaceConnected}
               onSaveBlocked={() => {
                 setErrorMessage('Save this project to GitHub before editing files. Use Save to GitHub in the preview panel.')
@@ -1892,6 +1898,25 @@ function getProjectGitHubWorkspace(project: Project | null): GitHubWorkspace | n
     autoSync: workspace.autoSync !== false,
     lastCommitSha: typeof workspace.lastCommitSha === 'string' ? workspace.lastCommitSha : null,
   }
+}
+
+function getProjectR2Workspace(project: Project | null) {
+  const workspace = project?.metadata?.r2Workspace
+
+  if (
+    !workspace ||
+    typeof workspace !== 'object' ||
+    workspace.provider !== 'cloudflare-r2' ||
+    typeof workspace.keyPrefix !== 'string'
+  ) {
+    return null
+  }
+
+  return workspace
+}
+
+function hasRestorableWorkspace(project: Project | null) {
+  return Boolean(getProjectGitHubWorkspace(project) || getProjectR2Workspace(project))
 }
 
 function toRepoPath(path: string) {

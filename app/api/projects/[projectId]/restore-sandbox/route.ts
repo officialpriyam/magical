@@ -5,6 +5,11 @@ import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import { createServerClient } from '@/lib/supabase-server'
 import { getGitHubAccessToken, githubHeaders } from '@/lib/github-server'
+import {
+  getProjectFilesFromR2,
+  getR2WorkspaceMetadata,
+  hasR2WorkspaceConfig,
+} from '@/lib/r2-workspace'
 import { validateGitHubIdentifier } from '@/lib/security'
 import type { FileSystemNode } from '@/components/file-tree'
 
@@ -71,37 +76,71 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to load project.' }, { status: 500 })
     }
 
-    const workspace = getGitHubWorkspace(project?.metadata)
-
-    if (!project || !workspace) {
-      return NextResponse.json({ error: 'This project is not connected to a GitHub workspace.' }, { status: 400 })
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
     }
 
-    const owner = workspace.owner
-    const repo = workspace.repo
-    const branch = normalizeBranch(workspace.branch)
-    const pathPrefix = normalizePathPrefix(workspace.pathPrefix)
+    const workspace = getGitHubWorkspace(project.metadata)
+    let files: GitHubFile[] = []
+    let restoredFrom = 'saved workspace'
 
-    if (!validateGitHubIdentifier(owner, 'owner') || !validateGitHubIdentifier(repo, 'repo')) {
-      return NextResponse.json({ error: 'Invalid GitHub workspace metadata.' }, { status: 400 })
-    }
+    if (workspace) {
+      const owner = workspace.owner
+      const repo = workspace.repo
+      const branch = normalizeBranch(workspace.branch)
+      const pathPrefix = normalizePathPrefix(workspace.pathPrefix)
 
-    const githubToken = await getGitHubAccessToken(user.id)
+      if (!validateGitHubIdentifier(owner, 'owner') || !validateGitHubIdentifier(repo, 'repo')) {
+        return NextResponse.json({ error: 'Invalid GitHub workspace metadata.' }, { status: 400 })
+      }
 
-    if (!githubToken) {
-      return NextResponse.json({ error: 'Connect GitHub again before restoring this project.' }, { status: 401 })
-    }
+      const githubToken = await getGitHubAccessToken(user.id)
 
-    const files = await fetchGitHubFiles({
-      owner,
-      repo,
-      branch,
-      pathPrefix,
-      accessToken: githubToken,
-    })
+      if (!githubToken) {
+        return NextResponse.json({ error: 'Connect GitHub again before restoring this project.' }, { status: 401 })
+      }
 
-    if (files.length === 0) {
-      return NextResponse.json({ error: 'No text files found in the connected GitHub workspace.' }, { status: 400 })
+      files = await fetchGitHubFiles({
+        owner,
+        repo,
+        branch,
+        pathPrefix,
+        accessToken: githubToken,
+      })
+      restoredFrom = `${owner}/${repo}`
+
+      if (files.length === 0) {
+        return NextResponse.json({ error: 'No text files found in the connected GitHub workspace.' }, { status: 400 })
+      }
+    } else {
+      const r2Workspace = getR2WorkspaceMetadata(project.metadata)
+
+      if (!r2Workspace && !hasR2WorkspaceConfig()) {
+        return NextResponse.json(
+          { error: 'This project has no GitHub workspace and Cloudflare R2 workspace storage is not configured.' },
+          { status: 400 },
+        )
+      }
+
+      if (r2Workspace && !hasR2WorkspaceConfig()) {
+        return NextResponse.json(
+          { error: 'Cloudflare R2 workspace storage is not configured for this deployment.' },
+          { status: 503 },
+        )
+      }
+
+      files = await getProjectFilesFromR2({
+        userId: user.id,
+        projectId,
+      })
+      restoredFrom = 'cloudflare-r2'
+
+      if (files.length === 0) {
+        return NextResponse.json(
+          { error: 'No saved workspace files were found for this project.' },
+          { status: 400 },
+        )
+      }
     }
 
     sbx = await createE2BSandbox(fragment.template, {
@@ -109,7 +148,7 @@ export async function POST(
         template: fragment.template,
         userID: user.id,
         teamID: typeof body.teamID === 'string' ? body.teamID : '',
-        restoredFrom: `${owner}/${repo}`,
+        restoredFrom,
       },
       timeoutMs: sandboxTimeout,
       ...(body.teamID && body.accessToken
@@ -158,7 +197,7 @@ export async function POST(
       files: tree,
     } as ExecutionResultWeb)
   } catch (error: any) {
-    console.error('Failed to restore project sandbox from GitHub:', error)
+    console.error('Failed to restore project sandbox from saved workspace:', error)
 
     try {
       await sbx?.kill()
@@ -166,7 +205,7 @@ export async function POST(
 
     return NextResponse.json(
       {
-        error: 'Failed to restore project sandbox from GitHub.',
+        error: 'Failed to restore project sandbox from saved workspace.',
         details: error?.message || 'Unknown error',
       },
       { status: 500 },

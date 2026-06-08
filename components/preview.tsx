@@ -30,6 +30,7 @@ export function Preview({
   isChatLoading,
   isPreviewLoading,
   fragment,
+  projectId,
   projectTitle,
   onGitHubWorkspaceSaved,
   githubSaveRequired = false,
@@ -48,6 +49,7 @@ export function Preview({
   isChatLoading: boolean
   isPreviewLoading: boolean
   fragment?: DeepPartial<FragmentSchema>
+  projectId?: string
   projectTitle?: string
   onGitHubWorkspaceSaved?: (workspace: GitHubWorkspace) => Promise<void> | void
   githubSaveRequired?: boolean
@@ -206,6 +208,7 @@ export function Preview({
               <div className="h-full w-full">
                 <IDE
                   sandboxId={result?.sbxId}
+                  projectId={projectId}
                   initialFiles={sandboxFiles}
                   onSave={onSave}
                   githubSaveRequired={githubSaveRequired}

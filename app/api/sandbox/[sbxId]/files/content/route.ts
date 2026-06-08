@@ -1,6 +1,12 @@
 import { Sandbox } from '@e2b/code-interpreter'
 import { NextRequest } from 'next/server'
 import path from 'path'
+import { createServerClient } from '@/lib/supabase-server'
+import {
+  deleteProjectFileFromR2,
+  renameProjectFileInR2,
+  saveProjectFileToR2,
+} from '@/lib/r2-workspace'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -89,7 +95,7 @@ export async function PATCH(
 ) {
   try {
     const { sbxId } = await params
-    const { oldPath, newPath } = await req.json()
+    const { oldPath, newPath, projectID } = await req.json()
 
     if (!sbxId) {
       return jsonResponse({ error: 'Missing sandbox ID' }, 400)
@@ -105,6 +111,7 @@ export async function PATCH(
 
     const sbx = await Sandbox.connect(sbxId)
     await sbx.files.rename(toSandboxRelativePath(oldPath), toSandboxRelativePath(newPath))
+    await persistR2Rename(projectID, oldPath, newPath)
 
     return jsonResponse({ success: true, path: newPath })
   } catch (error: any) {
@@ -122,7 +129,7 @@ export async function DELETE(
 ) {
   try {
     const { sbxId } = await params
-    const { path: filePath } = await req.json()
+    const { path: filePath, projectID } = await req.json()
 
     if (!sbxId) {
       return jsonResponse({ error: 'Missing sandbox ID' }, 400)
@@ -138,6 +145,7 @@ export async function DELETE(
 
     const sbx = await Sandbox.connect(sbxId)
     await sbx.files.remove(toSandboxRelativePath(filePath))
+    await persistR2Delete(projectID, filePath)
 
     return jsonResponse({ success: true })
   } catch (error: any) {
@@ -159,7 +167,7 @@ export async function POST(
 ) {
   try {
     const { sbxId } = await params
-    const { path: filePath, content } = await req.json()
+    const { path: filePath, content, projectID } = await req.json()
 
     if (!sbxId) {
       return new Response(
@@ -203,6 +211,7 @@ export async function POST(
     // E2B files.write expects path relative to /home/user
     const relativePath = normalizedPath === userDir ? '' : normalizedPath.substring(userDir.length + 1)
     await sbx.files.write(relativePath, content)
+    await persistR2File(projectID, filePath, content)
 
     return new Response(
       JSON.stringify({
@@ -241,4 +250,89 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+async function persistR2File(projectID: unknown, filePath: unknown, content: unknown) {
+  if (typeof projectID !== 'string' || typeof filePath !== 'string' || typeof content !== 'string') {
+    return
+  }
+
+  const userId = await getAuthenticatedUserId()
+
+  if (!userId) {
+    return
+  }
+
+  try {
+    await saveProjectFileToR2({
+      userId,
+      projectId: projectID,
+      path: filePath,
+      content,
+    })
+  } catch (error) {
+    console.warn('Cloudflare R2 sandbox file backup failed:', error)
+  }
+}
+
+async function persistR2Delete(projectID: unknown, filePath: unknown) {
+  if (typeof projectID !== 'string' || typeof filePath !== 'string') {
+    return
+  }
+
+  const userId = await getAuthenticatedUserId()
+
+  if (!userId) {
+    return
+  }
+
+  try {
+    await deleteProjectFileFromR2({
+      userId,
+      projectId: projectID,
+      path: filePath,
+    })
+  } catch (error) {
+    console.warn('Cloudflare R2 sandbox delete backup failed:', error)
+  }
+}
+
+async function persistR2Rename(projectID: unknown, oldPath: unknown, newPath: unknown) {
+  if (
+    typeof projectID !== 'string' ||
+    typeof oldPath !== 'string' ||
+    typeof newPath !== 'string'
+  ) {
+    return
+  }
+
+  const userId = await getAuthenticatedUserId()
+
+  if (!userId) {
+    return
+  }
+
+  try {
+    await renameProjectFileInR2({
+      userId,
+      projectId: projectID,
+      oldPath,
+      newPath,
+    })
+  } catch (error) {
+    console.warn('Cloudflare R2 sandbox rename backup failed:', error)
+  }
+}
+
+async function getAuthenticatedUserId() {
+  try {
+    const supabase = await createServerClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    return user?.id || ''
+  } catch {
+    return ''
+  }
 }

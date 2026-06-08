@@ -11,7 +11,7 @@ It uses Next.js 16, shadcn/ui, Tailwind CSS, the Vercel AI SDK, Supabase, and E2
 - Support for npm and pip package installation inside generated projects.
 - Built-in templates for Python data analysis, Next.js, Vue.js, Streamlit, and Gradio.
 - Multiple AI providers, including OpenAI, Anthropic, Google, Groq, Fireworks, Together AI, OpenRouter, Mistral, xAI, DeepSeek, and Ollama.
-- Optional Supabase authentication and workspace persistence.
+- Optional Supabase authentication, GitHub sync, and private Cloudflare R2 workspace backup.
 
 ## Setup
 
@@ -95,6 +95,32 @@ https://your-domain.com/api/supabase/callback
 
 Supabase documents this as an OAuth integration created from organization settings. Their docs also note that scopes are configured on the OAuth app, and existing users must re-authorize if scopes change.
 
+Run the bundled Supabase schema or at least `supabase/migrations/20260603000600_ensure_user_integrations_table.sql` before using OAuth integrations. If `user_integrations` is not present, GitHub and Supabase OAuth can temporarily fall back to Vercel KV when `KV_REST_API_URL` and `KV_REST_API_TOKEN` are configured.
+
+### Cloudflare R2 Workspace Backup
+
+Cloudflare R2 is used as private object storage for generated project files when a signed-in user has not connected that project to GitHub. The app stores files under an owner-scoped key prefix, checks Supabase project ownership before saving or restoring, and does not expose public R2 URLs.
+
+Set these variables:
+
+```sh
+CLOUDFLARE_R2_ACCOUNT_ID=
+CLOUDFLARE_R2_BUCKET=
+CLOUDFLARE_R2_ACCESS_KEY_ID=
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=
+```
+
+To get them:
+
+1. In Cloudflare Dashboard, open **Storage & databases > R2**.
+2. Create a private bucket for Magical workspace backups.
+3. Open **R2 > Overview > Manage API Tokens**.
+4. Create an account or user API token with **Object Read & Write** permission scoped to that bucket.
+5. Copy the Access Key ID and Secret Access Key into your environment variables.
+6. Copy the Account ID from the R2 overview page into `CLOUDFLARE_R2_ACCOUNT_ID`.
+
+R2 backups are a fallback source. Once a project is connected to GitHub, GitHub is treated as the primary workspace and R2 writes are skipped for that project.
+
 Start the app only when you are ready:
 
 ```sh
@@ -118,7 +144,7 @@ Use these project settings on Vercel:
 - Build command: `pnpm build`
 - Output directory: `.next`
 
-Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set `E2B_API_KEY`, one AI provider key, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL=https://magicalai.iampriyam.me`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
+Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set `E2B_API_KEY`, one AI provider key, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL=https://magicalai.iampriyam.me`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. For non-GitHub workspace recovery, also set the `CLOUDFLARE_R2_*` variables.
 
 Use this GitHub OAuth callback URL:
 
@@ -134,6 +160,7 @@ The generated `.env.local` contains placeholders for all runtime keys referenced
 - Supabase
 - Vercel KV rate limiting and short URLs
 - GitHub OAuth connection settings
+- Cloudflare R2 private workspace backup
 - Morph apply mode
 - PostHog analytics toggle
 - Optional ZeroBounce email validation

@@ -3,6 +3,8 @@ import { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import { createE2BSandbox } from '@/lib/e2b-sandbox'
 import { getFragmentFiles } from '@/lib/fragment-files'
 import { getSupabaseProjectRuntimeEnv } from '@/lib/supabase-integration'
+import { saveProjectFilesToR2 } from '@/lib/r2-workspace'
+import { createServerClient } from '@/lib/supabase-server'
 import type { Sandbox } from '@e2b/code-interpreter'
 import { FileSystemNode } from '@/components/file-tree'
 
@@ -124,6 +126,11 @@ export async function POST(req: Request) {
             await sbx.files.write(file.path, file.content)
           }),
         )
+        await saveGeneratedFilesToR2({
+          userID,
+          projectID,
+          files: generatedFiles,
+        })
       } else {
         return new Response(
           JSON.stringify({
@@ -202,5 +209,48 @@ export async function POST(req: Request) {
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
+  }
+}
+
+async function saveGeneratedFilesToR2({
+  userID,
+  projectID,
+  files,
+}: {
+  userID?: string
+  projectID?: string
+  files: ReturnType<typeof getFragmentFiles>
+}) {
+  if (!projectID || files.length === 0) {
+    return
+  }
+
+  const authenticatedUserId = await getAuthenticatedUserId()
+
+  if (!authenticatedUserId || (userID && userID !== authenticatedUserId)) {
+    return
+  }
+
+  try {
+    await saveProjectFilesToR2({
+      userId: authenticatedUserId,
+      projectId: projectID,
+      files,
+    })
+  } catch (error) {
+    console.warn('Cloudflare R2 workspace backup failed:', error)
+  }
+}
+
+async function getAuthenticatedUserId() {
+  try {
+    const supabase = await createServerClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    return user?.id || ''
+  } catch {
+    return ''
   }
 }
