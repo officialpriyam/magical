@@ -6,6 +6,7 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { AppStabilityGuard } from '@/components/app-stability-guard'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://magical-ai.vercel.app'),
@@ -68,7 +69,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <PostHogProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              <AppStabilityGuard>{children}</AppStabilityGuard>
+            </AuthProvider>
           </PostHogProvider>
           <Toaster />
         </ThemeProvider>
