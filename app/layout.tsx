@@ -27,7 +27,14 @@ export const metadata: Metadata = {
   publisher: 'priyx',
   description:
     'Magical AI is an AI software engineer with live code execution, file uploads, and real-time chat. Developed by priyx.',
-  icons: [{ rel: 'icon', type: 'image/x-icon', url: '/favicon.ico' }],
+  icons: {
+    icon: [
+      { rel: 'icon', type: 'image/png', sizes: '512x512', url: '/icon.png?v=3' },
+      { rel: 'icon', type: 'image/x-icon', url: '/favicon.ico?v=3' },
+    ],
+    shortcut: ['/favicon.ico?v=3'],
+    apple: [{ url: '/icon.png?v=3' }],
+  },
   openGraph: {
     title: 'Magical AI',
     description:
