@@ -63,7 +63,7 @@ export function CodeEditor({
     <Editor
       height="100%"
         language={lang}
-        value={code}
+        defaultValue={code}
         onChange={(value) => onChangeRef.current(value)}
         theme={theme === 'dark' ? 'vs-dark' : 'vs'}
         onMount={handleEditorDidMount}

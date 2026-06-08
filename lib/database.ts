@@ -212,32 +212,42 @@ export async function deleteProject(
   id: string, 
   permanent: boolean = false
 ): Promise<boolean> {
+  if (!supabase) return false
+
   const { data: { user } } = await supabase!.auth.getUser()
   if (user) {
     invalidateCache(new RegExp(`^projects:${user.id}:`))
   }
   if (!user) return false
 
-  return safeApiCall(supabase!, async () => {
+  return safeApiCall(supabase, async () => {
     if (permanent) {
-      const { error } = await supabase!
+      const { data, error } = await supabase
         .from('projects')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle()
       if (error) throw error
+
+      return Boolean(data)
     } else {
-      const { error } = await supabase!
+      const { data, error } = await supabase
         .from('projects')
         .update({ 
           deleted_at: new Date().toISOString(),
-          status: 'deleted'
+          status: 'deleted',
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
         .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle()
       if (error) throw error
+
+      return Boolean(data)
     }
-    return true
   }, false, 'deleteProject')
 }
 

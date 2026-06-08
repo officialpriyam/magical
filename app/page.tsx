@@ -1456,6 +1456,27 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     router.push('/')
   }
 
+  function handleSidebarHomeClick() {
+    resetChatState()
+    router.push('/')
+  }
+
+  function handleProjectDeleted(projectId: string) {
+    setRecentProjects((projects) => projects.filter((project) => project.id !== projectId))
+    setProjectPreviews((previews) => {
+      const nextPreviews = { ...previews }
+      delete nextPreviews[projectId]
+      return nextPreviews
+    })
+    invalidateCache(new RegExp(`^projects:${session?.user?.id}:`))
+    setChatHistoryRefreshKey((key) => key + 1)
+
+    if (currentProjectRef.current?.id === projectId) {
+      resetChatState()
+      router.push('/')
+    }
+  }
+
   function setCurrentPreview(preview: {
     fragment: DeepPartial<FragmentSchema> | undefined
     result: ExecutionResult | undefined
@@ -1752,6 +1773,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           onSignOut={logout}
           searchQuery={searchQuery}
           refreshKey={chatHistoryRefreshKey}
+          onHomeClick={handleSidebarHomeClick}
+          onProjectDeleted={handleProjectDeleted}
         />
       )}
 

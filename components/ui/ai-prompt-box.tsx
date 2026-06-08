@@ -1,11 +1,19 @@
 import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowUp, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCog, Server, Shuffle } from "lucide-react";
+import { ArrowUp, Check, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCog, Server, Shuffle, Settings2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ChatSettings } from '../chat-settings'
 import { ChatPicker } from '../chat-picker'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { LLMModel, LLMModelConfig } from '@/lib/models'
 import type { TemplateId, Templates } from '@/lib/templates'
 import { SANDBOX_PROVIDER_OPTIONS, type SandboxProviderMode } from '@/lib/sandbox-provider'
@@ -668,6 +676,10 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   };
 
   const hasContent = input.trim() !== "" || files.length > 0;
+  const activeSandboxOption =
+    SANDBOX_PROVIDER_OPTIONS.find((option) => option.value === sandboxProvider) ||
+    SANDBOX_PROVIDER_OPTIONS[0];
+  const ActiveSandboxIcon = activeSandboxOption.value === 'auto' ? Shuffle : Server;
 
   return (
     <>
@@ -916,34 +928,54 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <PromptInputAction
-              tooltip="Choose the sandbox provider for this chat"
-            >
-              <div className="flex h-8 items-center rounded-full border bg-muted/50 p-0.5">
-                {SANDBOX_PROVIDER_OPTIONS.map((option) => {
-                  const isActive = sandboxProvider === option.value;
-                  const Icon = option.value === 'auto' ? Shuffle : Server;
-                  const label = option.value === 'auto' ? 'AI choose' : option.label;
-
-                  return (
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
                     <button
-                      key={option.value}
                       type="button"
-                      onClick={() => onSandboxProviderChange?.(option.value)}
-                      className={cn(
-                        "flex h-7 items-center gap-1 rounded-full px-2 text-xs transition-colors",
-                        isActive
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-primary"
-                      )}
+                      className="flex h-8 max-w-[11rem] items-center gap-1.5 rounded-full border bg-muted/50 px-2.5 text-xs text-muted-foreground transition-colors hover:text-primary"
                     >
-                      <Icon className="h-3.5 w-3.5" />
-                      <span>{label}</span>
+                      <Settings2 className="h-3.5 w-3.5 shrink-0" />
+                      <ActiveSandboxIcon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {activeSandboxOption.value === 'auto' ? 'AI choose' : activeSandboxOption.label}
+                      </span>
                     </button>
-                  );
-                })}
-              </div>
-            </PromptInputAction>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Choose the sandbox provider for this chat
+                </TooltipContent>
+              </Tooltip>
+                <DropdownMenuContent side="top" align="end" className="w-64">
+                  <DropdownMenuLabel>Sandbox provider</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {SANDBOX_PROVIDER_OPTIONS.map((option) => {
+                    const isActive = sandboxProvider === option.value;
+                    const Icon = option.value === 'auto' ? Shuffle : Server;
+
+                    return (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onSelect={() => onSandboxProviderChange?.(option.value)}
+                        className="flex cursor-pointer items-start gap-2"
+                      >
+                        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium">
+                            {option.value === 'auto' ? 'AI choose' : option.label}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {option.description}
+                          </span>
+                        </span>
+                        {isActive && <Check className="mt-0.5 h-4 w-4 shrink-0" />}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
             <PromptInputAction
               tooltip="Choose whether Magical AI should plan first or build now"
@@ -966,7 +998,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                       )}
                     >
                       <Icon className="h-3.5 w-3.5" />
-                      <span className="capitalize">{mode}</span>
+                      <span className="hidden capitalize sm:inline">{mode}</span>
                     </button>
                   );
                 })}

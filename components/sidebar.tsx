@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { X, MessageCircle, Search, Gift, Settings, HelpCircle, CreditCard, LogOut, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch } from 'lucide-react';
+import { X, MessageCircle, Search, Gift, Settings, HelpCircle, CreditCard, LogOut, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch, Home } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -18,6 +18,15 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getProjects, Project, deleteProject } from '@/lib/database';
 import { formatDistanceToNow } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-media-query';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -28,6 +37,8 @@ interface SidebarProps {
   onGetFreeTokens?: () => void;
   onSignOut?: () => void;
   onChatSelected?: (chatId: string) => void;
+  onHomeClick?: () => void;
+  onProjectDeleted?: (chatId: string) => void;
   searchQuery?: string;
   refreshKey?: number;
 }
@@ -47,6 +58,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onGetFreeTokens = () => {},
   onSignOut = () => {},
   onChatSelected = () => {},
+  onHomeClick = () => {
+    window.location.assign('/');
+  },
+  onProjectDeleted = () => {},
   searchQuery: externalSearchQuery = "",
   refreshKey = 0,
 }) => {
@@ -55,6 +70,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isPricingModalOpen, setIsPricingModalOpen] = React.useState(false);
   const [user, setUser] = React.useState<SupabaseUser | null>(null);
   const [chatHistory, setChatHistory] = React.useState<ChatHistoryItem[]>([]);
+  const [deleteTarget, setDeleteTarget] = React.useState<ChatHistoryItem | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = React.useState('');
+  const [deleteError, setDeleteError] = React.useState('');
+  const [isDeletingChat, setIsDeletingChat] = React.useState(false);
   const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const leaveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile();
@@ -83,11 +102,64 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onSearch(value);
   };
 
-  const handleDeleteChat = async (chatId: string) => {
-    const supabase = createSupabaseBrowserClient();
-    await deleteProject(supabase, chatId);
-    setChatHistory(chatHistory.filter(chat => chat.id !== chatId));
+  const handleHomeClick = () => {
+    onHomeClick();
+    if (isMobile) {
+      handleCloseSidebar();
+    }
   };
+
+  const handleRequestDeleteChat = (chat: ChatHistoryItem) => {
+    setDeleteTarget(chat);
+    setDeleteConfirmation('');
+    setDeleteError('');
+  };
+
+  const resetDeleteDialog = () => {
+    if (isDeletingChat) return;
+    setDeleteTarget(null);
+    setDeleteConfirmation('');
+    setDeleteError('');
+  };
+
+  const handleDeleteChat = async () => {
+    if (!deleteTarget || deleteConfirmation.trim() !== deleteTarget.title || isDeletingChat) {
+      return;
+    }
+
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) {
+      setDeleteError('Supabase is not configured, so this project cannot be deleted here.');
+      return;
+    }
+
+    setIsDeletingChat(true);
+    setDeleteError('');
+
+    try {
+      const deleted = await deleteProject(supabase, deleteTarget.id);
+
+      if (!deleted) {
+        setDeleteError('Could not delete this project. Refresh and try again.');
+        return;
+      }
+
+      setChatHistory((history) => history.filter(chat => chat.id !== deleteTarget.id));
+      onProjectDeleted(deleteTarget.id);
+      setDeleteTarget(null);
+      setDeleteConfirmation('');
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      setDeleteError(error instanceof Error ? error.message : 'Could not delete this project.');
+    } finally {
+      setIsDeletingChat(false);
+    }
+  };
+
+  const canDeleteTarget =
+    Boolean(deleteTarget) &&
+    deleteConfirmation.trim() === deleteTarget?.title &&
+    !isDeletingChat;
 
   const handleOpenSidebar = () => {
     if (leaveTimeoutRef.current) {
@@ -351,9 +423,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 bg-white/10 text-white hover:bg-white/15"
-            onClick={handleCloseSidebar}
+            onClick={handleHomeClick}
           >
-            <MessageCircle className="h-4 w-4" />
+            <Home className="h-4 w-4" />
             Home
           </Button>
           <Button
@@ -439,7 +511,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               <CornerUpLeft className="mr-2 h-4 w-4" />
                               <span>Re-enter</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteChat(chat.id)} className="text-red-500">
+                            <DropdownMenuItem onClick={() => handleRequestDeleteChat(chat)} className="text-red-500">
                               <Trash2 className="mr-2 h-4 w-4" />
                               <span>Delete</span>
                             </DropdownMenuItem>
@@ -518,6 +590,64 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
       </div>
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => {
+        if (!open) resetDeleteDialog();
+      }}>
+        <AlertDialogContent className="border-white/10 bg-[#111211] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete project?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/60">
+              This will remove the project from your workspace. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteTarget && (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-red-200/80">
+                  Project name
+                </div>
+                <div className="mt-1 break-words text-sm font-semibold text-white">
+                  {deleteTarget.title}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="project-delete-confirmation" className="text-sm text-white/70">
+                  Type the project name to confirm deletion.
+                </label>
+                <Input
+                  id="project-delete-confirmation"
+                  value={deleteConfirmation}
+                  onChange={(event) => setDeleteConfirmation(event.target.value)}
+                  disabled={isDeletingChat}
+                  autoComplete="off"
+                  className="border-white/10 bg-white/[0.04] text-white placeholder:text-white/35"
+                />
+              </div>
+              {deleteError && (
+                <div className="rounded-md border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                  {deleteError}
+                </div>
+              )}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isDeletingChat}
+              className="border-white/10 bg-transparent text-white hover:bg-white/10"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              disabled={!canDeleteTarget}
+              onClick={handleDeleteChat}
+              className="bg-red-600 text-white hover:bg-red-500 disabled:opacity-45"
+            >
+              {isDeletingChat ? 'Deleting...' : 'Delete project'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <PricingModal isOpen={isPricingModalOpen} onClose={() => setIsPricingModalOpen(false)} />
     </div>
   );

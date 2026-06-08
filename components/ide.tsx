@@ -40,6 +40,7 @@ export function IDE({
   const isGitHubSaveBlocked = githubSaveRequired && !githubWorkspaceConnected
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSaveRef = useRef<{ path: string; content: string } | null>(null)
+  const selectedFileRef = useRef(selectedFile)
 
   const blockGitHubSave = useCallback(() => {
     onSaveBlocked?.()
@@ -49,6 +50,10 @@ export function IDE({
     () => filterFileTree(files, fileSearchQuery),
     [files, fileSearchQuery],
   )
+
+  useEffect(() => {
+    selectedFileRef.current = selectedFile
+  }, [selectedFile])
 
   const fetchFiles = useCallback(async () => {
     if (isSandboxMode && sandboxId) {
@@ -90,32 +95,37 @@ export function IDE({
       return
     }
 
+    let saved = false
+
     if (onSave) {
       await onSave(path, content)
-      setSelectedFile((current) =>
-        current?.path === path ? { path, content } : current,
-      )
-      return
-    }
-
-    if (isSandboxMode && sandboxId) {
+      saved = true
+    } else if (isSandboxMode && sandboxId) {
       // Save file to sandbox
-      await fetch(`/api/sandbox/${sandboxId}/files/content`, {
+      const response = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ path, content, projectID: projectId }),
       })
+      saved = response.ok
     } else if (session) {
       // Save file to Supabase
-      await fetch('/api/files/content', {
+      const response = await fetch('/api/files/content', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ path, content }),
       })
+      saved = response.ok
+    }
+
+    if (saved) {
+      setSelectedFile((current) =>
+        current?.path === path ? { path, content } : current,
+      )
     }
   }, [
     blockGitHubSave,
@@ -138,7 +148,11 @@ export function IDE({
     }
 
     pendingSaveRef.current = null
-    await persistFile(pendingSave.path, pendingSave.content)
+    try {
+      await persistFile(pendingSave.path, pendingSave.content)
+    } catch (error) {
+      console.error('Error saving file:', error)
+    }
   }, [persistFile])
 
   const scheduleFileSave = useCallback((path: string, content: string) => {
@@ -188,7 +202,7 @@ export function IDE({
   }
 
   async function handleSelectFile(path: string) {
-    await flushPendingSave()
+    void flushPendingSave()
 
     if (isSandboxMode && sandboxId) {
       // Load file from sandbox
@@ -204,20 +218,24 @@ export function IDE({
   }
 
   function handleEditorChange(content: string | undefined) {
-    if (!selectedFile) return
+    const currentFile = selectedFileRef.current
+
+    if (!currentFile) return
 
     const nextContent = content || ''
-    const path = selectedFile.path
+    const path = currentFile.path
 
-    setSelectedFile({ path, content: nextContent })
+    selectedFileRef.current = { path, content: nextContent }
     scheduleFileSave(path, nextContent)
   }
 
   function handleEditorSave(content: string) {
-    if (!selectedFile) return
+    const currentFile = selectedFileRef.current
 
-    const path = selectedFile.path
-    setSelectedFile({ path, content })
+    if (!currentFile) return
+
+    const path = currentFile.path
+    selectedFileRef.current = { path, content }
     scheduleFileSave(path, content)
     void flushPendingSave()
   }
