@@ -43,14 +43,23 @@ export default function SettingsLayout({
 }) {
   const pathname = usePathname()
 
+  function handleBackToWorkspace() {
+    window.location.assign('/')
+  }
+
   return (
     <MagicalPageShell contentClassName="container mx-auto px-4 py-6">
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="border border-white/10 bg-white/5 text-white hover:bg-white/10">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleBackToWorkspace}
+            aria-label="Back to workspace"
+            className="border border-white/10 bg-white/5 text-white hover:bg-white/10"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
           <h1 className="text-2xl font-semibold text-white">Settings</h1>
         </div>
 

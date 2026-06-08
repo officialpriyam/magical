@@ -40,6 +40,19 @@ const GITHUB_STATUS_ERROR_MESSAGE =
 
 type ChatMode = 'plan' | 'build'
 type ProjectShelfView = 'all' | 'recent' | 'github'
+type ProjectPreviewCard = {
+  url?: string
+  imageUrl?: string
+  title?: string
+  description?: string
+  template?: string
+}
+type ProjectPreviewRow = {
+  project_id: string | null
+  object_data: unknown
+  result_data: unknown
+  sequence_number: number | null
+}
 
 function getSandboxErrorMessage(errorResult: { error?: string; type?: string }) {
   if (errorResult.type === 'config_error') {
@@ -191,6 +204,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
+  const [projectPreviews, setProjectPreviews] = useState<Record<string, ProjectPreviewCard>>({})
+  const [activePreviewProjectId, setActivePreviewProjectId] = useState('')
   const currentProjectRef = useRef<Project | null>(null)
   const magicGlowRef = useRef<HTMLDivElement | null>(null)
   const magicAnimationFrameRef = useRef<number | null>(null)
@@ -271,6 +286,65 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       isMounted = false
     }
   }, [chatHistoryRefreshKey, session?.user?.id, supabase])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadProjectPreviews() {
+      const projectIds = recentProjects.slice(0, 18).map((project) => project.id)
+
+      if (!supabase || !session?.user?.id || projectIds.length === 0) {
+        setProjectPreviews({})
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select('project_id, object_data, result_data, sequence_number')
+        .in('project_id', projectIds)
+        .not('result_data', 'is', null)
+        .order('sequence_number', { ascending: false })
+        .returns<ProjectPreviewRow[]>()
+
+      if (!isMounted) return
+
+      if (error) {
+        console.warn('Failed to load project preview thumbnails:', error)
+        setProjectPreviews({})
+        return
+      }
+
+      const previews: Record<string, ProjectPreviewCard> = {}
+      const fallbackPreviews: Record<string, ProjectPreviewCard> = {}
+      const rows = (data as unknown as ProjectPreviewRow[] | null) || []
+
+      for (const row of rows) {
+        const projectId = typeof row.project_id === 'string' ? row.project_id : ''
+
+        if (!projectId || previews[projectId]) {
+          continue
+        }
+
+        const resultData = row.result_data as Record<string, any> | null
+        const objectData = row.object_data as Record<string, any> | null
+        const preview = getMessageProjectPreview(resultData, objectData)
+
+        if (preview.url || preview.imageUrl) {
+          previews[projectId] = preview
+        } else if (!fallbackPreviews[projectId] && (preview.title || preview.description || preview.template)) {
+          fallbackPreviews[projectId] = preview
+        }
+      }
+
+      setProjectPreviews({ ...fallbackPreviews, ...previews })
+    }
+
+    void loadProjectPreviews()
+
+    return () => {
+      isMounted = false
+    }
+  }, [recentProjects, session?.user?.id, supabase])
 
   const handleChatSelected = async (chatId: string) => {
     skipNextProjectMessagesLoadRef.current = ''
@@ -1785,7 +1859,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 }}
               />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,8,9,0.16),rgba(8,8,9,0)_48%,rgba(8,8,9,0.24))]" />
-              <div className="absolute inset-x-0 top-0 h-28 border-b border-white/10 bg-white/[0.025]" />
+              <div className="absolute inset-x-8 top-0 h-px bg-white/10" />
 
               <div className="relative z-10 flex w-full flex-col">
                 <div className="flex flex-1 flex-col items-center justify-center px-4 pt-16 text-center">
@@ -1812,15 +1886,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
                 <div className="mx-auto mt-8 w-[calc(100%-2rem)] max-w-7xl rounded-t-2xl border border-white/10 bg-[#111315]/92 p-4 shadow-2xl backdrop-blur-md sm:w-[calc(100%-3rem)] sm:p-5">
                   <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-1 text-xs text-white/60 sm:inline-grid sm:grid-cols-3">
+                    <div className="flex flex-wrap gap-1 text-xs text-white/60">
                       <button
                         type="button"
                         onClick={() => setProjectShelfView('all')}
                         className={cn(
-                          'inline-flex h-8 items-center justify-center gap-2 rounded-lg px-3 font-medium transition',
+                          'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'all'
-                            ? 'bg-white text-[#101214]'
-                            : 'text-white/65 hover:bg-white/10 hover:text-white',
+                            ? 'border-white/70 bg-white text-[#101214]'
+                            : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
                         )}
                       >
                         <FolderOpen className="h-3.5 w-3.5" />
@@ -1830,10 +1904,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                         type="button"
                         onClick={() => setProjectShelfView('recent')}
                         className={cn(
-                          'inline-flex h-8 items-center justify-center gap-2 rounded-lg px-3 font-medium transition',
+                          'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'recent'
-                            ? 'bg-white text-[#101214]'
-                            : 'text-white/65 hover:bg-white/10 hover:text-white',
+                            ? 'border-white/70 bg-white text-[#101214]'
+                            : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
                         )}
                       >
                         <Clock3 className="h-3.5 w-3.5" />
@@ -1843,10 +1917,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                         type="button"
                         onClick={() => setProjectShelfView('github')}
                         className={cn(
-                          'inline-flex h-8 items-center justify-center gap-2 rounded-lg px-3 font-medium transition',
+                          'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'github'
-                            ? 'bg-white text-[#101214]'
-                            : 'text-white/65 hover:bg-white/10 hover:text-white',
+                            ? 'border-white/70 bg-white text-[#101214]'
+                            : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
                         )}
                       >
                         <GitBranch className="h-3.5 w-3.5" />
@@ -1863,46 +1937,100 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     {dashboardProjects.length > 0 ? dashboardProjects.slice(0, 6).map((project) => {
                       const workspace = getProjectGitHubWorkspace(project)
                       const r2Workspace = getProjectR2Workspace(project)
+                      const preview = getProjectPreviewCard(project, projectPreviews[project.id])
+                      const shouldLoadPreviewFrame = Boolean(preview.url && activePreviewProjectId === project.id)
 
                       return (
-                        <button
+                        <div
                           key={project.id}
-                          type="button"
+                          role="button"
+                          tabIndex={0}
                           onClick={() => handleChatSelected(project.id)}
-                          className="group min-h-32 rounded-lg border border-white/10 bg-white/[0.055] p-4 text-left transition hover:border-white/20 hover:bg-white/[0.09]"
+                          onPointerEnter={() => {
+                            if (preview.url) setActivePreviewProjectId(project.id)
+                          }}
+                          onPointerLeave={() => {
+                            setActivePreviewProjectId((projectId) => (projectId === project.id ? '' : projectId))
+                          }}
+                          onFocus={() => {
+                            if (preview.url) setActivePreviewProjectId(project.id)
+                          }}
+                          onBlur={() => {
+                            setActivePreviewProjectId((projectId) => (projectId === project.id ? '' : projectId))
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              void handleChatSelected(project.id)
+                            }
+                          }}
+                          className="group min-h-32 cursor-pointer overflow-hidden rounded-lg border border-white/10 bg-white/[0.055] text-left transition hover:border-white/20 hover:bg-white/[0.09]"
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="line-clamp-2 text-sm font-semibold text-white">
-                                {project.title}
-                              </div>
-                              <div className="mt-2 text-xs text-white/50">
-                                {new Date(project.updated_at).toLocaleDateString()}
-                              </div>
-                            </div>
-                            <span className="inline-flex shrink-0 items-center rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-white/60">
-                              {project.is_public ? 'Public' : 'Private'}
-                            </span>
-                          </div>
-                          <div className="mt-5 flex items-center gap-2 text-xs text-white/65">
-                            {workspace ? (
-                              <>
-                                <GitBranch className="h-3.5 w-3.5 text-emerald-300" />
-                                <span className="truncate">{workspace.fullName}</span>
-                              </>
-                            ) : r2Workspace ? (
-                              <>
-                                <FolderOpen className="h-3.5 w-3.5 text-sky-300" />
-                                <span>Private backup</span>
-                              </>
+                          <div className="relative aspect-[16/9] overflow-hidden border-b border-white/10 bg-[#0b0d0b]">
+                            {shouldLoadPreviewFrame ? (
+                              <iframe
+                                title={`${project.title} preview`}
+                                src={preview.url}
+                                loading="lazy"
+                                sandbox="allow-forms allow-scripts allow-same-origin"
+                                tabIndex={-1}
+                                className="pointer-events-none absolute left-0 top-0 h-[200%] w-[200%] origin-top-left scale-50 border-0 opacity-80 transition duration-300 group-hover:opacity-100"
+                              />
+                            ) : preview.imageUrl ? (
+                              <div
+                                className="absolute inset-0 bg-cover bg-center opacity-85 transition duration-300 group-hover:scale-[1.02] group-hover:opacity-100"
+                                style={{ backgroundImage: toCssUrl(preview.imageUrl) }}
+                              />
+                            ) : preview.url ? (
+                              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(84,198,139,0.24),transparent_34%),linear-gradient(135deg,#121814,#0b0d0b_60%,#10100c)]" />
                             ) : (
-                              <>
-                                <FolderOpen className="h-3.5 w-3.5 text-white/45" />
-                                <span>Local project</span>
-                              </>
+                              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,196,87,0.22),transparent_34%),linear-gradient(135deg,#151913,#0b0d0b_58%,#100d08)]" />
                             )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d0b]/85 via-transparent to-black/15" />
+                            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2">
+                              <span className="truncate text-xs font-medium text-white/82">
+                                {preview.template || project.template_id || 'Magical app'}
+                              </span>
+                              <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1 text-[10px] text-white/65">
+                                {preview.url || preview.imageUrl ? 'Preview' : 'No image'}
+                              </span>
+                            </div>
                           </div>
-                        </button>
+
+                          <div className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="line-clamp-2 text-sm font-semibold text-white">
+                                  {preview.title || project.title}
+                                </div>
+                                <div className="mt-2 text-xs text-white/50">
+                                  {new Date(project.updated_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                              <span className="inline-flex shrink-0 items-center rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-white/60">
+                                {project.is_public ? 'Public' : 'Private'}
+                              </span>
+                            </div>
+                            <div className="mt-5 flex items-center gap-2 text-xs text-white/65">
+                              {workspace ? (
+                                <>
+                                  <GitBranch className="h-3.5 w-3.5 text-emerald-300" />
+                                  <span className="truncate">{workspace.fullName}</span>
+                                </>
+                              ) : r2Workspace ? (
+                                <>
+                                  <FolderOpen className="h-3.5 w-3.5 text-sky-300" />
+                                  <span>Private backup</span>
+                                </>
+                              ) : (
+                                <>
+                                  <FolderOpen className="h-3.5 w-3.5 text-white/45" />
+                                  <span>Local project</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       )
                     }) : (
                       <div className="rounded-lg border border-white/10 bg-white/[0.055] p-5 text-sm text-white/70 md:col-span-2 xl:col-span-3">
@@ -2017,6 +2145,65 @@ function getProjectR2Workspace(project: Project | null) {
   }
 
   return workspace
+}
+
+function getProjectPreviewCard(project: Project, preview?: ProjectPreviewCard): ProjectPreviewCard {
+  const metadata = project.metadata && typeof project.metadata === 'object' ? project.metadata : {}
+  const metadataPreviewUrl =
+    readSafeUrl(metadata.previewUrl) ||
+    readSafeUrl(metadata.sandboxUrl) ||
+    readSafeUrl(metadata.url)
+  const metadataImageUrl =
+    readSafeUrl(metadata.previewImageUrl) ||
+    readSafeUrl(metadata.thumbnailUrl) ||
+    readSafeUrl(metadata.imageUrl)
+
+  return {
+    url: preview?.url || metadataPreviewUrl || '',
+    imageUrl: preview?.imageUrl || metadataImageUrl || '',
+    title: preview?.title || project.title,
+    description: preview?.description || project.description || '',
+    template: preview?.template || project.template_id || '',
+  }
+}
+
+function getMessageProjectPreview(
+  resultData: Record<string, any> | null,
+  objectData: Record<string, any> | null,
+): ProjectPreviewCard {
+  const resultTemplate = typeof resultData?.template === 'string' ? resultData.template : ''
+  const objectTemplate = typeof objectData?.template === 'string' ? objectData.template : ''
+
+  return {
+    url: readSafeUrl(resultData?.url),
+    imageUrl:
+      readSafeUrl(objectData?.previewImageUrl) ||
+      readSafeUrl(objectData?.thumbnailUrl) ||
+      readSafeUrl(objectData?.imageUrl) ||
+      readSafeUrl(resultData?.previewImageUrl) ||
+      readSafeUrl(resultData?.thumbnailUrl) ||
+      readSafeUrl(resultData?.imageUrl),
+    title: typeof objectData?.title === 'string' ? objectData.title : '',
+    description: typeof objectData?.description === 'string' ? objectData.description : '',
+    template: resultTemplate || objectTemplate,
+  }
+}
+
+function readSafeUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return ''
+  }
+
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : ''
+  } catch {
+    return ''
+  }
+}
+
+function toCssUrl(value: string) {
+  return `url("${value.replace(/["\\]/g, '\\$&')}")`
 }
 
 function hasRestorableWorkspace(project: Project | null) {
