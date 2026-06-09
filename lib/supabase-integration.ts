@@ -85,6 +85,57 @@ const SUPABASE_OAUTH_SCOPES = [
   'database:write',
   'secrets:read',
 ]
+const DEFAULT_SUPABASE_PROJECT_REGION = 'us-east-1'
+const SUPABASE_REGION_BY_COUNTRY: Record<string, string> = {
+  IN: 'ap-south-1',
+  BD: 'ap-south-1',
+  LK: 'ap-south-1',
+  NP: 'ap-south-1',
+  PK: 'ap-south-1',
+  SG: 'ap-southeast-1',
+  ID: 'ap-southeast-1',
+  MY: 'ap-southeast-1',
+  PH: 'ap-southeast-1',
+  TH: 'ap-southeast-1',
+  VN: 'ap-southeast-1',
+  AU: 'ap-southeast-2',
+  NZ: 'ap-southeast-2',
+  JP: 'ap-northeast-1',
+  KR: 'ap-northeast-2',
+  GB: 'eu-west-2',
+  IE: 'eu-west-1',
+  FR: 'eu-west-3',
+  DE: 'eu-central-1',
+  NL: 'eu-central-1',
+  ES: 'eu-west-3',
+  IT: 'eu-south-1',
+  SE: 'eu-north-1',
+  NO: 'eu-north-1',
+  US: 'us-east-1',
+  CA: 'ca-central-1',
+  BR: 'sa-east-1',
+  AR: 'sa-east-1',
+  CL: 'sa-east-1',
+  ZA: 'af-south-1',
+}
+const SUPABASE_REGION_BY_VERCEL_REGION: Record<string, string> = {
+  bom1: 'ap-south-1',
+  sin1: 'ap-southeast-1',
+  syd1: 'ap-southeast-2',
+  hnd1: 'ap-northeast-1',
+  kix1: 'ap-northeast-1',
+  icn1: 'ap-northeast-2',
+  lhr1: 'eu-west-2',
+  dub1: 'eu-west-1',
+  cdg1: 'eu-west-3',
+  fra1: 'eu-central-1',
+  arn1: 'eu-north-1',
+  iad1: 'us-east-1',
+  sfo1: 'us-west-1',
+  pdx1: 'us-west-2',
+  cle1: 'us-east-2',
+  gru1: 'sa-east-1',
+}
 
 export function getSupabaseOAuthScopes() {
   return SUPABASE_OAUTH_SCOPES
@@ -248,12 +299,14 @@ export async function applySupabaseMigration(
   options: {
     projectId?: string
     projectTitle?: string
+    regionCountry?: string
   } = {},
 ) {
   const target = await resolveSupabaseMigrationTarget({
     userId,
     projectId: options.projectId,
     projectTitle: options.projectTitle,
+    regionCountry: options.regionCountry,
   })
 
   await waitForSupabaseProjectReady(target.credentials.accessToken, target.projectRef)
@@ -329,10 +382,12 @@ async function resolveSupabaseMigrationTarget({
   userId,
   projectId,
   projectTitle,
+  regionCountry,
 }: {
   userId?: string
   projectId?: string
   projectTitle?: string
+  regionCountry?: string
 }) {
   const credentials = await getSupabaseCredentials(userId)
 
@@ -368,6 +423,7 @@ async function resolveSupabaseMigrationTarget({
     projectId,
     projectTitle,
     credentials,
+    regionCountry,
   })
 
   return {
@@ -382,11 +438,13 @@ async function ensureSupabaseProjectForMagicalProject({
   projectId,
   projectTitle,
   credentials,
+  regionCountry,
 }: {
   userId: string
   projectId: string
   projectTitle?: string
   credentials: SupabaseCredentials
+  regionCountry?: string
 }) {
   const ownedProject = await getOwnedMagicalProject(userId, projectId)
   const existing = getSupabaseProjectBindingFromMetadata(ownedProject.metadata)
@@ -405,6 +463,7 @@ async function ensureSupabaseProjectForMagicalProject({
     credentials.accessToken,
     credentials.organizationSlug,
     buildSupabaseProjectName(projectTitle || ownedProject.title || projectId),
+    regionCountry,
   )
 
   const binding: SupabaseProjectBinding = {
@@ -869,6 +928,7 @@ async function createSupabaseProject(
   accessToken: string,
   organizationSlug: string,
   name: string,
+  regionCountry?: string,
 ) {
   const body: Record<string, any> = {
     db_pass: generateDatabasePassword(),
@@ -876,7 +936,7 @@ async function createSupabaseProject(
     organization_slug: organizationSlug,
   }
 
-  const region = readFirstEnvValue(['SUPABASE_DEFAULT_REGION'])
+  const region = resolveSupabaseProjectRegion(regionCountry)
   const instanceSize = readFirstEnvValue(['SUPABASE_DEFAULT_INSTANCE_SIZE'])
 
   if (region) {
@@ -1033,6 +1093,25 @@ function readFirstEnvValue(names: string[]) {
   }
 
   return ''
+}
+
+function resolveSupabaseProjectRegion(countryHint?: string) {
+  const configuredRegion = readFirstEnvValue(['SUPABASE_DEFAULT_REGION'])
+
+  if (configuredRegion) {
+    return configuredRegion
+  }
+
+  const countryRegion = SUPABASE_REGION_BY_COUNTRY[countryHint?.trim().toUpperCase() || '']
+
+  if (countryRegion) {
+    return countryRegion
+  }
+
+  const vercelRegion = readFirstEnvValue(['VERCEL_REGION'])
+  const deploymentRegion = SUPABASE_REGION_BY_VERCEL_REGION[vercelRegion.toLowerCase()]
+
+  return deploymentRegion || DEFAULT_SUPABASE_PROJECT_REGION
 }
 
 function getProjectRefFromUrl(value: string) {

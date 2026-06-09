@@ -47,6 +47,7 @@ export async function POST(req: Request) {
       }, {
         projectId,
         projectTitle,
+        regionCountry: getRequestCountry(req),
       }),
     )
   } catch (error) {
@@ -60,4 +61,12 @@ export async function POST(req: Request) {
       { status: 500 },
     )
   }
+}
+
+function getRequestCountry(req: Request) {
+  return (
+    req.headers.get('x-vercel-ip-country') ||
+    req.headers.get('cf-ipcountry') ||
+    ''
+  )
 }

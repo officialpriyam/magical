@@ -165,6 +165,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const posthog = usePostHog()
 
   const [result, setResult] = useState<ExecutionResult>()
+  const [warmSandboxResult, setWarmSandboxResult] = useState<ExecutionResult>()
   const [sessionStartTime] = useState(Date.now())
   const [fragmentsGenerated, setFragmentsGenerated] = useState(0)
   const [messagesCount, setMessagesCount] = useState(0)
@@ -173,6 +174,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const messagesRef = useRef<Message[]>([])
   const githubSyncTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const restoringProjectRef = useRef('')
+  const warmingSandboxKeyRef = useRef('')
   const skipNextWorkspaceRestoreRef = useRef('')
   const planAbortControllerRef = useRef<AbortController | null>(null)
   const autoFixAttemptsRef = useRef(0)
@@ -224,6 +226,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     () => getProjectR2Workspace(currentProject),
     [currentProject],
   )
+  const previewExecutionResult = result || (currentTab === 'ide' ? warmSandboxResult : undefined)
   const isGitHubWorkspaceConnected = Boolean(currentProjectGitHubWorkspace)
   const dashboardProjects = useMemo(() => {
     const sortedProjects = [...recentProjects].sort(
@@ -351,6 +354,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     const project = await getProject(supabase, chatId);
     if (project) {
       setErrorMessage('')
+      setWarmSandboxResult(undefined)
+      warmingSandboxKeyRef.current = ''
       currentProjectRef.current = project
       setCurrentProject(project);
       setProjectMessagesRefreshKey((key) => key + 1)
@@ -416,6 +421,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setCurrentProject(project)
       currentProjectRef.current = project
       setResult(undefined)
+      setWarmSandboxResult(undefined)
+      warmingSandboxKeyRef.current = ''
       setFragment(undefined)
       setCurrentTab('code')
       setIsPreviewLoading(false)
@@ -564,6 +571,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               accessToken: session?.access_token,
               projectID: currentProjectRef.current?.id,
               sandboxProvider,
+              existingSandboxId: getReusableWarmSandboxId(fragment),
             }),
           })
           result = await response.json()
@@ -605,6 +613,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         const messagesWithResult = withLatestAssistantFragment(messagesRef.current, fragment, executionResult)
         messagesRef.current = messagesWithResult
         setMessages(messagesWithResult)
+        setWarmSandboxResult(executionResult)
         setResult(executionResult);
         setCurrentPreview({ fragment, result: executionResult });
 
@@ -757,6 +766,51 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }
 
+  const warmProjectSandbox = useCallback(async (project: Project) => {
+    if (!session?.user?.id || !project?.id) return
+
+    const template =
+      selectedTemplate !== 'auto'
+        ? selectedTemplate
+        : isTemplateId(project.template_id)
+          ? project.template_id
+          : 'nextjs-developer'
+    const warmKey = `${project.id}:${template}:${sandboxProvider}`
+
+    if (warmingSandboxKeyRef.current === warmKey) {
+      return
+    }
+
+    warmingSandboxKeyRef.current = warmKey
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/start-sandbox`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          template,
+          teamID: userTeam?.id,
+          accessToken: session.access_token,
+          sandboxProvider,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start project sandbox.')
+      }
+
+      if (currentProjectRef.current?.id === project.id) {
+        setWarmSandboxResult(data as ExecutionResult)
+      }
+    } catch (error) {
+      warmingSandboxKeyRef.current = ''
+      console.warn('Project sandbox warm start failed:', error)
+    }
+  }, [sandboxProvider, selectedTemplate, session?.access_token, session?.user?.id, userTeam?.id])
+
   const restoreProjectWorkspace = useCallback(async (
     project: Project,
     savedFragment: DeepPartial<FragmentSchema>,
@@ -822,6 +876,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         isHydratingProjectMessagesRef.current = false
         messagesRef.current = []
         setMessages([])
+        setWarmSandboxResult(undefined)
         return
       }
 
@@ -829,6 +884,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         skipNextProjectMessagesLoadRef.current = ''
         isHydratingProjectMessagesRef.current = false
         setIsLoadingProject(false)
+        if (currentProject) {
+          void warmProjectSandbox(currentProject)
+        }
         return
       }
 
@@ -848,6 +906,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
       setFragment(latestPreviewMessage?.object)
       setResult(latestPreviewMessage?.result)
+      setWarmSandboxResult(undefined)
       setCurrentTab('code')
       setIsLoadingProject(false)
 
@@ -855,6 +914,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         skipNextWorkspaceRestoreRef.current = ''
       } else if (currentProject && latestPreviewMessage?.object && hasRestorableWorkspace(currentProject)) {
         void restoreProjectWorkspace(currentProject, latestPreviewMessage.object)
+      } else if (currentProject && !latestPreviewMessage?.result) {
+        void warmProjectSandbox(currentProject)
       }
     }
 
@@ -863,7 +924,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       isMounted = false
     }
-  }, [currentProject, currentProjectId, projectMessagesRefreshKey, restoreProjectWorkspace, supabase])
+  }, [currentProject, currentProjectId, projectMessagesRefreshKey, restoreProjectWorkspace, supabase, warmProjectSandbox])
 
   useEffect(() => {
     async function saveMessagesToDb() {
@@ -1308,6 +1369,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     invalidateCache(new RegExp(`^projects:${session.user.id}:`))
     currentProjectRef.current = newProject
     setCurrentProject(newProject)
+    setWarmSandboxResult(undefined)
+    warmingSandboxKeyRef.current = ''
     setChatHistoryRefreshKey((key) => key + 1)
     if (navigate) {
       router.replace(`/chat/${newProject.id}`)
@@ -1443,6 +1506,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setMessages([])
     setFragment(undefined)
     setResult(undefined)
+    setWarmSandboxResult(undefined)
+    warmingSandboxKeyRef.current = ''
     setCurrentTab('code')
     setIsPreviewLoading(false)
     setAutoFixMessage('')
@@ -1483,6 +1548,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }) {
     setFragment(preview.fragment)
     setResult(preview.result)
+  }
+
+  function getReusableWarmSandboxId(nextFragment: DeepPartial<FragmentSchema>) {
+    if (
+      !warmSandboxResult?.sbxId ||
+      !nextFragment?.template ||
+      warmSandboxResult.template !== nextFragment.template
+    ) {
+      return undefined
+    }
+
+    return warmSandboxResult.sbxId
   }
 
   async function handleSaveFile(path: string, content: string) {
@@ -2112,7 +2189,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 setErrorMessage('Save this project to GitHub before editing files. Use Save to GitHub in the preview panel.')
                 setIsPreviewPanelOpen(true)
               }}
-              result={result as ExecutionResult}
+              result={previewExecutionResult}
               onClose={() => {
                 setCurrentPreview({ fragment: undefined, result: undefined })
                 setIsPreviewPanelOpen(false)
@@ -2227,6 +2304,10 @@ function readSafeUrl(value: unknown) {
 
 function toCssUrl(value: string) {
   return `url("${value.replace(/["\\]/g, '\\$&')}")`
+}
+
+function isTemplateId(value: unknown): value is TemplateId {
+  return typeof value === 'string' && value in templates
 }
 
 function hasRestorableWorkspace(project: Project | null) {

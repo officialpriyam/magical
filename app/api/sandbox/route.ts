@@ -7,6 +7,7 @@ import { saveProjectFilesToR2 } from '@/lib/r2-workspace'
 import { createServerClient } from '@/lib/supabase-server'
 import {
   chooseSandboxProvider,
+  decodeSandboxId,
   encodeSandboxId,
   normalizeSandboxProviderMode,
   type SandboxProvider,
@@ -14,17 +15,21 @@ import {
 } from '@/lib/sandbox-provider'
 import {
   createVercelSandbox,
+  getVercelSandbox,
   getVercelSandboxUrl,
   hasVercelSandboxConfig,
   installAndStartVercelProject,
   listVercelSandboxFiles,
   writeVercelProjectFiles,
 } from '@/lib/vercel-sandbox'
-import type { Sandbox } from '@e2b/code-interpreter'
+import { Sandbox } from '@e2b/code-interpreter'
 import { FileSystemNode } from '@/components/file-tree'
 import type { TemplateId } from '@/lib/templates'
 
 const sandboxTimeout = 10 * 60 * 1000
+type VercelSandboxInstance =
+  | Awaited<ReturnType<typeof createVercelSandbox>>
+  | Awaited<ReturnType<typeof getVercelSandbox>>
 
 async function fetchSandboxFiles(sbx: Sandbox): Promise<FileSystemNode[]> {
   try {
@@ -69,6 +74,7 @@ export async function POST(req: Request) {
       accessToken,
       projectID,
       sandboxProvider,
+      existingSandboxId,
     }: {
       fragment: FragmentSchema
       userID: string | undefined
@@ -76,6 +82,7 @@ export async function POST(req: Request) {
       accessToken: string | undefined
       projectID: string | undefined
       sandboxProvider?: SandboxProviderMode
+      existingSandboxId?: string
     } = await req.json()
 
     if (!fragment) {
@@ -89,7 +96,16 @@ export async function POST(req: Request) {
     }
 
     const providerMode = normalizeSandboxProviderMode(sandboxProvider)
-    const selectedProvider = resolveSandboxProviderForFragment(providerMode, fragment)
+    let selectedProvider = resolveSandboxProviderForFragment(providerMode, fragment)
+    const reusableSandboxRef = getReusableSandboxRef(existingSandboxId)
+
+    if (
+      reusableSandboxRef &&
+      (providerMode === 'auto' || providerMode === reusableSandboxRef.provider) &&
+      isProviderAvailableForFragment(reusableSandboxRef.provider, fragment)
+    ) {
+      selectedProvider = reusableSandboxRef.provider
+    }
 
     if (!selectedProvider) {
       console.error('No configured sandbox provider is available for this template.')
@@ -115,34 +131,40 @@ export async function POST(req: Request) {
       )
     }
 
-    let sbx: Sandbox | Awaited<ReturnType<typeof createVercelSandbox>> | null = null
+    let sbx: Sandbox | VercelSandboxInstance | null = null
+    let createdSandbox = false
     try {
-      sbx = selectedProvider === 'vercel'
-        ? await createVercelSandbox({
-            template: fragment.template as TemplateId,
-            userId: userID,
-            teamId: teamID,
-            projectId: projectID,
-            port: fragment.port,
-            env: supabaseRuntimeEnv,
-            timeoutMs: sandboxTimeout,
-          })
-        : await createE2BSandbox(fragment.template, {
-            metadata: {
-              template: fragment.template,
-              userID: userID ?? '',
-              teamID: teamID ?? '',
-            },
-            timeoutMs: sandboxTimeout,
-            ...(teamID && accessToken
-              ? {
-                  headers: {
-                    'X-Supabase-Team': teamID,
-                    'X-Supabase-Token': accessToken,
-                  },
-                }
-              : {}),
-          })
+      sbx = await connectReusableSandbox(existingSandboxId, selectedProvider)
+
+      if (!sbx) {
+        createdSandbox = true
+        sbx = selectedProvider === 'vercel'
+          ? await createVercelSandbox({
+              template: fragment.template as TemplateId,
+              userId: userID,
+              teamId: teamID,
+              projectId: projectID,
+              port: fragment.port,
+              env: supabaseRuntimeEnv,
+              timeoutMs: sandboxTimeout,
+            })
+          : await createE2BSandbox(fragment.template, {
+              metadata: {
+                template: fragment.template,
+                userID: userID ?? '',
+                teamID: teamID ?? '',
+              },
+              timeoutMs: sandboxTimeout,
+              ...(teamID && accessToken
+                ? {
+                    headers: {
+                      'X-Supabase-Team': teamID,
+                      'X-Supabase-Token': accessToken,
+                    },
+                  }
+                : {}),
+            })
+      }
     } catch (sandboxError: any) {
       console.error(`${selectedProvider} sandbox creation failed:`, sandboxError)
       return new Response(
@@ -250,10 +272,12 @@ export async function POST(req: Request) {
       
       // Clean up sandbox on execution error
       try {
-        if (selectedProvider === 'vercel') {
-          await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
-        } else {
-          await (sbx as Sandbox | null)?.kill()
+        if (createdSandbox) {
+          if (selectedProvider === 'vercel') {
+            await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
+          } else {
+            await (sbx as Sandbox | null)?.kill()
+          }
         }
       } catch {}
 
@@ -280,21 +304,61 @@ export async function POST(req: Request) {
   }
 }
 
+function getReusableSandboxRef(encodedSandboxId: unknown) {
+  if (typeof encodedSandboxId !== 'string' || !encodedSandboxId.trim()) {
+    return null
+  }
+
+  return decodeSandboxId(encodedSandboxId)
+}
+
+async function connectReusableSandbox(
+  encodedSandboxId: unknown,
+  selectedProvider: SandboxProvider,
+) {
+  const sandboxRef = getReusableSandboxRef(encodedSandboxId)
+
+  if (!sandboxRef) {
+    return null
+  }
+
+  if (sandboxRef.provider !== selectedProvider) {
+    return null
+  }
+
+  try {
+    return sandboxRef.provider === 'vercel'
+      ? await getVercelSandbox(sandboxRef.id)
+      : await Sandbox.connect(sandboxRef.id)
+  } catch (error) {
+    console.warn('Could not reuse warm sandbox; creating a new one:', error)
+    return null
+  }
+}
+
 function resolveSandboxProviderForFragment(
   mode: SandboxProviderMode,
   fragment: FragmentSchema,
 ): SandboxProvider | null {
   const available: SandboxProvider[] = []
 
-  if (process.env.E2B_API_KEY) {
+  if (isProviderAvailableForFragment('e2b', fragment)) {
     available.push('e2b')
   }
 
-  if (fragment.template !== 'code-interpreter-v1' && hasVercelSandboxConfig()) {
+  if (isProviderAvailableForFragment('vercel', fragment)) {
     available.push('vercel')
   }
 
   return chooseSandboxProvider({ mode, available })
+}
+
+function isProviderAvailableForFragment(provider: SandboxProvider, fragment: FragmentSchema) {
+  if (provider === 'e2b') {
+    return Boolean(process.env.E2B_API_KEY)
+  }
+
+  return fragment.template !== 'code-interpreter-v1' && hasVercelSandboxConfig()
 }
 
 function getNoSandboxProviderMessage(
