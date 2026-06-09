@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import staticModels from '@/lib/models.json'
-import type { LLMModel } from '@/lib/models'
+import { hasProviderEnvironmentCredentials, type LLMModel } from '@/lib/models'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,19 +20,57 @@ type GoogleGenerativeModel = {
   supportedGenerationMethods?: string[]
 }
 
+type OpenAICompatibleModel = {
+  id?: string
+  owned_by?: string
+}
+
+const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
+const NVIDIA_NON_CHAT_MODEL_PARTS = [
+  'alphafold',
+  'bevformer',
+  'bge',
+  'content-safety',
+  'cuopt',
+  'diffusion',
+  'dino',
+  'embed',
+  'genmol',
+  'gliner-pii',
+  'grounding',
+  'image',
+  'jailbreak',
+  'molmim',
+  'nvclip',
+  'parse',
+  'protein',
+  'rerank',
+  'retriever',
+  'safety-guard',
+  'sparsedrive',
+  'stable-video',
+  'streampetr',
+  'topic-control',
+  'translate',
+  'vista3d',
+]
+
 export async function GET() {
   const models = new Map<string, LLMModel>()
 
   for (const model of staticModels.models as LLMModel[]) {
-    models.set(model.id, model)
+    if (hasProviderEnvironmentCredentials(model.providerId)) {
+      models.set(model.id, model)
+    }
   }
 
-  const [googleModels, openRouterModels] = await Promise.all([
+  const [googleModels, nvidiaModels, openRouterModels] = await Promise.all([
     fetchGoogleModels(),
+    fetchNvidiaModels(),
     fetchOpenRouterModels(),
   ])
 
-  for (const model of [...googleModels, ...openRouterModels]) {
+  for (const model of [...googleModels, ...nvidiaModels, ...openRouterModels]) {
     models.set(model.id, model)
   }
 
@@ -95,11 +133,53 @@ async function fetchGoogleModels(): Promise<LLMModel[]> {
   }
 }
 
+async function fetchNvidiaModels(): Promise<LLMModel[]> {
+  const apiKey = process.env.NVIDIA_API_KEY
+  if (!apiKey) return []
+
+  const baseURL = (process.env.NVIDIA_BASE_URL || NVIDIA_BASE_URL).replace(/\/$/, '')
+
+  try {
+    const response = await fetch(`${baseURL}/models`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      next: { revalidate: 60 * 60 },
+    })
+
+    if (!response.ok) {
+      throw new Error(`NVIDIA models request failed: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const remoteModels = Array.isArray(data.data) ? (data.data as OpenAICompatibleModel[]) : []
+
+    return remoteModels
+      .filter((model): model is OpenAICompatibleModel & { id: string } => {
+        return typeof model.id === 'string' && model.id.trim().length > 0
+      })
+      .filter((model) => isLikelyNvidiaChatModel(model.id))
+      .map((model) => ({
+        id: model.id,
+        name: formatNvidiaModelName(model.id),
+        provider: 'NVIDIA NIM',
+        providerId: 'nvidia',
+      }))
+  } catch (error) {
+    console.warn('Falling back to bundled NVIDIA model list:', error)
+    return []
+  }
+}
+
 async function fetchOpenRouterModels(): Promise<LLMModel[]> {
+  if (!hasProviderEnvironmentCredentials('openrouter')) return []
+
   try {
     const response = await fetch('https://openrouter.ai/api/v1/models', {
       headers: {
         Accept: 'application/json',
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       },
       next: { revalidate: 60 * 60 },
     })
@@ -126,4 +206,23 @@ async function fetchOpenRouterModels(): Promise<LLMModel[]> {
     console.warn('Falling back to bundled model list:', error)
     return []
   }
+}
+
+function isLikelyNvidiaChatModel(id: string) {
+  const normalizedId = id.toLowerCase()
+
+  return !NVIDIA_NON_CHAT_MODEL_PARTS.some((part) => normalizedId.includes(part))
+}
+
+function formatNvidiaModelName(id: string) {
+  const modelName = id.includes('/') ? id.split('/').slice(1).join('/') : id
+
+  return modelName
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((word) => {
+      if (/^\d+(\.\d+)?[a-z]?$/i.test(word)) return word.toUpperCase()
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
 }

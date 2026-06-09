@@ -24,7 +24,6 @@ import { useLocalStorage } from 'usehooks-ts';
 import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
 import { SupabaseClient } from '@supabase/supabase-js';
-import models from '@/lib/models.json';
 import { invalidateCache } from '@/lib/caching';
 import type { GitHubWorkspace } from '@/components/github-save';
 import type { PreviewTab } from '@/components/preview';
@@ -183,7 +182,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const skipNextProjectMessagesLoadRef = useRef('')
   const isHydratingProjectMessagesRef = useRef(false)
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
-  const [availableModels, setAvailableModels] = useState<LLMModel[]>(models.models as LLMModel[])
+  const [availableModels, setAvailableModels] = useState<LLMModel[]>([])
   const [currentTab, setCurrentTab] = useState<PreviewTab>('code');
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isPlanLoading, setIsPlanLoading] = useState(false);
@@ -446,11 +445,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         if (!response.ok) return
 
         const data = await response.json()
-        if (isMounted && Array.isArray(data.models) && data.models.length > 0) {
+        if (isMounted && Array.isArray(data.models)) {
           setAvailableModels(data.models)
         }
       } catch (error) {
-        console.warn('Using bundled model list because dynamic models failed:', error)
+        console.warn('Failed to load configured model list:', error)
       }
     }
 

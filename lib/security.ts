@@ -163,6 +163,7 @@ export function validateProviderId(providerId: string): boolean {
     'togetherai',
     'xai',
     'deepseek',
+    'nvidia',
     'ollama'
   ]
 

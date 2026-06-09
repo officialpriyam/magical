@@ -10,7 +10,7 @@ It uses Next.js 16, shadcn/ui, Tailwind CSS, the Vercel AI SDK, Supabase, and E2
 - Secure code execution with selectable E2B or Vercel sandboxes.
 - Support for npm and pip package installation inside generated projects.
 - Built-in templates for Python data analysis, Next.js, Vue.js, Streamlit, and Gradio.
-- Multiple AI providers, including OpenAI, Anthropic, Google, Groq, Fireworks, Together AI, OpenRouter, Mistral, xAI, DeepSeek, and Ollama.
+- Multiple AI providers, including OpenAI, Anthropic, Google, Groq, Fireworks, Together AI, OpenRouter, Mistral, xAI, DeepSeek, NVIDIA, and Ollama.
 - Optional Supabase authentication, GitHub sync, and private Cloudflare R2 workspace backup.
 
 ## Setup
@@ -59,6 +59,7 @@ TOGETHER_API_KEY=
 OPENROUTER_API_KEY=
 XAI_API_KEY=
 DEEPSEEK_API_KEY=
+NVIDIA_API_KEY=
 ```
 
 Supabase is needed for auth and saved workspace data:

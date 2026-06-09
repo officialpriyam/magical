@@ -28,6 +28,8 @@ export type LLMModelConfig = {
   maxTokens?: number
 }
 
+const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
+
 export function resolveGenerationModel(model: LLMModel, config: LLMModelConfig): LLMModel {
   if (hasProviderCredentials(model.providerId, config)) {
     return model
@@ -54,9 +56,7 @@ export function resolveGenerationModel(model: LLMModel, config: LLMModelConfig):
   return model
 }
 
-export function hasProviderCredentials(providerId: string, config: LLMModelConfig) {
-  if (config.apiKey) return true
-
+export function hasProviderEnvironmentCredentials(providerId: string) {
   switch (providerId) {
     case 'anthropic':
       return Boolean(process.env.ANTHROPIC_API_KEY)
@@ -80,11 +80,18 @@ export function hasProviderCredentials(providerId: string, config: LLMModelConfi
       return Boolean(process.env.DEEPSEEK_API_KEY)
     case 'openrouter':
       return Boolean(process.env.OPENROUTER_API_KEY)
-    case 'ollama':
-      return Boolean(config.baseURL)
+    case 'nvidia':
+      return Boolean(process.env.NVIDIA_API_KEY)
     default:
       return false
   }
+}
+
+export function hasProviderCredentials(providerId: string, config: LLMModelConfig) {
+  if (config.apiKey) return true
+  if (providerId === 'ollama') return Boolean(config.baseURL)
+
+  return hasProviderEnvironmentCredentials(providerId)
 }
 
 export function getModelClient(model: LLMModel, config: LLMModelConfig) {
@@ -167,6 +174,11 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
         baseURL: baseURL || 'https://openrouter.ai/api/v1',
+      })(modelNameString),
+    nvidia: () =>
+      createOpenAI({
+        apiKey: apiKey || process.env.NVIDIA_API_KEY,
+        baseURL: baseURL || process.env.NVIDIA_BASE_URL || NVIDIA_BASE_URL,
       })(modelNameString),
   }
 
