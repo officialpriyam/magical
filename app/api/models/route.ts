@@ -59,7 +59,7 @@ export async function GET() {
   const models = new Map<string, LLMModel>()
 
   for (const model of staticModels.models as LLMModel[]) {
-    if (hasProviderEnvironmentCredentials(model.providerId)) {
+    if (model.providerId !== 'nvidia' && hasProviderEnvironmentCredentials(model.providerId)) {
       models.set(model.id, model)
     }
   }
@@ -167,7 +167,7 @@ async function fetchNvidiaModels(): Promise<LLMModel[]> {
         providerId: 'nvidia',
       }))
   } catch (error) {
-    console.warn('Falling back to bundled NVIDIA model list:', error)
+    console.warn('Skipping NVIDIA model list because the live fetch failed:', error)
     return []
   }
 }
