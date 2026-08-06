@@ -812,9 +812,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   ) => {
     const workspace = getProjectGitHubWorkspace(project)
     const r2Workspace = getProjectR2Workspace(project)
+    const sandboxStorageWorkspace = getProjectSandboxStorageWorkspace(project)
 
     if (
-      (!workspace && !r2Workspace) ||
+      (!workspace && !r2Workspace && !sandboxStorageWorkspace) ||
       !savedFragment?.template ||
       restoringProjectRef.current === project.id
     ) {
@@ -822,7 +823,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
 
     restoringProjectRef.current = project.id
-    setAutoFixMessage(workspace ? 'Restoring files from GitHub...' : 'Restoring files from private storage...')
+    setAutoFixMessage(
+      workspace
+        ? 'Restoring files from GitHub...'
+        : sandboxStorageWorkspace
+          ? 'Restoring files from sandbox storage...'
+          : 'Restoring files from private storage...'
+    )
     setIsPreviewLoading(true)
 
     try {
@@ -2220,6 +2227,21 @@ function getProjectR2Workspace(project: Project | null) {
   return workspace
 }
 
+function getProjectSandboxStorageWorkspace(project: Project | null) {
+  const workspace = project?.metadata?.sandboxStorage
+
+  if (
+    !workspace ||
+    typeof workspace !== 'object' ||
+    workspace.provider !== 'sandbox-storage' ||
+    typeof workspace.storageId !== 'string'
+  ) {
+    return null
+  }
+
+  return workspace
+}
+
 function getProjectPreviewCard(project: Project, preview?: ProjectPreviewCard): ProjectPreviewCard {
   const metadata = project.metadata && typeof project.metadata === 'object' ? project.metadata : {}
   const metadataPreviewUrl =
@@ -2284,7 +2306,7 @@ function isTemplateId(value: unknown): value is TemplateId {
 }
 
 function hasRestorableWorkspace(project: Project | null) {
-  return Boolean(getProjectGitHubWorkspace(project) || getProjectR2Workspace(project))
+  return Boolean(getProjectGitHubWorkspace(project) || getProjectR2Workspace(project) || getProjectSandboxStorageWorkspace(project))
 }
 
 function toRepoPath(path: string) {
