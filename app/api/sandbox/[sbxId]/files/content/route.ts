@@ -89,7 +89,10 @@ export async function GET(
     }
 
     // Connect to existing sandbox
-    const sbx = await Sandbox.connect(sandboxRef.id)
+    const sbx = await Promise.race([
+      Sandbox.connect(sandboxRef.id),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+    ])
 
     // Sanitize path to prevent path traversal attacks
     const userDir = '/home/user'
@@ -165,7 +168,10 @@ export async function PATCH(
       return jsonResponse({ error: 'E2B_API_KEY not configured' }, 503)
     }
 
-    const sbx = await Sandbox.connect(sandboxRef.id)
+    const sbx = await Promise.race([
+      Sandbox.connect(sandboxRef.id),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+    ])
     await Promise.all([
       persistProjectRename(projectID, oldPath, newPath),
       sbx.files.rename(toSandboxRelativePath(oldPath), toSandboxRelativePath(newPath)),

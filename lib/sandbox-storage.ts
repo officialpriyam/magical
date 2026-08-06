@@ -344,11 +344,25 @@ async function sandboxStorageFetch(
     headers['Content-Type'] = 'application/json'
   }
 
-  const response = await fetch(`${baseUrl}${pathname}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 8000)
+
+  let response: Response
+  try {
+    response = await fetch(`${baseUrl}${pathname}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error('Sandbox storage request timed out')
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
 
   const data = await response.json().catch(() => ({}))
 

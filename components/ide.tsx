@@ -214,10 +214,12 @@ export function IDE({
       return
     }
 
+    if (pendingSaveRef.current) {
+      void flushPendingSave()
+    }
+
     setIsOpeningFile(true)
     try {
-      await flushPendingSave()
-
       if (isSandboxMode && sandboxId) {
         const response = await fetch(`/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`)
         if (!response.ok) {

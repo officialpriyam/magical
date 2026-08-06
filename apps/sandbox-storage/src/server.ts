@@ -13,6 +13,7 @@ const maxFileBytes = Number(process.env.SANDBOX_STORAGE_MAX_FILE_BYTES || 1024 *
 const maxBodyBytes = Number(process.env.SANDBOX_STORAGE_MAX_BODY_BYTES || 10 * 1024 * 1024)
 const manifestName = '.sandbox-storage-manifest.json'
 const skipPathRe = /(^|\/)(\.git|node_modules|\.next|\.nuxt|dist|build|coverage|__pycache__|\.cache)(\/|$)/
+const accessToken = (process.env.SANDBOX_STORAGE_TOKEN || '').trim()
 const accessKey = (process.env.SANDBOX_STORAGE_ACCESS_KEY || '').trim()
 const accessSalt = (process.env.SANDBOX_STORAGE_ACCESS_SALT || '').trim()
 
@@ -150,32 +151,44 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
 }
 
 function isAuthorized(req: IncomingMessage, body: StoredBody, url: URL): boolean {
-  if (!accessKey || !accessSalt) {
+  if (!accessToken && !accessKey && !accessSalt) {
     return true
   }
 
-  const key = req.headers['x-sandbox-storage-key']
-  const signature = req.headers['x-sandbox-storage-signature']
-  const timestamp = req.headers['x-sandbox-storage-timestamp']
-  const requestId = req.headers['x-request-id']
-
-  if (typeof key !== 'string' || typeof signature !== 'string' || typeof timestamp !== 'string') {
-    return false
+  const authHeader = typeof req.headers.authorization === 'string' ? req.headers.authorization : ''
+  if (accessToken) {
+    const match = authHeader.match(/^Bearer\s+(.+)$/i)
+    if (match && safeCompare(match[1], accessToken)) {
+      return true
+    }
   }
 
-  if (!safeCompare(key, accessKey)) {
-    return false
+  if (accessKey && accessSalt) {
+    const key = req.headers['x-sandbox-storage-key']
+    const signature = req.headers['x-sandbox-storage-signature']
+    const timestamp = req.headers['x-sandbox-storage-timestamp']
+    const requestId = req.headers['x-request-id']
+
+    if (typeof key !== 'string' || typeof signature !== 'string' || typeof timestamp !== 'string') {
+      return false
+    }
+
+    if (!safeCompare(key, accessKey)) {
+      return false
+    }
+
+    const ts = Number(timestamp)
+    const now = Date.now()
+    if (!Number.isFinite(ts) || Math.abs(now - ts) > 5 * 60 * 1000) {
+      return false
+    }
+
+    const payload = `${timestamp}:${req.method || 'GET'}:${url.pathname}:${crypto.createHash('sha256').update(body.raw).digest('hex')}`
+    const expectedSignature = createSignature(accessSalt, payload)
+    return safeCompare(signature, expectedSignature) && (requestId ? requestId.length <= 128 : true)
   }
 
-  const ts = Number(timestamp)
-  const now = Date.now()
-  if (!Number.isFinite(ts) || Math.abs(now - ts) > 5 * 60 * 1000) {
-    return false
-  }
-
-  const payload = `${timestamp}:${req.method || 'GET'}:${url.pathname}:${crypto.createHash('sha256').update(body.raw).digest('hex')}`
-  const expectedSignature = createSignature(accessSalt, payload)
-  return safeCompare(signature, expectedSignature) && (requestId ? requestId.length <= 128 : true)
+  return false
 }
 
 function createSignature(secret: string, payload: string): string {
@@ -281,7 +294,7 @@ export function normalizeWorkspacePath(value: unknown): string {
   if (!cleaned || cleaned === '.' || cleaned === '..') return ''
   const parts = cleaned.split('/').filter(Boolean)
   if (parts.length === 0) return ''
-  if (parts.some((part) => part === '.' || part === '..' || part.includes('\0') || part.startsWith('.'))) return ''
+  if (parts.some((part) => part === '.' || part === '..' || part.includes('\0'))) return ''
   const normalized = parts.join('/')
   if (normalized === manifestName || skipPathRe.test(normalized)) return ''
   return normalized
