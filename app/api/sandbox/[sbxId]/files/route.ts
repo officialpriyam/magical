@@ -3,7 +3,7 @@ import { FileSystemNode } from '@/components/file-tree'
 import { decodeSandboxId } from '@/lib/sandbox-provider'
 import { getVercelSandbox, listVercelSandboxFiles } from '@/lib/vercel-sandbox'
 
-export const maxDuration = 60
+export const maxDuration = 20
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -29,13 +29,23 @@ export async function GET(
     const sandboxRef = decodeSandboxId(sbxId)
 
     if (sandboxRef.provider === 'vercel') {
-      const sbx = await getVercelSandbox(sandboxRef.id)
-      const files = await listVercelSandboxFiles(sbx)
+      try {
+        const sbx = await getVercelSandbox(sandboxRef.id)
+        const files = await Promise.race([
+          listVercelSandboxFiles(sbx),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_list_timeout')), 8000)),
+        ])
 
-      return new Response(
-        JSON.stringify({ files }),
-        { headers: { 'Content-Type': 'application/json' } }
-      )
+        return new Response(
+          JSON.stringify({ files }),
+          { headers: { 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        return new Response(
+          JSON.stringify({ files: [], error: 'Sandbox file listing timed out' }),
+          { status: 504, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     if (!process.env.E2B_API_KEY) {
@@ -46,10 +56,16 @@ export async function GET(
     }
 
     // Connect to existing sandbox
-    const sbx = await Sandbox.connect(sandboxRef.id)
+    const sbx = await Promise.race([
+      Sandbox.connect(sandboxRef.id),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+    ])
 
     // Use E2B SDK's files.list() method for robust file listing
-    const filesList = await sbx.files.list('/home/user')
+    const filesList = await Promise.race([
+      sbx.files.list('/home/user'),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_list_timeout')), 8000)),
+    ])
 
     // Convert E2B file structure to our FileSystemNode format
     const files = convertE2BFilesToTree(filesList)

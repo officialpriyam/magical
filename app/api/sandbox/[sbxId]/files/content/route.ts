@@ -21,7 +21,7 @@ import {
   writeVercelSandboxFile,
 } from '@/lib/vercel-sandbox'
 
-export const maxDuration = 60
+export const maxDuration = 20
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -56,16 +56,29 @@ export async function GET(
     const sandboxRef = decodeSandboxId(sbxId)
 
     if (sandboxRef.provider === 'vercel') {
-      const sbx = await getVercelSandbox(sandboxRef.id)
-      const content = await readVercelSandboxFile(sbx, filePath)
+      try {
+        const sbx = await Promise.race([
+          getVercelSandbox(sandboxRef.id),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+        ])
+        const content = await Promise.race([
+          readVercelSandboxFile(sbx, filePath),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_read_timeout')), 8000)),
+        ])
 
-      return new Response(
-        JSON.stringify({
-          content,
-          path: filePath
-        }),
-        { headers: { 'Content-Type': 'application/json' } }
-      )
+        return new Response(
+          JSON.stringify({
+            content,
+            path: filePath
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        )
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Sandbox file read timed out' }),
+          { status: 504, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     if (!process.env.E2B_API_KEY) {
@@ -96,7 +109,10 @@ export async function GET(
 
     // Use E2B SDK's files.read() method for robust file reading
     const relativePath = normalizedPath === userDir ? '' : normalizedPath.substring(userDir.length + 1)
-    const content = await sbx.files.read(relativePath)
+    const content = await Promise.race([
+      sbx.files.read(relativePath),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_read_timeout')), 8000)),
+    ])
 
     return new Response(
       JSON.stringify({
@@ -184,23 +200,39 @@ export async function DELETE(
     const sandboxRef = decodeSandboxId(sbxId)
 
     if (sandboxRef.provider === 'vercel') {
-      const sbx = await getVercelSandbox(sandboxRef.id)
-      await Promise.all([
-        persistProjectDelete(projectID, filePath),
-        deleteVercelSandboxFile(sbx, filePath),
-      ])
+      try {
+        const sbx = await Promise.race([
+          getVercelSandbox(sandboxRef.id),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+        ])
+        await Promise.all([
+          persistProjectDelete(projectID, filePath),
+          Promise.race([
+            deleteVercelSandboxFile(sbx, filePath),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_delete_timeout')), 8000)),
+          ]),
+        ])
 
-      return jsonResponse({ success: true })
+        return jsonResponse({ success: true })
+      } catch {
+        return jsonResponse({ error: 'Sandbox delete timed out' }, 504)
+      }
     }
 
     if (!process.env.E2B_API_KEY) {
       return jsonResponse({ error: 'E2B_API_KEY not configured' }, 503)
     }
 
-    const sbx = await Sandbox.connect(sandboxRef.id)
+    const sbx = await Promise.race([
+      Sandbox.connect(sandboxRef.id),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+    ])
     await Promise.all([
       persistProjectDelete(projectID, filePath),
-      sbx.files.remove(toSandboxRelativePath(filePath)),
+      Promise.race([
+        sbx.files.remove(toSandboxRelativePath(filePath)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_delete_timeout')), 8000)),
+      ]),
     ])
 
     return jsonResponse({ success: true })
@@ -242,19 +274,32 @@ export async function POST(
     const sandboxRef = decodeSandboxId(sbxId)
 
     if (sandboxRef.provider === 'vercel') {
-      const sbx = await getVercelSandbox(sandboxRef.id)
-      await Promise.all([
-        persistProjectFile(projectID, filePath, content),
-        writeVercelSandboxFile(sbx, filePath, content),
-      ])
+      try {
+        const sbx = await Promise.race([
+          getVercelSandbox(sandboxRef.id),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+        ])
+        await Promise.all([
+          persistProjectFile(projectID, filePath, content),
+          Promise.race([
+            writeVercelSandboxFile(sbx, filePath, content),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_write_timeout')), 8000)),
+          ]),
+        ])
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          path: filePath
-        }),
-        { headers: { 'Content-Type': 'application/json' } }
-      )
+        return new Response(
+          JSON.stringify({
+            success: true,
+            path: filePath
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        )
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Sandbox write timed out' }),
+          { status: 504, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     if (!process.env.E2B_API_KEY) {
@@ -265,7 +310,10 @@ export async function POST(
     }
 
     // Connect to existing sandbox
-    const sbx = await Sandbox.connect(sandboxRef.id)
+    const sbx = await Promise.race([
+      Sandbox.connect(sandboxRef.id),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+    ])
 
     // Sanitize path to prevent path traversal attacks
     const userDir = '/home/user'
@@ -286,7 +334,10 @@ export async function POST(
     const relativePath = normalizedPath === userDir ? '' : normalizedPath.substring(userDir.length + 1)
     await Promise.all([
       persistProjectFile(projectID, filePath, content),
-      sbx.files.write(relativePath, content),
+      Promise.race([
+        sbx.files.write(relativePath, content),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_write_timeout')), 8000)),
+      ]),
     ])
 
     return new Response(
