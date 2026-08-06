@@ -36,11 +36,13 @@ export function IDE({
   } | null>(null)
   const [fileSearchQuery, setFileSearchQuery] = useState('')
   const [showGitHubImport, setShowGitHubImport] = useState(false)
+  const [isOpeningFile, setIsOpeningFile] = useState(false)
   const isSandboxMode = !!sandboxId
   const isGitHubSaveBlocked = githubSaveRequired && !githubWorkspaceConnected
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSaveRef = useRef<{ path: string; content: string } | null>(null)
   const selectedFileRef = useRef(selectedFile)
+  const fileContentCacheRef = useRef<Map<string, string>>(new Map())
 
   const blockGitHubSave = useCallback(() => {
     onSaveBlocked?.()
@@ -202,18 +204,41 @@ export function IDE({
   }
 
   async function handleSelectFile(path: string) {
-    void flushPendingSave()
+    const cached = fileContentCacheRef.current.get(path)
+    if (cached !== undefined) {
+      setSelectedFile({ path, content: cached })
+      return
+    }
 
-    if (isSandboxMode && sandboxId) {
-      // Load file from sandbox
-      const response = await fetch(`/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`)
-      const { content } = await response.json()
-      setSelectedFile({ path, content })
-    } else if (session) {
-      // Load file from Supabase
-      const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`)
-      const { content } = await response.json()
-      setSelectedFile({ path, content })
+    if (isOpeningFile) {
+      return
+    }
+
+    setIsOpeningFile(true)
+    try {
+      await flushPendingSave()
+
+      if (isSandboxMode && sandboxId) {
+        const response = await fetch(`/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`)
+        if (!response.ok) {
+          throw new Error('Failed to load sandbox file')
+        }
+        const { content } = await response.json()
+        fileContentCacheRef.current.set(path, content)
+        setSelectedFile({ path, content })
+      } else if (session) {
+        const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`)
+        if (!response.ok) {
+          throw new Error('Failed to load workspace file')
+        }
+        const { content } = await response.json()
+        fileContentCacheRef.current.set(path, content)
+        setSelectedFile({ path, content })
+      }
+    } catch (error) {
+      console.error('Error opening file:', error)
+    } finally {
+      setIsOpeningFile(false)
     }
   }
 
@@ -226,6 +251,7 @@ export function IDE({
     const path = currentFile.path
 
     selectedFileRef.current = { path, content: nextContent }
+    fileContentCacheRef.current.set(path, nextContent)
     scheduleFileSave(path, nextContent)
   }
 
@@ -236,6 +262,7 @@ export function IDE({
 
     const path = currentFile.path
     selectedFileRef.current = { path, content }
+    fileContentCacheRef.current.set(path, content)
     scheduleFileSave(path, content)
     void flushPendingSave()
   }
