@@ -15,6 +15,6 @@ export async function GET() {
     return NextResponse.json(await getGitHubConnectionStatus(user.id))
   } catch (error) {
     console.error('Failed to read GitHub connection status:', error)
-    return NextResponse.json({ error: 'Failed to read GitHub connection status' }, { status: 500 })
+    return NextResponse.json({ connected: false })
   }
 }

@@ -98,8 +98,19 @@ export async function getOptionalAuthenticatedUser(): Promise<User | null> {
 }
 
 export async function getGitHubConnectionStatus(userId: string): Promise<GitHubConnectionStatus> {
-  const integration = await getGitHubIntegration(userId)
+  try {
+    const integration = await getGitHubIntegration(userId)
+    return normalizeGitHubConnectionStatus(integration)
+  } catch (error) {
+    console.error('GitHub connection status lookup failed:', error)
+    return { connected: false }
+  }
+}
 
+export function normalizeGitHubConnectionStatus(integration: {
+  is_connected?: boolean
+  connection_data?: GitHubConnectionData | null
+} | null | undefined): GitHubConnectionStatus {
   if (!integration?.is_connected || !integration.connection_data) {
     return { connected: false }
   }

@@ -32,10 +32,6 @@ import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRigh
 const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
 const MAX_AUTO_FIX_ATTEMPTS = 2
-const GITHUB_REQUIRED_MESSAGE =
-  'Connect GitHub before generating code. Open Settings > Integrations, connect GitHub, then try again.'
-const GITHUB_STATUS_ERROR_MESSAGE =
-  'Could not verify your GitHub connection. Check Settings > Integrations, then try again.'
 
 type ChatMode = 'plan' | 'build'
 type ProjectShelfView = 'all' | 'recent' | 'github'
@@ -1068,29 +1064,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       return false
     }
 
-    try {
-      const response = await fetch('/api/github/status', { cache: 'no-store' })
-      const data = await response.json().catch(() => ({}))
-
-      if (response.ok && data?.connected) {
-        return true
-      }
-
-      setErrorMessage(
-        response.ok
-          ? GITHUB_REQUIRED_MESSAGE
-          : data?.error || GITHUB_STATUS_ERROR_MESSAGE,
-      )
-      setAutoFixMessage('')
-      setIsPreviewLoading(false)
-      return false
-    } catch (error) {
-      console.error('GitHub connection check failed:', error)
-      setErrorMessage(GITHUB_STATUS_ERROR_MESSAGE)
-      setAutoFixMessage('')
-      setIsPreviewLoading(false)
-      return false
-    }
+    return true
   }
 
   function handleAcceptPlan(plan: MessagePlan, answer?: string) {
