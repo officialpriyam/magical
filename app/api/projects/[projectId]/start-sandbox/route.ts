@@ -15,6 +15,7 @@ import {
   listVercelSandboxFiles,
   writeVercelProjectFiles,
 } from '@/lib/vercel-sandbox'
+import { getProjectFilesFromSandboxStorage } from '@/lib/sandbox-storage'
 import templates, { type TemplateId } from '@/lib/templates'
 import type { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import type { FileSystemNode } from '@/components/file-tree'
@@ -66,6 +67,13 @@ export async function POST(
     const template = resolveWarmTemplate(body.template, project.template_id)
     const providerMode = normalizeSandboxProviderMode(body.sandboxProvider)
     selectedProvider = resolveSandboxProvider(providerMode, template)
+    const storedFiles = await getProjectFilesFromSandboxStorage({
+      userId: user.id,
+      projectId,
+    }).catch((error) => {
+      console.warn('External sandbox storage warm start hydrate failed:', error)
+      return []
+    })
 
     if (!selectedProvider) {
       return NextResponse.json(
@@ -84,11 +92,7 @@ export async function POST(
         timeoutMs: sandboxTimeout,
       })
 
-      await writeVercelProjectFiles(
-        sbx as Awaited<ReturnType<typeof createVercelSandbox>>,
-        [],
-        template,
-      )
+      await writeVercelProjectFiles(sbx as Awaited<ReturnType<typeof createVercelSandbox>>, storedFiles, template)
 
       const files = await listVercelSandboxFiles(sbx as Awaited<ReturnType<typeof createVercelSandbox>>)
 
@@ -118,6 +122,12 @@ export async function POST(
           }
         : {}),
     })
+
+    await Promise.all(
+      storedFiles.map((file) =>
+        (sbx as SandboxInstance).files.write(file.path, file.content),
+      ),
+    )
 
     const files = await fetchSandboxFiles(sbx as SandboxInstance)
 

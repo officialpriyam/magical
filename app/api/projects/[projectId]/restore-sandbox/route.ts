@@ -12,6 +12,11 @@ import {
   hasR2WorkspaceConfig,
 } from '@/lib/r2-workspace'
 import {
+  getProjectFilesFromSandboxStorage,
+  getSandboxStorageMetadata,
+  hasSandboxStorageConfig,
+} from '@/lib/sandbox-storage'
+import {
   chooseSandboxProvider,
   encodeSandboxId,
   normalizeSandboxProviderMode,
@@ -104,11 +109,32 @@ export async function POST(
       )
     }
 
+    const sandboxStorage = getSandboxStorageMetadata(project.metadata)
     const workspace = getGitHubWorkspace(project.metadata)
     let files: GitHubFile[] = []
     let restoredFrom = 'saved workspace'
 
-    if (workspace) {
+    if (sandboxStorage) {
+      if (!hasSandboxStorageConfig()) {
+        return NextResponse.json(
+          { error: 'External sandbox storage is not configured for this deployment.' },
+          { status: 503 },
+        )
+      }
+
+      files = await getProjectFilesFromSandboxStorage({
+        userId: user.id,
+        projectId,
+      })
+      restoredFrom = 'sandbox-storage'
+
+      if (files.length === 0) {
+        return NextResponse.json(
+          { error: 'No saved sandbox-storage files were found for this project.' },
+          { status: 400 },
+        )
+      }
+    } else if (workspace) {
       const owner = workspace.owner
       const repo = workspace.repo
       const branch = normalizeBranch(workspace.branch)

@@ -4,6 +4,7 @@ import { createE2BSandbox } from '@/lib/e2b-sandbox'
 import { getFragmentFiles } from '@/lib/fragment-files'
 import { getSupabaseProjectRuntimeEnv } from '@/lib/supabase-integration'
 import { saveProjectFilesToR2 } from '@/lib/r2-workspace'
+import { saveProjectFilesToSandboxStorage } from '@/lib/sandbox-storage'
 import { createServerClient } from '@/lib/supabase-server'
 import {
   chooseSandboxProvider,
@@ -178,21 +179,27 @@ export async function POST(req: Request) {
     }
 
     try {
-      if (selectedProvider === 'vercel') {
-        await writeVercelProjectFiles(sbx as Awaited<ReturnType<typeof createVercelSandbox>>, generatedFiles, fragment.template as TemplateId)
-      } else {
-        await Promise.all(
-          generatedFiles.map(async (file) => {
-            await (sbx as Sandbox).files.write(file.path, file.content)
-          }),
-        )
-      }
-
-      await saveGeneratedFilesToR2({
+      const storageSave = saveGeneratedFilesToSandboxStorage({
         userID,
         projectID,
         files: generatedFiles,
       })
+
+      if (selectedProvider === 'vercel') {
+        await Promise.all([
+          writeVercelProjectFiles(sbx as Awaited<ReturnType<typeof createVercelSandbox>>, generatedFiles, fragment.template as TemplateId),
+          storageSave,
+        ])
+      } else {
+        await Promise.all([
+          Promise.all(
+            generatedFiles.map(async (file) => {
+              await (sbx as Sandbox).files.write(file.path, file.content)
+            }),
+          ),
+          storageSave,
+        ])
+      }
 
       if (fragment.template === 'code-interpreter-v1') {
         if (fragment.has_additional_dependencies && cleanCommand(fragment.install_dependencies_command)) {
@@ -411,6 +418,41 @@ async function saveGeneratedFilesToR2({
     })
   } catch (error) {
     console.warn('Cloudflare R2 workspace backup failed:', error)
+  }
+}
+
+async function saveGeneratedFilesToSandboxStorage({
+  userID,
+  projectID,
+  files,
+}: {
+  userID?: string
+  projectID?: string
+  files: ReturnType<typeof getFragmentFiles>
+}) {
+  if (!projectID || files.length === 0) {
+    return
+  }
+
+  const authenticatedUserId = await getAuthenticatedUserId()
+
+  if (!authenticatedUserId || (userID && userID !== authenticatedUserId)) {
+    return
+  }
+
+  try {
+    const result = await saveProjectFilesToSandboxStorage({
+      userId: authenticatedUserId,
+      projectId: projectID,
+      files,
+    })
+
+    if (!result.saved && result.reason === 'not_configured') {
+      await saveGeneratedFilesToR2({ userID, projectID, files })
+    }
+  } catch (error) {
+    console.warn('External sandbox storage backup failed:', error)
+    await saveGeneratedFilesToR2({ userID, projectID, files })
   }
 }
 

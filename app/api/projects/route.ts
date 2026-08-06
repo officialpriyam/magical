@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { supabaseServiceRoleKey } from '@/lib/supabase-credentials'
+import { ensureProjectSandboxStorage } from '@/lib/sandbox-storage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -73,6 +74,15 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 },
       )
+    }
+
+    try {
+      await ensureProjectSandboxStorage({
+        userId: user.id,
+        projectId: project.id,
+      })
+    } catch (storageError) {
+      console.warn('Failed to create external sandbox storage workspace:', storageError)
     }
 
     return NextResponse.json({ project })

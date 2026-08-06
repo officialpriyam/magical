@@ -7,6 +7,11 @@ import {
   renameProjectFileInR2,
   saveProjectFileToR2,
 } from '@/lib/r2-workspace'
+import {
+  deleteProjectFileFromSandboxStorage,
+  renameProjectFileInSandboxStorage,
+  saveProjectFileToSandboxStorage,
+} from '@/lib/sandbox-storage'
 import { decodeSandboxId } from '@/lib/sandbox-provider'
 import {
   deleteVercelSandboxFile,
@@ -132,8 +137,10 @@ export async function PATCH(
 
     if (sandboxRef.provider === 'vercel') {
       const sbx = await getVercelSandbox(sandboxRef.id)
-      await renameVercelSandboxFile(sbx, oldPath, newPath)
-      await persistR2Rename(projectID, oldPath, newPath)
+      await Promise.all([
+        persistProjectRename(projectID, oldPath, newPath),
+        renameVercelSandboxFile(sbx, oldPath, newPath),
+      ])
 
       return jsonResponse({ success: true, path: newPath })
     }
@@ -143,8 +150,10 @@ export async function PATCH(
     }
 
     const sbx = await Sandbox.connect(sandboxRef.id)
-    await sbx.files.rename(toSandboxRelativePath(oldPath), toSandboxRelativePath(newPath))
-    await persistR2Rename(projectID, oldPath, newPath)
+    await Promise.all([
+      persistProjectRename(projectID, oldPath, newPath),
+      sbx.files.rename(toSandboxRelativePath(oldPath), toSandboxRelativePath(newPath)),
+    ])
 
     return jsonResponse({ success: true, path: newPath })
   } catch (error: any) {
@@ -176,8 +185,10 @@ export async function DELETE(
 
     if (sandboxRef.provider === 'vercel') {
       const sbx = await getVercelSandbox(sandboxRef.id)
-      await deleteVercelSandboxFile(sbx, filePath)
-      await persistR2Delete(projectID, filePath)
+      await Promise.all([
+        persistProjectDelete(projectID, filePath),
+        deleteVercelSandboxFile(sbx, filePath),
+      ])
 
       return jsonResponse({ success: true })
     }
@@ -187,8 +198,10 @@ export async function DELETE(
     }
 
     const sbx = await Sandbox.connect(sandboxRef.id)
-    await sbx.files.remove(toSandboxRelativePath(filePath))
-    await persistR2Delete(projectID, filePath)
+    await Promise.all([
+      persistProjectDelete(projectID, filePath),
+      sbx.files.remove(toSandboxRelativePath(filePath)),
+    ])
 
     return jsonResponse({ success: true })
   } catch (error: any) {
@@ -230,8 +243,10 @@ export async function POST(
 
     if (sandboxRef.provider === 'vercel') {
       const sbx = await getVercelSandbox(sandboxRef.id)
-      await writeVercelSandboxFile(sbx, filePath, content)
-      await persistR2File(projectID, filePath, content)
+      await Promise.all([
+        persistProjectFile(projectID, filePath, content),
+        writeVercelSandboxFile(sbx, filePath, content),
+      ])
 
       return new Response(
         JSON.stringify({
@@ -269,8 +284,10 @@ export async function POST(
 
     // E2B files.write expects path relative to /home/user
     const relativePath = normalizedPath === userDir ? '' : normalizedPath.substring(userDir.length + 1)
-    await sbx.files.write(relativePath, content)
-    await persistR2File(projectID, filePath, content)
+    await Promise.all([
+      persistProjectFile(projectID, filePath, content),
+      sbx.files.write(relativePath, content),
+    ])
 
     return new Response(
       JSON.stringify({
@@ -311,7 +328,7 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-async function persistR2File(projectID: unknown, filePath: unknown, content: unknown) {
+async function persistProjectFile(projectID: unknown, filePath: unknown, content: unknown) {
   if (typeof projectID !== 'string' || typeof filePath !== 'string' || typeof content !== 'string') {
     return
   }
@@ -323,18 +340,33 @@ async function persistR2File(projectID: unknown, filePath: unknown, content: unk
   }
 
   try {
+    const result = await saveProjectFileToSandboxStorage({
+      userId,
+      projectId: projectID,
+      path: filePath,
+      content,
+    })
+
+    if (!result.saved && result.reason === 'not_configured') {
+      await saveProjectFileToR2({
+        userId,
+        projectId: projectID,
+        path: filePath,
+        content,
+      })
+    }
+  } catch (error) {
+    console.warn('External sandbox storage file backup failed:', error)
     await saveProjectFileToR2({
       userId,
       projectId: projectID,
       path: filePath,
       content,
     })
-  } catch (error) {
-    console.warn('Cloudflare R2 sandbox file backup failed:', error)
   }
 }
 
-async function persistR2Delete(projectID: unknown, filePath: unknown) {
+async function persistProjectDelete(projectID: unknown, filePath: unknown) {
   if (typeof projectID !== 'string' || typeof filePath !== 'string') {
     return
   }
@@ -346,17 +378,30 @@ async function persistR2Delete(projectID: unknown, filePath: unknown) {
   }
 
   try {
+    const result = await deleteProjectFileFromSandboxStorage({
+      userId,
+      projectId: projectID,
+      path: filePath,
+    })
+
+    if (!result.saved && result.reason === 'not_configured') {
+      await deleteProjectFileFromR2({
+        userId,
+        projectId: projectID,
+        path: filePath,
+      })
+    }
+  } catch (error) {
+    console.warn('External sandbox storage delete backup failed:', error)
     await deleteProjectFileFromR2({
       userId,
       projectId: projectID,
       path: filePath,
     })
-  } catch (error) {
-    console.warn('Cloudflare R2 sandbox delete backup failed:', error)
   }
 }
 
-async function persistR2Rename(projectID: unknown, oldPath: unknown, newPath: unknown) {
+async function persistProjectRename(projectID: unknown, oldPath: unknown, newPath: unknown) {
   if (
     typeof projectID !== 'string' ||
     typeof oldPath !== 'string' ||
@@ -372,14 +417,29 @@ async function persistR2Rename(projectID: unknown, oldPath: unknown, newPath: un
   }
 
   try {
+    const result = await renameProjectFileInSandboxStorage({
+      userId,
+      projectId: projectID,
+      oldPath,
+      newPath,
+    })
+
+    if (!result.saved && result.reason === 'not_configured') {
+      await renameProjectFileInR2({
+        userId,
+        projectId: projectID,
+        oldPath,
+        newPath,
+      })
+    }
+  } catch (error) {
+    console.warn('External sandbox storage rename backup failed:', error)
     await renameProjectFileInR2({
       userId,
       projectId: projectID,
       oldPath,
       newPath,
     })
-  } catch (error) {
-    console.warn('Cloudflare R2 sandbox rename backup failed:', error)
   }
 }
 
