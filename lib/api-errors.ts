@@ -85,9 +85,23 @@ export function createRateLimitResponse(limit: {
   remaining: number
   reset: number
 }): Response {
+  const resetDate = new Date(limit.reset * 1000)
+  const now = new Date()
+  const minutesUntilReset = Math.ceil((resetDate.getTime() - now.getTime()) / (1000 * 60))
+  
+  let resetMessage = 'Please try again later.'
+  if (minutesUntilReset > 0) {
+    if (minutesUntilReset < 60) {
+      resetMessage = `Please try again in ${minutesUntilReset} minute${minutesUntilReset !== 1 ? 's' : ''}.`
+    } else {
+      const hours = Math.ceil(minutesUntilReset / 60)
+      resetMessage = `Please try again in ${hours} hour${hours !== 1 ? 's' : ''}.`
+    }
+  }
+
   return new Response(JSON.stringify({
     type: 'rate_limit',
-    error: 'You have reached your request limit. Please try again later.',
+    error: `You have reached your request limit. ${resetMessage}`,
     limit,
   }), {
     status: 429,

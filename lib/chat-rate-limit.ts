@@ -2,7 +2,7 @@ import { Duration } from './duration'
 import ratelimit from './ratelimit'
 import type { LLMModelConfig } from './models'
 
-const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 100
+const DEFAULT_RATE_LIMIT_MAX_REQUESTS = 1000
 const DEFAULT_RATE_LIMIT_WINDOW: Duration = '1d'
 
 export async function applyChatRateLimit({
