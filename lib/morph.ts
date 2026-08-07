@@ -1,5 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai'
-import { generateText, LanguageModel } from 'ai'
+import { generateText } from 'ai'
 
 export async function applyPatch({
   targetFile,
@@ -30,7 +30,7 @@ export async function applyPatch({
 
   try {
     const { text: mergedCode } = await generateText({
-      model: openai('morph-v3-large') as LanguageModel,
+      model: openai('morph-v3-large') as unknown as any,
       prompt: `<instruction>${instructions}</instruction>\n<code>${initialCode}</code>\n<update>${codeEdit}</update>`,
     })
 

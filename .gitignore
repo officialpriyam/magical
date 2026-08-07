@@ -1,6 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
+.vercel
+.env.local
+.env.production
 /node_modules
 /.pnp
 .pnp.js
@@ -60,3 +63,4 @@ apps/*/.next/
 apps/*/out/
 apps/*/.env
 apps/*/.env.local
+.env*

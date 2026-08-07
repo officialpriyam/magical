@@ -59,8 +59,18 @@ export function IDE({
 
   const fetchFiles = useCallback(async () => {
     if (isSandboxMode && sandboxId) {
-      // Fetch files from sandbox
       try {
+        if (projectId) {
+          const storageResponse = await fetch(`/api/projects/${projectId}/sandbox-storage-files`)
+          if (storageResponse.ok) {
+            const storageData = await storageResponse.json()
+            if (Array.isArray(storageData.files) && storageData.files.length > 0) {
+              setFiles(storageData.files)
+              return
+            }
+          }
+        }
+
         const response = await fetch(`/api/sandbox/${sandboxId}/files`)
         if (response.ok) {
           const data = await response.json()
@@ -74,7 +84,6 @@ export function IDE({
         setFiles([])
       }
     } else if (session) {
-      // Fetch files from Supabase
       try {
         const response = await fetch('/api/files')
         if (response.ok) {
@@ -89,7 +98,7 @@ export function IDE({
         setFiles([])
       }
     }
-  }, [session, isSandboxMode, sandboxId])
+  }, [session, isSandboxMode, sandboxId, projectId])
 
   const persistFile = useCallback(async (path: string, content: string) => {
     if (isGitHubSaveBlocked) {
@@ -220,14 +229,21 @@ export function IDE({
 
     setIsOpeningFile(true)
     try {
-      if (isSandboxMode && sandboxId) {
-        const response = await fetch(`/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`)
-        if (!response.ok) {
-          throw new Error('Failed to load sandbox file')
+      if (isSandboxMode && sandboxId && projectId) {
+        const response = await fetch(`/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(path)}`)
+        if (response.ok) {
+          const { content } = await response.json()
+          fileContentCacheRef.current.set(path, content)
+          setSelectedFile({ path, content })
+        } else {
+          const fallback = await fetch(`/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`)
+          if (!fallback.ok) {
+            throw new Error('Failed to load sandbox file')
+          }
+          const { content } = await fallback.json()
+          fileContentCacheRef.current.set(path, content)
+          setSelectedFile({ path, content })
         }
-        const { content } = await response.json()
-        fileContentCacheRef.current.set(path, content)
-        setSelectedFile({ path, content })
       } else if (session) {
         const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`)
         if (!response.ok) {
