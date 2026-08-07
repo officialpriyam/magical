@@ -116,25 +116,32 @@ export async function POST(
 
     if (sandboxStorage) {
       if (!hasSandboxStorageConfig()) {
-        return NextResponse.json(
-          { error: 'External sandbox storage is not configured for this deployment.' },
-          { status: 503 },
-        )
-      }
+        console.warn('Sandbox storage is not configured for this deployment')
+        // Fall through to try GitHub or R2 instead of failing
+      } else {
+        try {
+          files = await getProjectFilesFromSandboxStorage({
+            userId: user.id,
+            projectId,
+          })
+          restoredFrom = 'sandbox-storage'
 
-      files = await getProjectFilesFromSandboxStorage({
-        userId: user.id,
-        projectId,
-      })
-      restoredFrom = 'sandbox-storage'
-
-      if (files.length === 0) {
-        return NextResponse.json(
-          { error: 'No saved sandbox-storage files were found for this project.' },
-          { status: 400 },
-        )
+          if (files.length === 0) {
+            console.warn('No files found in sandbox-storage, will try other sources')
+            files = []
+          } else {
+            // Successfully got files from sandbox storage, proceed
+            files = files
+          }
+        } catch (error) {
+          console.warn('Failed to fetch from sandbox-storage:', error)
+          // Fall through to try GitHub or R2
+        }
       }
-    } else if (workspace) {
+    }
+
+    // If sandbox-storage didn't work or isn't configured, try GitHub or R2
+    if (files.length === 0 && workspace) {
       const owner = workspace.owner
       const repo = workspace.repo
       const branch = normalizeBranch(workspace.branch)
@@ -150,24 +157,33 @@ export async function POST(
         return NextResponse.json({ error: 'Connect GitHub again before restoring this project.' }, { status: 401 })
       }
 
-      files = await fetchGitHubFiles({
-        owner,
-        repo,
-        branch,
-        pathPrefix,
-        accessToken: githubToken,
-      })
-      restoredFrom = `${owner}/${repo}`
+      try {
+        files = await fetchGitHubFiles({
+          owner,
+          repo,
+          branch,
+          pathPrefix,
+          accessToken: githubToken,
+        })
+        restoredFrom = `${owner}/${repo}`
 
-      if (files.length === 0) {
-        return NextResponse.json({ error: 'No text files found in the connected GitHub workspace.' }, { status: 400 })
+        if (files.length === 0) {
+          console.warn('No files found in GitHub workspace')
+          files = []
+        }
+      } catch (error) {
+        console.warn('Failed to fetch from GitHub:', error)
+        files = []
       }
-    } else {
+    }
+
+    // If still no files, try R2
+    if (files.length === 0) {
       const r2Workspace = getR2WorkspaceMetadata(project.metadata)
 
       if (!r2Workspace && !hasR2WorkspaceConfig()) {
         return NextResponse.json(
-          { error: 'This project has no GitHub workspace and Cloudflare R2 workspace storage is not configured.' },
+          { error: 'This project has no saved files and no GitHub/R2 workspace is configured.' },
           { status: 400 },
         )
       }
@@ -179,18 +195,26 @@ export async function POST(
         )
       }
 
-      files = await getProjectFilesFromR2({
-        userId: user.id,
-        projectId,
-      })
-      restoredFrom = 'cloudflare-r2'
+      try {
+        files = await getProjectFilesFromR2({
+          userId: user.id,
+          projectId,
+        })
+        restoredFrom = 'cloudflare-r2'
 
-      if (files.length === 0) {
-        return NextResponse.json(
-          { error: 'No saved workspace files were found for this project.' },
-          { status: 400 },
-        )
+        if (files.length === 0) {
+          console.warn('No files found in R2')
+        }
+      } catch (error) {
+        console.warn('Failed to fetch from R2:', error)
       }
+    }
+
+    if (files.length === 0) {
+      return NextResponse.json(
+        { error: 'No saved files were found for this project in any storage source.' },
+        { status: 400 },
+      )
     }
 
     const supabaseRuntimeEnv = await getSupabaseProjectRuntimeEnv(user.id, projectId)
