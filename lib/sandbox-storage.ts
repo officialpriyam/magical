@@ -345,7 +345,7 @@ async function sandboxStorageFetch(
   }
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 8000)
+  const timeout = setTimeout(() => controller.abort(), 3000)
 
   let response: Response
   try {

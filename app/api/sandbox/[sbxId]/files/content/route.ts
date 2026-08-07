@@ -21,7 +21,7 @@ import {
   writeVercelSandboxFile,
 } from '@/lib/vercel-sandbox'
 
-export const maxDuration = 20
+export const maxDuration = 15
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -59,11 +59,11 @@ export async function GET(
       try {
         const sbx = await Promise.race([
           getVercelSandbox(sandboxRef.id),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 5000)),
         ])
         const content = await Promise.race([
           readVercelSandboxFile(sbx, filePath),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_read_timeout')), 8000)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_read_timeout')), 5000)),
         ])
 
         return new Response(
@@ -91,7 +91,7 @@ export async function GET(
     // Connect to existing sandbox
     const sbx = await Promise.race([
       Sandbox.connect(sandboxRef.id),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 5000)),
     ])
 
     // Sanitize path to prevent path traversal attacks

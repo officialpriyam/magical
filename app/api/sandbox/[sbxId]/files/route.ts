@@ -3,7 +3,7 @@ import { FileSystemNode } from '@/components/file-tree'
 import { decodeSandboxId } from '@/lib/sandbox-provider'
 import { getVercelSandbox, listVercelSandboxFiles } from '@/lib/vercel-sandbox'
 
-export const maxDuration = 20
+export const maxDuration = 15
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -33,7 +33,7 @@ export async function GET(
         const sbx = await getVercelSandbox(sandboxRef.id)
         const files = await Promise.race([
           listVercelSandboxFiles(sbx),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_list_timeout')), 8000)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_list_timeout')), 5000)),
         ])
 
         return new Response(
@@ -58,13 +58,13 @@ export async function GET(
     // Connect to existing sandbox
     const sbx = await Promise.race([
       Sandbox.connect(sandboxRef.id),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 5000)),
     ])
 
     // Use E2B SDK's files.list() method for robust file listing
     const filesList = await Promise.race([
       sbx.files.list('/home/user'),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_list_timeout')), 8000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_list_timeout')), 5000)),
     ])
 
     // Convert E2B file structure to our FileSystemNode format

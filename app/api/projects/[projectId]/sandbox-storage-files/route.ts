@@ -8,7 +8,7 @@ import {
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 10
+export const maxDuration = 8
 
 export async function GET(
   req: NextRequest,
@@ -73,7 +73,7 @@ export async function GET(
             projectId,
           }),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('sandbox_storage_timeout')), 3000)
+            setTimeout(() => reject(new Error('sandbox_storage_timeout')), 2000)
           ),
         ])
         
@@ -96,7 +96,7 @@ export async function GET(
         projectId,
       }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('sandbox_storage_timeout')), 3000)
+        setTimeout(() => reject(new Error('sandbox_storage_timeout')), 2000)
       ),
     ])
 

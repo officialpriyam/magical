@@ -238,7 +238,7 @@ export function IDE({
     try {
       if (isSandboxMode && sandboxId && projectId) {
         const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 4000)
+        const timeout = setTimeout(() => controller.abort(), 3000)
         
         const response = await fetch(`/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(path)}`, {
           signal: controller.signal,
@@ -253,7 +253,14 @@ export function IDE({
           throw new Error('Failed to load file from sandbox-storage')
         }
       } else if (session) {
-        const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`)
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 3000)
+        
+        const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`, {
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        
         if (!response.ok) {
           throw new Error('Failed to load workspace file')
         }

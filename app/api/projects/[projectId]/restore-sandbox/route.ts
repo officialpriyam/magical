@@ -35,13 +35,13 @@ import { validateGitHubIdentifier } from '@/lib/security'
 import type { FileSystemNode } from '@/components/file-tree'
 import type { TemplateId } from '@/lib/templates'
 
-export const maxDuration = 120
+export const maxDuration = 30
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const sandboxTimeout = 10 * 60 * 1000
-const MAX_RESTORE_FILES = 100
-const MAX_RESTORE_FILE_BYTES = 1024 * 1024
+const sandboxTimeout = 25 * 1000
+const MAX_RESTORE_FILES = 50
+const MAX_RESTORE_FILE_BYTES = 512 * 1024
 
 type GitHubWorkspace = {
   owner?: string
