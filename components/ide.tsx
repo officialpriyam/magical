@@ -59,41 +59,31 @@ export function IDE({
 
   const fetchFiles = useCallback(async () => {
     if (isSandboxMode && sandboxId) {
-      try {
-        if (projectId) {
-          const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 5000)
-          
-          const storageResponse = await fetch(`/api/projects/${projectId}/sandbox-storage-files`, {
-            signal: controller.signal,
-          })
-          clearTimeout(timeout)
-          
-          if (storageResponse.ok) {
-            const storageData = await storageResponse.json()
-            if (Array.isArray(storageData.files) && storageData.files.length > 0) {
-              setFiles(storageData.files)
-              return
-            }
-          }
-        }
+      if (!projectId) {
+        console.warn('Sandbox mode requires projectId to fetch files from sandbox-storage')
+        return
+      }
 
+      try {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 5000)
         
-        const response = await fetch(`/api/sandbox/${sandboxId}/files`, {
+        const storageResponse = await fetch(`/api/projects/${projectId}/sandbox-storage-files`, {
           signal: controller.signal,
         })
         clearTimeout(timeout)
         
-        if (response.ok) {
-          const data = await response.json()
-          setFiles(data.files || [])
+        if (storageResponse.ok) {
+          const storageData = await storageResponse.json()
+          if (Array.isArray(storageData.files)) {
+            setFiles(storageData.files)
+            return
+          }
         } else {
-          console.warn('Failed to fetch sandbox files, keeping existing file list')
+          console.warn('Failed to fetch files from sandbox-storage')
         }
       } catch (error) {
-        console.warn('Error fetching sandbox files (keeping existing list):', error)
+        console.warn('Error fetching files from sandbox-storage (keeping existing list):', error)
       }
     } else if (session) {
       try {
@@ -247,40 +237,21 @@ export function IDE({
     setIsOpeningFile(true)
     try {
       if (isSandboxMode && sandboxId && projectId) {
-        try {
-          const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 4000) // 4 second timeout
-          
-          const response = await fetch(`/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(path)}`, {
-            signal: controller.signal,
-          })
-          clearTimeout(timeout)
-          
-          if (response.ok) {
-            const { content } = await response.json()
-            fileContentCacheRef.current.set(path, content)
-            setSelectedFile({ path, content })
-            return
-          }
-        } catch (error) {
-          console.warn('Sandbox-storage fetch failed, falling back to live sandbox:', error)
-        }
-        
-        // Fallback to live sandbox
         const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 4000) // 4 second timeout
+        const timeout = setTimeout(() => controller.abort(), 4000)
         
-        const fallback = await fetch(`/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`, {
+        const response = await fetch(`/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(path)}`, {
           signal: controller.signal,
         })
         clearTimeout(timeout)
         
-        if (!fallback.ok) {
-          throw new Error('Failed to load sandbox file')
+        if (response.ok) {
+          const { content } = await response.json()
+          fileContentCacheRef.current.set(path, content)
+          setSelectedFile({ path, content })
+        } else {
+          throw new Error('Failed to load file from sandbox-storage')
         }
-        const { content } = await fallback.json()
-        fileContentCacheRef.current.set(path, content)
-        setSelectedFile({ path, content })
       } else if (session) {
         const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`)
         if (!response.ok) {
