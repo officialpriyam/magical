@@ -61,7 +61,14 @@ export function IDE({
     if (isSandboxMode && sandboxId) {
       try {
         if (projectId) {
-          const storageResponse = await fetch(`/api/projects/${projectId}/sandbox-storage-files`)
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 5000)
+          
+          const storageResponse = await fetch(`/api/projects/${projectId}/sandbox-storage-files`, {
+            signal: controller.signal,
+          })
+          clearTimeout(timeout)
+          
           if (storageResponse.ok) {
             const storageData = await storageResponse.json()
             if (Array.isArray(storageData.files) && storageData.files.length > 0) {
@@ -71,31 +78,41 @@ export function IDE({
           }
         }
 
-        const response = await fetch(`/api/sandbox/${sandboxId}/files`)
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 5000)
+        
+        const response = await fetch(`/api/sandbox/${sandboxId}/files`, {
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        
         if (response.ok) {
           const data = await response.json()
           setFiles(data.files || [])
         } else {
-          console.error('Failed to fetch sandbox files')
-          setFiles([])
+          console.warn('Failed to fetch sandbox files, keeping existing file list')
         }
       } catch (error) {
-        console.error('Error fetching sandbox files:', error)
-        setFiles([])
+        console.warn('Error fetching sandbox files (keeping existing list):', error)
       }
     } else if (session) {
       try {
-        const response = await fetch('/api/files')
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 5000)
+        
+        const response = await fetch('/api/files', {
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        
         if (response.ok) {
           const data = await response.json()
           setFiles(data)
         } else {
-          console.error('Failed to fetch files')
-          setFiles([])
+          console.warn('Failed to fetch files, keeping existing file list')
         }
       } catch (error) {
-        console.error('Error fetching files:', error)
-        setFiles([])
+        console.warn('Error fetching files (keeping existing list):', error)
       }
     }
   }, [session, isSandboxMode, sandboxId, projectId])
