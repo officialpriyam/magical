@@ -2,6 +2,7 @@ import { Sandbox } from '@e2b/code-interpreter'
 import { FileSystemNode } from '@/components/file-tree'
 import { decodeSandboxId } from '@/lib/sandbox-provider'
 import { getVercelSandbox, listVercelSandboxFiles } from '@/lib/vercel-sandbox'
+import { getModalSandbox, listModalSandboxFiles } from '@/lib/modal-sandbox'
 
 export const maxDuration = 15
 export const runtime = 'nodejs'
@@ -10,7 +11,7 @@ export const fetchCache = 'force-no-store'
 
 /**
  * GET /api/sandbox/[sbxId]/files
- * Fetches the file tree from an E2B sandbox
+ * Fetches the file tree from a sandbox
  */
 export async function GET(
   _req: Request,
@@ -43,6 +44,26 @@ export async function GET(
       } catch (error) {
         return new Response(
           JSON.stringify({ files: [], error: 'Sandbox file listing timed out' }),
+          { status: 504, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    if (sandboxRef.provider === 'modal') {
+      try {
+        const sbx = await getModalSandbox(sandboxRef.id)
+        const files = await Promise.race([
+          listModalSandboxFiles(sbx),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_list_timeout')), 5000)),
+        ])
+
+        return new Response(
+          JSON.stringify({ files }),
+          { headers: { 'Content-Type': 'application/json' } }
+        )
+      } catch (error) {
+        return new Response(
+          JSON.stringify({ files: [], error: 'Modal sandbox file listing timed out' }),
           { status: 504, headers: { 'Content-Type': 'application/json' } }
         )
       }

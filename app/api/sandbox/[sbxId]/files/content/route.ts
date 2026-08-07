@@ -20,6 +20,13 @@ import {
   renameVercelSandboxFile,
   writeVercelSandboxFile,
 } from '@/lib/vercel-sandbox'
+import {
+  deleteModalSandboxFile,
+  getModalSandbox,
+  readModalSandboxFile,
+  renameModalSandboxFile,
+  writeModalSandboxFile,
+} from '@/lib/modal-sandbox'
 
 export const maxDuration = 15
 export const runtime = 'nodejs'
@@ -28,7 +35,7 @@ export const fetchCache = 'force-no-store'
 
 /**
  * GET /api/sandbox/[sbxId]/files/content?path=/path/to/file
- * Fetches the content of a specific file from an E2B sandbox
+ * Fetches the content of a specific file from a sandbox
  */
 export async function GET(
   req: NextRequest,
@@ -76,6 +83,32 @@ export async function GET(
       } catch {
         return new Response(
           JSON.stringify({ error: 'Sandbox file read timed out' }),
+          { status: 504, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    if (sandboxRef.provider === 'modal') {
+      try {
+        const sbx = await Promise.race([
+          getModalSandbox(sandboxRef.id),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 5000)),
+        ])
+        const content = await Promise.race([
+          readModalSandboxFile(sbx, filePath),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_read_timeout')), 5000)),
+        ])
+
+        return new Response(
+          JSON.stringify({
+            content,
+            path: filePath
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        )
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Modal sandbox file read timed out' }),
           { status: 504, headers: { 'Content-Type': 'application/json' } }
         )
       }
@@ -164,6 +197,16 @@ export async function PATCH(
       return jsonResponse({ success: true, path: newPath })
     }
 
+    if (sandboxRef.provider === 'modal') {
+      const sbx = await getModalSandbox(sandboxRef.id)
+      await Promise.all([
+        persistProjectRename(projectID, oldPath, newPath),
+        renameModalSandboxFile(sbx, oldPath, newPath),
+      ])
+
+      return jsonResponse({ success: true, path: newPath })
+    }
+
     if (!process.env.E2B_API_KEY) {
       return jsonResponse({ error: 'E2B_API_KEY not configured' }, 503)
     }
@@ -225,6 +268,26 @@ export async function DELETE(
       }
     }
 
+    if (sandboxRef.provider === 'modal') {
+      try {
+        const sbx = await Promise.race([
+          getModalSandbox(sandboxRef.id),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+        ])
+        await Promise.all([
+          persistProjectDelete(projectID, filePath),
+          Promise.race([
+            deleteModalSandboxFile(sbx, filePath),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_delete_timeout')), 8000)),
+          ]),
+        ])
+
+        return jsonResponse({ success: true })
+      } catch {
+        return jsonResponse({ error: 'Modal sandbox delete timed out' }, 504)
+      }
+    }
+
     if (!process.env.E2B_API_KEY) {
       return jsonResponse({ error: 'E2B_API_KEY not configured' }, 503)
     }
@@ -253,7 +316,7 @@ export async function DELETE(
 
 /**
  * POST /api/sandbox/[sbxId]/files/content
- * Writes content to a specific file in an E2B sandbox
+ * Writes content to a specific file in a sandbox
  */
 export async function POST(
   req: Request,
@@ -303,6 +366,35 @@ export async function POST(
       } catch {
         return new Response(
           JSON.stringify({ error: 'Sandbox write timed out' }),
+          { status: 504, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    if (sandboxRef.provider === 'modal') {
+      try {
+        const sbx = await Promise.race([
+          getModalSandbox(sandboxRef.id),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_connect_timeout')), 8000)),
+        ])
+        await Promise.all([
+          persistProjectFile(projectID, filePath, content),
+          Promise.race([
+            writeModalSandboxFile(sbx, filePath, content),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('sandbox_write_timeout')), 8000)),
+          ]),
+        ])
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            path: filePath
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        )
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Modal sandbox write timed out' }),
           { status: 504, headers: { 'Content-Type': 'application/json' } }
         )
       }

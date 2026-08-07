@@ -1,4 +1,4 @@
-export type SandboxProvider = 'e2b' | 'vercel'
+export type SandboxProvider = 'e2b' | 'vercel' | 'modal'
 export type SandboxProviderMode = 'auto' | SandboxProvider
 
 export const SANDBOX_PROVIDER_OPTIONS: {
@@ -10,6 +10,11 @@ export const SANDBOX_PROVIDER_OPTIONS: {
     value: 'auto',
     label: 'Let AI choose',
     description: 'Randomly uses one configured sandbox provider.',
+  },
+  {
+    value: 'modal',
+    label: 'Modal',
+    description: 'Run the project in Modal Sandbox.',
   },
   {
     value: 'vercel',
@@ -24,7 +29,7 @@ export const SANDBOX_PROVIDER_OPTIONS: {
 ]
 
 export function normalizeSandboxProviderMode(value: unknown): SandboxProviderMode {
-  return value === 'e2b' || value === 'vercel' || value === 'auto'
+  return value === 'e2b' || value === 'vercel' || value === 'modal' || value === 'auto'
     ? value
     : 'auto'
 }
@@ -46,7 +51,7 @@ export function decodeSandboxId(value: string): {
   const provider = value.slice(0, separatorIndex)
   const rawId = value.slice(separatorIndex + 1)
 
-  if (provider !== 'e2b' && provider !== 'vercel') {
+  if (provider !== 'e2b' && provider !== 'vercel' && provider !== 'modal') {
     return { provider: 'e2b', id: value }
   }
 

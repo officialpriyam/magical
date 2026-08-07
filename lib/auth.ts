@@ -24,7 +24,7 @@ export function useAuth(
 
     let isMounted = true
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
       if (!isMounted) return
 
       setSession(session)
@@ -43,7 +43,7 @@ export function useAuth(
       }
 
       setLoading(false)
-    }).catch((error) => {
+    }).catch((error: unknown) => {
       console.error('Failed to load auth session:', error)
       if (isMounted) {
         setLoading(false)

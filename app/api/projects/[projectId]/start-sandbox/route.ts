@@ -15,6 +15,13 @@ import {
   listVercelSandboxFiles,
   writeVercelProjectFiles,
 } from '@/lib/vercel-sandbox'
+import {
+  createModalSandbox,
+  hasModalSandboxConfig,
+  listModalSandboxFiles,
+  writeModalProjectFiles,
+} from '@/lib/modal-sandbox'
+import type { Sandbox as ModalSandbox } from 'modal'
 import { getProjectFilesFromSandboxStorage } from '@/lib/sandbox-storage'
 import templates, { type TemplateId } from '@/lib/templates'
 import type { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
@@ -32,7 +39,7 @@ export async function POST(
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   let selectedProvider: SandboxProvider | null = null
-  let sbx: SandboxInstance | Awaited<ReturnType<typeof createVercelSandbox>> | null = null
+  let sbx: SandboxInstance | Awaited<ReturnType<typeof createVercelSandbox>> | ModalSandbox | null = null
 
   try {
     const { projectId } = await params
@@ -82,13 +89,16 @@ export async function POST(
       )
     }
 
+    const templateConfig = templates[template]
+    const port = templateConfig ? templateConfig.port : 3000
+
     if (selectedProvider === 'vercel') {
       sbx = await createVercelSandbox({
         template,
         userId: user.id,
         teamId: typeof body.teamID === 'string' ? body.teamID : '',
         projectId,
-        port: templates[template].port,
+        port,
         timeoutMs: sandboxTimeout,
       })
 
@@ -98,6 +108,29 @@ export async function POST(
 
       return NextResponse.json({
         sbxId: encodeSandboxId('vercel', (sbx as Awaited<ReturnType<typeof createVercelSandbox>>).name),
+        sandboxProvider: selectedProvider,
+        template,
+        url: '',
+        files,
+      } as ExecutionResultWeb)
+    }
+
+    if (selectedProvider === 'modal') {
+      sbx = await createModalSandbox({
+        template,
+        userId: user.id,
+        teamId: typeof body.teamID === 'string' ? body.teamID : '',
+        projectId,
+        port,
+        timeoutMs: sandboxTimeout,
+      })
+
+      await writeModalProjectFiles(sbx as ModalSandbox, storedFiles, template)
+
+      const files = await listModalSandboxFiles(sbx as ModalSandbox)
+
+      return NextResponse.json({
+        sbxId: encodeSandboxId('modal', (sbx as ModalSandbox).sandboxId),
         sandboxProvider: selectedProvider,
         template,
         url: '',
@@ -156,6 +189,8 @@ export async function POST(
     try {
       if (selectedProvider === 'vercel') {
         await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
+      } else if (selectedProvider === 'modal') {
+        await (sbx as ModalSandbox | null)?.terminate()
       } else {
         await (sbx as SandboxInstance | null)?.kill()
       }
@@ -194,6 +229,10 @@ function resolveSandboxProvider(mode: SandboxProviderMode, template: TemplateId)
     available.push('e2b')
   }
 
+  if (hasModalSandboxConfig()) {
+    available.push('modal')
+  }
+
   if (template !== 'code-interpreter-v1' && hasVercelSandboxConfig()) {
     available.push('vercel')
   }
@@ -203,7 +242,11 @@ function resolveSandboxProvider(mode: SandboxProviderMode, template: TemplateId)
 
 function getNoSandboxProviderMessage(mode: SandboxProviderMode, template: TemplateId) {
   if (mode === 'vercel' && template === 'code-interpreter-v1') {
-    return 'Vercel Sandbox is only available for app previews. Python code interpreter requires E2B_API_KEY.'
+    return 'Vercel Sandbox is only available for app previews. Python code interpreter requires E2B_API_KEY or Modal Sandbox.'
+  }
+
+  if (mode === 'modal') {
+    return 'Modal Sandbox is not configured. Set MODAL_TOKEN_ID and MODAL_TOKEN_SECRET.'
   }
 
   if (mode === 'vercel') {
@@ -211,10 +254,10 @@ function getNoSandboxProviderMessage(mode: SandboxProviderMode, template: Templa
   }
 
   if (mode === 'e2b') {
-    return 'E2B is not configured. Set E2B_API_KEY or choose Vercel Sandbox.'
+    return 'E2B is not configured. Set E2B_API_KEY or choose Modal or Vercel Sandbox.'
   }
 
-  return 'No sandbox provider is configured. Set E2B_API_KEY or configure Vercel Sandbox.'
+  return 'No sandbox provider is configured. Set E2B_API_KEY, MODAL_TOKEN_ID/SECRET, or configure Vercel Sandbox.'
 }
 
 async function fetchSandboxFiles(sbx: SandboxInstance): Promise<FileSystemNode[]> {

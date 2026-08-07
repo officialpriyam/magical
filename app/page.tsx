@@ -296,13 +296,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         return
       }
 
-      const { data, error } = await supabase
+      const { data, error } = (await supabase
         .from('messages')
         .select('project_id, object_data, result_data, sequence_number')
         .in('project_id', projectIds)
         .not('result_data', 'is', null)
-        .order('sequence_number', { ascending: false })
-        .returns<ProjectPreviewRow[]>()
+        .order('sequence_number', { ascending: false })) as { data: ProjectPreviewRow[] | null; error: any }
 
       if (!isMounted) return
 

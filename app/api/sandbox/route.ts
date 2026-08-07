@@ -23,7 +23,17 @@ import {
   listVercelSandboxFiles,
   writeVercelProjectFiles,
 } from '@/lib/vercel-sandbox'
+import {
+  createModalSandbox,
+  getModalSandbox,
+  getModalSandboxUrl,
+  hasModalSandboxConfig,
+  installAndStartModalProject,
+  listModalSandboxFiles,
+  writeModalProjectFiles,
+} from '@/lib/modal-sandbox'
 import { Sandbox } from '@e2b/code-interpreter'
+import type { Sandbox as ModalSandbox } from 'modal'
 import { FileSystemNode } from '@/components/file-tree'
 import type { TemplateId } from '@/lib/templates'
 
@@ -132,45 +142,57 @@ export async function POST(req: Request) {
       )
     }
 
-    let sbx: Sandbox | VercelSandboxInstance | null = null
+    let sbx: Sandbox | VercelSandboxInstance | ModalSandbox | null = null
     let createdSandbox = false
     try {
       sbx = await connectReusableSandbox(existingSandboxId, selectedProvider)
 
       if (!sbx) {
         createdSandbox = true
-        sbx = selectedProvider === 'vercel'
-          ? await createVercelSandbox({
-              template: fragment.template as TemplateId,
-              userId: userID,
-              teamId: teamID,
-              projectId: projectID,
-              port: fragment.port,
-              env: supabaseRuntimeEnv,
-              timeoutMs: sandboxTimeout,
-            })
-          : await createE2BSandbox(fragment.template, {
-              metadata: {
-                template: fragment.template,
-                userID: userID ?? '',
-                teamID: teamID ?? '',
-              },
-              timeoutMs: sandboxTimeout,
-              ...(teamID && accessToken
-                ? {
-                    headers: {
-                      'X-Supabase-Team': teamID,
-                      'X-Supabase-Token': accessToken,
-                    },
-                  }
-                : {}),
-            })
+        if (selectedProvider === 'vercel') {
+          sbx = await createVercelSandbox({
+            template: fragment.template as TemplateId,
+            userId: userID,
+            teamId: teamID,
+            projectId: projectID,
+            port: fragment.port,
+            env: supabaseRuntimeEnv,
+            timeoutMs: sandboxTimeout,
+          })
+        } else if (selectedProvider === 'modal') {
+          sbx = await createModalSandbox({
+            template: fragment.template as TemplateId,
+            userId: userID,
+            teamId: teamID,
+            projectId: projectID,
+            port: fragment.port,
+            env: supabaseRuntimeEnv,
+            timeoutMs: sandboxTimeout,
+          })
+        } else {
+          sbx = await createE2BSandbox(fragment.template, {
+            metadata: {
+              template: fragment.template,
+              userID: userID ?? '',
+              teamID: teamID ?? '',
+            },
+            timeoutMs: sandboxTimeout,
+            ...(teamID && accessToken
+              ? {
+                  headers: {
+                    'X-Supabase-Team': teamID,
+                    'X-Supabase-Token': accessToken,
+                  },
+                }
+              : {}),
+          })
+        }
       }
     } catch (sandboxError: any) {
       console.error(`${selectedProvider} sandbox creation failed:`, sandboxError)
       return new Response(
         JSON.stringify({ 
-          error: `Failed to create ${selectedProvider === 'vercel' ? 'Vercel' : 'E2B'} sandbox environment. Please try again later.`,
+          error: `Failed to create ${selectedProvider} sandbox environment. Please try again later.`,
           type: 'sandbox_creation_error',
           details: sandboxError.message
         }),
@@ -188,6 +210,11 @@ export async function POST(req: Request) {
       if (selectedProvider === 'vercel') {
         await Promise.all([
           writeVercelProjectFiles(sbx as Awaited<ReturnType<typeof createVercelSandbox>>, generatedFiles, fragment.template as TemplateId),
+          storageSave,
+        ])
+      } else if (selectedProvider === 'modal') {
+        await Promise.all([
+          writeModalProjectFiles(sbx as ModalSandbox, generatedFiles, fragment.template as TemplateId),
           storageSave,
         ])
       } else {
@@ -250,6 +277,30 @@ export async function POST(req: Request) {
         )
       }
 
+      if (selectedProvider === 'modal') {
+        const modalSandbox = sbx as ModalSandbox
+
+        await installAndStartModalProject({
+          sandbox: modalSandbox,
+          fragment,
+          env: supabaseRuntimeEnv,
+        })
+
+        const files = await listModalSandboxFiles(modalSandbox)
+        const url = await getModalSandboxUrl(modalSandbox, fragment.port || 3000)
+
+        return new Response(
+          JSON.stringify({
+            sbxId: encodeSandboxId('modal', modalSandbox.sandboxId),
+            sandboxProvider: selectedProvider,
+            template: fragment.template,
+            url,
+            files,
+          } as ExecutionResultWeb),
+          { headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
       const installCommand = cleanCommand(fragment.install_dependencies_command)
 
       if (installCommand) {
@@ -282,6 +333,8 @@ export async function POST(req: Request) {
         if (createdSandbox) {
           if (selectedProvider === 'vercel') {
             await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
+          } else if (selectedProvider === 'modal') {
+            await (sbx as ModalSandbox | null)?.terminate()
           } else {
             await (sbx as Sandbox | null)?.kill()
           }
@@ -334,9 +387,13 @@ async function connectReusableSandbox(
   }
 
   try {
-    return sandboxRef.provider === 'vercel'
-      ? await getVercelSandbox(sandboxRef.id)
-      : await Sandbox.connect(sandboxRef.id)
+    if (sandboxRef.provider === 'vercel') {
+      return await getVercelSandbox(sandboxRef.id)
+    }
+    if (sandboxRef.provider === 'modal') {
+      return await getModalSandbox(sandboxRef.id)
+    }
+    return await Sandbox.connect(sandboxRef.id)
   } catch (error) {
     console.warn('Could not reuse warm sandbox; creating a new one:', error)
     return null
@@ -353,6 +410,10 @@ function resolveSandboxProviderForFragment(
     available.push('e2b')
   }
 
+  if (isProviderAvailableForFragment('modal', fragment)) {
+    available.push('modal')
+  }
+
   if (isProviderAvailableForFragment('vercel', fragment)) {
     available.push('vercel')
   }
@@ -365,6 +426,10 @@ function isProviderAvailableForFragment(provider: SandboxProvider, fragment: Fra
     return Boolean(process.env.E2B_API_KEY)
   }
 
+  if (provider === 'modal') {
+    return hasModalSandboxConfig()
+  }
+
   return fragment.template !== 'code-interpreter-v1' && hasVercelSandboxConfig()
 }
 
@@ -373,7 +438,11 @@ function getNoSandboxProviderMessage(
   fragment: FragmentSchema,
 ) {
   if (mode === 'vercel' && fragment.template === 'code-interpreter-v1') {
-    return 'Vercel Sandbox is only available for app previews. Python code interpreter requires E2B_API_KEY.'
+    return 'Vercel Sandbox is only available for app previews. Python code interpreter requires E2B_API_KEY or Modal Sandbox.'
+  }
+
+  if (mode === 'modal') {
+    return 'Modal Sandbox is not configured. Set MODAL_TOKEN_ID and MODAL_TOKEN_SECRET.'
   }
 
   if (mode === 'vercel') {
@@ -381,10 +450,10 @@ function getNoSandboxProviderMessage(
   }
 
   if (mode === 'e2b') {
-    return 'E2B is not configured. Set E2B_API_KEY or choose Vercel Sandbox.'
+    return 'E2B is not configured. Set E2B_API_KEY or choose Modal or Vercel Sandbox.'
   }
 
-  return 'No sandbox provider is configured. Set E2B_API_KEY or configure Vercel Sandbox.'
+  return 'No sandbox provider is configured. Set E2B_API_KEY, MODAL_TOKEN_ID/SECRET, or configure Vercel Sandbox.'
 }
 
 function cleanCommand(value: unknown) {

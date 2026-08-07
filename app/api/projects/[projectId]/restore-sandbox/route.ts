@@ -31,6 +31,15 @@ import {
   listVercelSandboxFiles,
   writeVercelProjectFiles,
 } from '@/lib/vercel-sandbox'
+import {
+  createModalSandbox,
+  getModalSandboxUrl,
+  hasModalSandboxConfig,
+  installAndStartModalProject,
+  listModalSandboxFiles,
+  writeModalProjectFiles,
+} from '@/lib/modal-sandbox'
+import type { Sandbox as ModalSandbox } from 'modal'
 import { validateGitHubIdentifier } from '@/lib/security'
 import type { FileSystemNode } from '@/components/file-tree'
 import type { TemplateId } from '@/lib/templates'
@@ -60,7 +69,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
-  let sbx: SandboxInstance | Awaited<ReturnType<typeof createVercelSandbox>> | null = null
+  let sbx: SandboxInstance | Awaited<ReturnType<typeof createVercelSandbox>> | ModalSandbox | null = null
   let selectedProvider: SandboxProvider | null = null
 
   try {
@@ -234,6 +243,21 @@ export async function POST(
         files,
         fragment.template as TemplateId,
       )
+    } else if (selectedProvider === 'modal') {
+      sbx = await createModalSandbox({
+        template: fragment.template as TemplateId,
+        userId: user.id,
+        teamId: typeof body.teamID === 'string' ? body.teamID : '',
+        projectId,
+        port: fragment.port,
+        env: supabaseRuntimeEnv,
+        timeoutMs: sandboxTimeout,
+      })
+      await writeModalProjectFiles(
+        sbx as ModalSandbox,
+        files,
+        fragment.template as TemplateId,
+      )
     } else {
       sbx = await createE2BSandbox(fragment.template, {
         metadata: {
@@ -294,6 +318,27 @@ export async function POST(
       } as ExecutionResultWeb)
     }
 
+    if (selectedProvider === 'modal') {
+      const modalSandbox = sbx as ModalSandbox
+
+      await installAndStartModalProject({
+        sandbox: modalSandbox,
+        fragment,
+        env: supabaseRuntimeEnv,
+      })
+
+      const tree = await listModalSandboxFiles(modalSandbox)
+      const url = await getModalSandboxUrl(modalSandbox, fragment.port || 3000)
+
+      return NextResponse.json({
+        sbxId: encodeSandboxId('modal', modalSandbox.sandboxId),
+        sandboxProvider: selectedProvider,
+        template: fragment.template,
+        url,
+        files: tree,
+      } as ExecutionResultWeb)
+    }
+
     if (installCommand) {
       await (sbx as SandboxInstance).commands.run(installCommand, {
         envs: {
@@ -318,6 +363,8 @@ export async function POST(
     try {
       if (selectedProvider === 'vercel') {
         await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
+      } else if (selectedProvider === 'modal') {
+        await (sbx as ModalSandbox | null)?.terminate()
       } else {
         await (sbx as SandboxInstance | null)?.kill()
       }
@@ -341,6 +388,10 @@ function resolveSandboxProviderForFragment(
 
   if (process.env.E2B_API_KEY) {
     available.push('e2b')
+  }
+
+  if (hasModalSandboxConfig()) {
+    available.push('modal')
   }
 
   if (fragment.template !== 'code-interpreter-v1' && hasVercelSandboxConfig()) {
