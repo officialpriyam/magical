@@ -8,6 +8,7 @@ import {
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 10
 
 export async function GET(
   req: NextRequest,
@@ -60,19 +61,44 @@ export async function GET(
   }
 
   try {
-    const files = await getProjectFilesFromSandboxStorage({
-      userId: user.id,
-      projectId,
-    })
-
     const path = req.nextUrl.searchParams.get('path')
+    
+    // If requesting a specific file with sandbox fallback capability
     if (path) {
-      const match = files.find((file: { path?: string }) => file.path === path)
-      if (!match) {
-        return NextResponse.json({ error: 'File not found', content: '' }, { status: 404 })
+      // Try sandbox-storage first with aggressive timeout
+      try {
+        const files = await Promise.race([
+          getProjectFilesFromSandboxStorage({
+            userId: user.id,
+            projectId,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('sandbox_storage_timeout')), 3000)
+          ),
+        ])
+        
+        const match = files.find((file: { path?: string }) => file.path === path)
+        if (match) {
+          return NextResponse.json({ content: match.content, path: match.path })
+        }
+      } catch (storageError) {
+        console.warn('Sandbox storage fetch failed, skipping:', storageError)
+        // Fall through to return 404 - IDE will try live sandbox
       }
-      return NextResponse.json({ content: match.content, path: match.path })
+      
+      return NextResponse.json({ error: 'File not found', content: '' }, { status: 404 })
     }
+
+    // List all files from sandbox storage
+    const files = await Promise.race([
+      getProjectFilesFromSandboxStorage({
+        userId: user.id,
+        projectId,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('sandbox_storage_timeout')), 3000)
+      ),
+    ])
 
     return NextResponse.json({ files })
   } catch (error) {
