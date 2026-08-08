@@ -1,7 +1,7 @@
 import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import { createE2BSandbox } from '@/lib/e2b-sandbox'
-import { getFragmentFiles } from '@/lib/fragment-files'
+import { getFragmentFiles, getTemplateFiles } from '@/lib/fragment-files'
 import { getSupabaseProjectRuntimeEnv } from '@/lib/supabase-integration'
 import { saveProjectFilesToR2 } from '@/lib/r2-workspace'
 import { saveProjectFilesToSandboxStorage } from '@/lib/sandbox-storage'
@@ -205,6 +205,7 @@ export async function POST(req: Request) {
         userID,
         projectID,
         files: generatedFiles,
+        template: fragment.template as string,
       })
 
       if (selectedProvider === 'vercel') {
@@ -494,10 +495,12 @@ async function saveGeneratedFilesToSandboxStorage({
   userID,
   projectID,
   files,
+  template,
 }: {
   userID?: string
   projectID?: string
   files: ReturnType<typeof getFragmentFiles>
+  template?: string
 }) {
   if (!projectID || files.length === 0) {
     return
@@ -509,19 +512,22 @@ async function saveGeneratedFilesToSandboxStorage({
     return
   }
 
+  const templateFiles = getTemplateFiles(template)
+  const allFiles = [...templateFiles, ...files]
+
   try {
     const result = await saveProjectFilesToSandboxStorage({
       userId: authenticatedUserId,
       projectId: projectID,
-      files,
+      files: allFiles,
     })
 
     if (!result.saved && result.reason === 'not_configured') {
-      await saveGeneratedFilesToR2({ userID, projectID, files })
+      await saveGeneratedFilesToR2({ userID, projectID, files: allFiles })
     }
   } catch (error) {
     console.warn('External sandbox storage backup failed:', error)
-    await saveGeneratedFilesToR2({ userID, projectID, files })
+    await saveGeneratedFilesToR2({ userID, projectID, files: allFiles })
   }
 }
 

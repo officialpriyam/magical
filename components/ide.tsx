@@ -6,11 +6,13 @@ import { CodeEditor } from '@/components/code-editor'
 import { GitHubImport } from '@/components/github-import'
 import { useAuth } from '@/lib/auth'
 import { Button } from './ui/button'
-import { GitBranch, RefreshCw, Search } from 'lucide-react'
+import { GitBranch, RefreshCw, Search, AlertTriangle, Wifi, WifiOff } from 'lucide-react'
 import Spinner from './ui/spinner'
 
+type StorageStatus = 'idle' | 'loading' | 'ok' | 'error' | 'degraded'
+
 interface IDEProps {
-  sandboxId?: string // Optional sandbox ID for viewing sandbox files
+  sandboxId?: string
   projectId?: string
   initialFiles?: FileSystemNode[]
   onSave?: (path: string, content: string) => Promise<void>
@@ -41,6 +43,7 @@ export function IDE({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [storageSlow, setStorageSlow] = useState(false)
+  const [storageStatus, setStorageStatus] = useState<StorageStatus>('idle')
   const isSandboxMode = !!sandboxId
   const isGitHubSaveBlocked = githubSaveRequired && !githubWorkspaceConnected
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -48,6 +51,11 @@ export function IDE({
   const selectedFileRef = useRef(selectedFile)
   const fileContentCacheRef = useRef<Map<string, string>>(new Map())
   const fetchInFlightRef = useRef(false)
+  const initialFilesRef = useRef(initialFiles)
+
+  useEffect(() => {
+    initialFilesRef.current = initialFiles
+  }, [initialFiles])
 
   const blockGitHubSave = useCallback(() => {
     onSaveBlocked?.()
@@ -69,13 +77,14 @@ export function IDE({
 
     if (isSandboxMode && sandboxId) {
       if (!projectId) {
-        console.warn('Sandbox mode requires projectId to fetch files from sandbox-storage')
+        setLoadError('Sandbox mode requires a project ID to fetch files from storage.')
+        setStorageStatus('error')
         return
       }
 
       fetchInFlightRef.current = true
       setIsRefreshing(true)
-      setLoadError(null)
+      setStorageStatus('loading')
 
       try {
         const controller = new AbortController()
@@ -94,17 +103,18 @@ export function IDE({
               setFiles(storageData.files)
               setLoadError(null)
               setStorageSlow(Boolean(storageData.slow))
+              setStorageStatus('ok')
               return
             }
 
-            // Storage is empty or degraded. Keep showing the live-sandbox
-            // tree (initialFiles) instead of wiping it, and tell the user why.
-            if (initialFiles && initialFiles.length > 0) {
-              setFiles(initialFiles)
+            const fallback = initialFilesRef.current
+            if (fallback && fallback.length > 0) {
+              setFiles(fallback)
             } else {
               setFiles([])
             }
             setStorageSlow(false)
+            setStorageStatus('degraded')
             setLoadError(
               storageData.error ||
                 'Sandbox storage returned no files. Save a file to sync the workspace, then refresh.',
@@ -112,15 +122,18 @@ export function IDE({
             return
           }
 
-          setFiles(initialFiles && initialFiles.length > 0 ? initialFiles : [])
-          setLoadError('Sandbox storage returned no files.')
+          setFiles([])
+          setStorageStatus('error')
+          setLoadError('Sandbox storage returned an unexpected response.')
         } else {
           const errorData = await storageResponse.json().catch(() => null)
           const message =
             errorData?.error || `Failed to fetch files (HTTP ${storageResponse.status}).`
           setLoadError(message)
-          if (initialFiles && initialFiles.length > 0) {
-            setFiles(initialFiles)
+          setStorageStatus('error')
+          const fallback = initialFilesRef.current
+          if (fallback && fallback.length > 0) {
+            setFiles(fallback)
           }
         }
       } catch (error: any) {
@@ -129,6 +142,7 @@ export function IDE({
         } else {
           setLoadError('Could not reach sandbox storage. Check that the storage server is running.')
         }
+        setStorageStatus('error')
       } finally {
         fetchInFlightRef.current = false
         setIsRefreshing(false)
@@ -161,7 +175,7 @@ export function IDE({
         setIsRefreshing(false)
       }
     }
-  }, [session, isSandboxMode, sandboxId, projectId, initialFiles])
+  }, [session, isSandboxMode, sandboxId, projectId])
 
   const persistFile = useCallback(async (path: string, content: string) => {
     if (isGitHubSaveBlocked) {
@@ -175,7 +189,6 @@ export function IDE({
       await onSave(path, content)
       saved = true
     } else if (isSandboxMode && sandboxId) {
-      // Save file to sandbox (which also persists to sandbox-storage server-side)
       try {
         const response = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
           method: 'POST',
@@ -200,7 +213,6 @@ export function IDE({
         )
       }
     } else if (session) {
-      // Save file to Supabase
       const response = await fetch('/api/files/content', {
         method: 'POST',
         headers: {
@@ -264,12 +276,6 @@ export function IDE({
       fetchFiles()
     }
   }, [session, isSandboxMode, fetchFiles])
-
-  useEffect(() => {
-    if (isSandboxMode && initialFiles) {
-      setFiles(initialFiles)
-    }
-  }, [initialFiles, isSandboxMode])
 
   useEffect(() => {
     return () => {
@@ -337,7 +343,6 @@ export function IDE({
           setSelectedFile({ path, content })
           setLoadError(null)
         } else if (response.status === 404) {
-          // File exists in the live sandbox but not yet in storage: try the live sandbox.
           const fallbackController = new AbortController()
           const fallbackTimeout = setTimeout(() => fallbackController.abort(), 8000)
 
@@ -448,7 +453,6 @@ export function IDE({
       return
     }
 
-    // File creation in sandbox mode is not supported via this UI
     if (isSandboxMode) {
       console.log('File creation in sandbox mode not supported')
       return
@@ -586,8 +590,6 @@ export function IDE({
   async function handleImportRepository(repo: any, repoFiles: any[]) {
     if (!session) return
     try {
-      // The files have been imported via the GitHubImport component
-      // Just refresh the file list to show the newly imported files
       await fetchFiles()
       setShowGitHubImport(false)
     } catch (error) {
@@ -605,6 +607,32 @@ export function IDE({
       </div>
     )
   }
+
+  const storageIndicator = isSandboxMode ? (
+    <div className="flex items-center gap-1.5 px-2 py-1 text-xs">
+      {storageStatus === 'loading' || isRefreshing ? (
+        <>
+          <Spinner />
+          <span className="text-white/50">Loading...</span>
+        </>
+      ) : storageStatus === 'error' ? (
+        <>
+          <WifiOff className="h-3 w-3 text-red-400" />
+          <span className="text-red-400">Storage offline</span>
+        </>
+      ) : storageStatus === 'degraded' ? (
+        <>
+          <AlertTriangle className="h-3 w-3 text-amber-400" />
+          <span className="text-amber-400">Partial</span>
+        </>
+      ) : storageStatus === 'ok' ? (
+        <>
+          <Wifi className="h-3 w-3 text-green-400" />
+          <span className="text-green-400">Synced</span>
+        </>
+      ) : null}
+    </div>
+  ) : null
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#181818] text-[#d4d4d4] md:flex-row">
@@ -643,18 +671,41 @@ export function IDE({
             </Button>
           )}
         </div>
+        {storageIndicator}
         <div className="min-h-0 flex-1 overflow-auto">
-        <FileTree
-          files={visibleFiles}
-          onSelectFile={handleSelectFile}
-          onCreateFile={isSandboxMode ? undefined : handleCreateFile}
-          onDeleteFile={handleDeleteFile}
-          onRenameFile={handleRenameFile}
-        />
+          {storageStatus === 'error' && files.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 p-4 text-center">
+              <WifiOff className="h-8 w-8 text-red-400/60" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-red-300">Storage Unavailable</p>
+                <p className="text-xs text-white/40 max-w-[200px]">
+                  Cannot connect to sandbox storage. Files may still be available in the live sandbox.
+                </p>
+              </div>
+              <Button
+                onClick={fetchFiles}
+                variant="outline"
+                size="sm"
+                className="border-red-500/20 text-red-300 hover:bg-red-500/10"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Retry Connection
+              </Button>
+            </div>
+          ) : (
+            <FileTree
+              files={visibleFiles}
+              onSelectFile={handleSelectFile}
+              onCreateFile={isSandboxMode ? undefined : handleCreateFile}
+              onDeleteFile={handleDeleteFile}
+              onRenameFile={handleRenameFile}
+            />
+          )}
         </div>
         {loadError && (
           <div className="shrink-0 border-t border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
             <div className="flex items-start gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-red-400" />
               <p className="min-w-0 flex-1 leading-5">{loadError}</p>
               <Button
                 onClick={() => void fetchFiles()}
@@ -664,7 +715,7 @@ export function IDE({
                 title="Retry"
                 aria-label="Retry load files"
               >
-                Retry
+                <RefreshCw className="h-3 w-3" />
               </Button>
             </div>
           </div>
@@ -686,39 +737,39 @@ export function IDE({
           )}
         </div>
         <div className="min-h-0 flex-1">
-        {isOpeningFile && !selectedFile ? (
-          <div className="flex h-full items-center justify-center gap-2 px-6 text-center text-sm text-white/45">
-            <Spinner />
-            <span>Loading {openingPath || 'file'}…</span>
-          </div>
-        ) : selectedFile ? (
-          isGitHubSaveBlocked ? (
-            <div className="flex h-full items-center justify-center p-6 text-center">
-              <div className="max-w-sm space-y-3 rounded-lg border border-white/10 bg-white/[0.04] p-5 shadow-sm">
-                <div className="text-sm font-medium">GitHub save required</div>
-                <p className="text-sm text-white/60">
-                  Save this project to GitHub before editing files. Use the Save to GitHub button in the preview toolbar.
-                </p>
-                <Button type="button" variant="outline" size="sm" onClick={blockGitHubSave}>
-                  Use Save to GitHub
-                </Button>
-              </div>
+          {isOpeningFile && !selectedFile ? (
+            <div className="flex h-full items-center justify-center gap-2 px-6 text-center text-sm text-white/45">
+              <Spinner />
+              <span>Loading {openingPath || 'file'}...</span>
             </div>
+          ) : selectedFile ? (
+            isGitHubSaveBlocked ? (
+              <div className="flex h-full items-center justify-center p-6 text-center">
+                <div className="max-w-sm space-y-3 rounded-lg border border-white/10 bg-white/[0.04] p-5 shadow-sm">
+                  <div className="text-sm font-medium">GitHub save required</div>
+                  <p className="text-sm text-white/60">
+                    Save this project to GitHub before editing files. Use the Save to GitHub button in the preview toolbar.
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={blockGitHubSave}>
+                    Use Save to GitHub
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <CodeEditor
+                key={selectedFile.path}
+                code={selectedFile.content}
+                lang={selectedFile.path.split('.').pop() || 'typescript'}
+                onChange={handleEditorChange}
+                onBlur={() => void flushPendingSave()}
+                onSave={handleEditorSave}
+              />
+            )
           ) : (
-            <CodeEditor
-              key={selectedFile.path}
-              code={selectedFile.content}
-              lang={selectedFile.path.split('.').pop() || 'typescript'}
-              onChange={handleEditorChange}
-              onBlur={() => void flushPendingSave()}
-              onSave={handleEditorSave}
-            />
-          )
-        ) : (
-          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/45">
-            <p>Select a file from the tree to open it here</p>
-          </div>
-        )}
+            <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/45">
+              <p>Select a file from the tree to open it here</p>
+            </div>
+          )}
         </div>
       </section>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback, memo, useRef, useEffect } from 'react'
 import {
   ChevronDown,
   ChevronRight,
@@ -40,13 +40,13 @@ export function FileTree({ files, onSelectFile, onCreateFile, onDeleteFile, onRe
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [createType, setCreateType] = useState<'file' | 'folder'>('file')
 
-  const handleCreateFile = () => {
+  const handleCreateFile = useCallback(() => {
     if (newFileName.trim() && onCreateFile) {
       onCreateFile(newFileName.trim(), createType === 'folder')
       setNewFileName('')
       setIsCreateDialogOpen(false)
     }
-  }
+  }, [newFileName, createType, onCreateFile])
 
   return (
     <div className="p-2">
@@ -106,13 +106,15 @@ export function FileTree({ files, onSelectFile, onCreateFile, onDeleteFile, onRe
           </div>
         )}
       </div>
-      {Array.isArray(files) && files.map(file => (
+      {Array.isArray(files) && files.map((file) => (
         <FileTreeNode
-          key={file.name}
+          key={file.path || file.name}
           node={file}
           onSelectFile={onSelectFile}
           onDeleteFile={onDeleteFile}
           onRenameFile={onRenameFile}
+          level={0}
+          parentPath=""
         />
       ))}
     </div>
@@ -124,83 +126,104 @@ interface FileTreeNodeProps {
   onSelectFile: (path: string) => void
   onDeleteFile?: (path: string) => void
   onRenameFile?: (oldPath: string, newPath: string) => void
-  level?: number
+  level: number
+  parentPath: string
 }
 
-function FileTreeNode({
+const FileTreeNode = memo(function FileTreeNode({
   node,
   onSelectFile,
   onDeleteFile,
   onRenameFile,
-  level = 0,
-  path = '',
-}: FileTreeNodeProps & { path?: string }) {
+  level,
+  parentPath,
+}: FileTreeNodeProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
   const [renameValue, setRenameValue] = useState(node.name)
+  const renameInputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    if (isRenameDialogOpen && renameInputRef.current) {
+      renameInputRef.current.focus()
+      renameInputRef.current.select()
+    }
+  }, [isRenameDialogOpen])
+
+  const fullPath = node.path || (parentPath ? `${parentPath}/${node.name}` : node.name)
   const isDirectory = node.isDirectory
   const hasChildren = node.children && node.children.length > 0
-  const newPath = node.path || (path ? `${path}/${node.name}` : node.name)
 
-  const handleToggle = () => {
+  const handleToggle = useCallback(() => {
     if (isDirectory) {
-      setIsOpen(!isOpen)
+      setIsOpen((prev) => !prev)
     } else {
-      onSelectFile(newPath)
+      onSelectFile(fullPath)
     }
-  }
+  }, [isDirectory, onSelectFile, fullPath])
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     if (onDeleteFile) {
-      onDeleteFile(newPath)
+      onDeleteFile(fullPath)
     }
-  }
+  }, [onDeleteFile, fullPath])
 
-  const handleRename = () => {
+  const handleRename = useCallback(() => {
     const nextName = renameValue.trim()
-
     if (!nextName || !onRenameFile) return
 
-    const parentPath = newPath.includes('/')
-      ? newPath.slice(0, newPath.lastIndexOf('/'))
+    const parentDir = fullPath.includes('/')
+      ? fullPath.slice(0, fullPath.lastIndexOf('/'))
       : ''
-    const nextPath = parentPath ? `${parentPath}/${nextName}` : nextName
+    const nextPath = parentDir ? `${parentDir}/${nextName}` : nextName
 
-    onRenameFile(newPath, nextPath)
+    onRenameFile(fullPath, nextPath)
     setIsRenameDialogOpen(false)
-  }
+  }, [renameValue, onRenameFile, fullPath])
+
+  const handleRenameKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        handleRename()
+      } else if (e.key === 'Escape') {
+        setIsRenameDialogOpen(false)
+      }
+    },
+    [handleRename],
+  )
+
+  const indent = level * 16 + 4
 
   return (
     <div>
       <div
         className="flex items-center cursor-pointer hover:bg-primary/5 dark:hover:bg-muted/50 rounded-sm p-1 group"
-        style={{ paddingLeft: level * 16 + 4 }}
+        style={{ paddingLeft: indent }}
         onClick={handleToggle}
       >
         {isDirectory ? (
           <>
             {isOpen ? (
-              <ChevronDown size={16} className="mr-1 text-muted-foreground" />
+              <ChevronDown size={16} className="mr-1 shrink-0 text-muted-foreground" />
             ) : (
-              <ChevronRight size={16} className="mr-1 text-muted-foreground" />
+              <ChevronRight size={16} className="mr-1 shrink-0 text-muted-foreground" />
             )}
-            <Folder size={16} className="mr-2 text-blue-500" />
+            <Folder size={16} className="mr-2 shrink-0 text-blue-500" />
           </>
         ) : (
-          <FileIcon size={16} className="mr-2 ml-4 text-muted-foreground" />
+          <FileIcon size={16} className="mr-2 ml-4 shrink-0 text-muted-foreground" />
         )}
-        <span className="text-sm truncate flex-1">{node.name}</span>
+        <span className="text-sm truncate flex-1 min-w-0">{node.name}</span>
         {!isDirectory && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-5 w-5 opacity-60 group-hover:opacity-100 ml-1"
+            className="h-5 w-5 opacity-0 group-hover:opacity-100 ml-1 shrink-0 transition-opacity"
             aria-label={`Open ${node.name}`}
             title={`Open ${node.name}`}
             onClick={(e) => {
               e.stopPropagation()
-              onSelectFile(newPath)
+              onSelectFile(fullPath)
             }}
           >
             <SquarePen className="h-3 w-3" />
@@ -212,7 +235,7 @@ function FileTreeNode({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-5 w-5 opacity-60 group-hover:opacity-100 ml-1"
+                className="h-5 w-5 opacity-0 group-hover:opacity-100 ml-1 shrink-0 transition-opacity"
                 aria-label={`Rename ${node.name}`}
                 title={`Rename ${node.name}`}
                 onClick={(e) => {
@@ -232,13 +255,10 @@ function FileTreeNode({
               </DialogHeader>
               <div className="flex items-center space-x-2">
                 <Input
+                  ref={renameInputRef}
                   value={renameValue}
                   onChange={(event) => setRenameValue(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      handleRename()
-                    }
-                  }}
+                  onKeyDown={handleRenameKeyDown}
                 />
                 <Button onClick={handleRename}>Rename</Button>
               </div>
@@ -249,7 +269,7 @@ function FileTreeNode({
           <Button
             variant="ghost"
             size="icon"
-            className="h-5 w-5 opacity-60 group-hover:opacity-100 ml-1"
+            className="h-5 w-5 opacity-0 group-hover:opacity-100 ml-1 shrink-0 transition-opacity"
             aria-label={`Delete ${node.name}`}
             title={`Delete ${node.name}`}
             onClick={(e) => {
@@ -263,17 +283,17 @@ function FileTreeNode({
       </div>
       {isOpen &&
         hasChildren &&
-        node.children?.map(child => (
+        node.children?.map((child) => (
           <FileTreeNode
-            key={child.name}
+            key={child.path || child.name}
             node={child}
             onSelectFile={onSelectFile}
             onDeleteFile={onDeleteFile}
             onRenameFile={onRenameFile}
             level={level + 1}
-            path={newPath}
+            parentPath={fullPath}
           />
         ))}
     </div>
   )
-}
+})
