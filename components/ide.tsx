@@ -28,7 +28,9 @@ export function IDE({
   githubWorkspaceConnected = false,
   onSaveBlocked,
 }: IDEProps = {}) {
-  const { session, loading } = useAuth(() => {}, () => {})
+  const noOpDialog = useCallback(() => {}, [])
+  const noOpView = useCallback(() => {}, [])
+  const { session, loading } = useAuth(noOpDialog, noOpView)
   const [files, setFiles] = useState<FileSystemNode[]>([])
   const [selectedFile, setSelectedFile] = useState<{
     path: string
@@ -50,6 +52,14 @@ export function IDE({
   const fileContentCacheRef = useRef<Map<string, string>>(new Map())
   const fetchInFlightRef = useRef(false)
   const isOpeningRef = useRef(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   const blockGitHubSave = useCallback(() => {
     onSaveBlocked?.()
