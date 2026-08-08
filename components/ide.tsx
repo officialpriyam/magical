@@ -305,13 +305,13 @@ export function IDE({
     setIsOpeningFile(true)
     setOpeningPath(path)
     try {
-      if (isSandboxMode && sandboxId) {
+      if (isSandboxMode && projectId) {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 8000)
 
         try {
           const response = await fetch(
-            `/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`,
+            `/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(path)}`,
             { signal: controller.signal },
           )
 
@@ -324,17 +324,17 @@ export function IDE({
             const errorData = await response.json().catch(() => null)
             setLoadError(
               errorData?.error ||
-                `"${path}" could not be loaded from the sandbox.`,
+                `"${path}" could not be loaded from sandbox storage.`,
             )
           }
         } catch (error: any) {
           if (error?.name === 'AbortError') {
             setLoadError(
-              `Loading "${path}" timed out. The sandbox may be unreachable.`,
+              `Loading "${path}" timed out. Sandbox storage may be unreachable.`,
             )
           } else {
             setLoadError(
-              `Could not reach the sandbox to load "${path}". Check the sandbox connection.`,
+              `Could not reach sandbox storage to load "${path}". Check the storage connection.`,
             )
           }
         } finally {
@@ -372,7 +372,7 @@ export function IDE({
       setIsOpeningFile(false)
       setOpeningPath(null)
     }
-  }, [isSandboxMode, sandboxId, session, flushPendingSave])
+  }, [isSandboxMode, projectId, session, flushPendingSave])
 
   useEffect(() => {
     return () => {
