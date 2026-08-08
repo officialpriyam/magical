@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/auth-utils'
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { createServerClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
 
     const gitlabUser = await gitlabUserResponse.json()
 
-    const supabase = createSupabaseBrowserClient()
+    const supabase = await createServerClient()
     if (!supabase) {
       const response = redirectToSettings('storage_failed')
       response.cookies.delete('gitlab_oauth_state')
@@ -113,19 +113,19 @@ export async function GET(request: NextRequest) {
           connected_at: new Date().toISOString(),
           gitlab_host: gitlabHost,
         },
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id,service_name' },
     )
 
     if (upsertError) {
-      console.error('GitLab token storage failed:', upsertError)
+      console.error('GitLab token storage failed:', JSON.stringify(upsertError))
       const response = redirectToSettings('storage_failed')
       response.cookies.delete('gitlab_oauth_state')
       return response
     }
 
+    console.log('GitLab connected successfully for user:', user.id)
     const response = redirectToSettings('connected')
     response.cookies.delete('gitlab_oauth_state')
     return response

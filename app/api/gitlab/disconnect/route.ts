@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/auth-utils'
-import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { createServerClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +12,7 @@ export async function POST() {
   }
 
   try {
-    const supabase = createSupabaseBrowserClient()
+    const supabase = await createServerClient()
     if (!supabase) {
       return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
     }
