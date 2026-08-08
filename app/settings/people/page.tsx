@@ -26,7 +26,7 @@ const defaultMembers: Member[] = [
 ]
 
 const roleColors: Record<string, string> = {
-  Owner: 'bg-[#1EAEDB]/15 text-[#1EAEDB]',
+  Owner: 'bg-[#f97316]/15 text-[#f97316]',
   Admin: 'bg-emerald-400/15 text-emerald-400',
   Member: 'bg-white/10 text-white/60',
   Guest: 'bg-amber-400/15 text-amber-400',
@@ -59,7 +59,7 @@ export default function PeoplePage() {
         <button
           type="button"
           onClick={() => setShowInvite(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#1EAEDB] px-4 py-2 text-sm font-medium text-black transition hover:bg-[#1EAEDB]/90"
+          className="inline-flex items-center gap-2 rounded-lg bg-[#f97316] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#ea580c]"
         >
           <UserPlus className="h-4 w-4" />
           Add member
@@ -184,7 +184,7 @@ export default function PeoplePage() {
                     setInviteEmail('')
                   }
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#1EAEDB] px-4 py-2 text-sm font-medium text-black transition hover:bg-[#1EAEDB]/90"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#f97316] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#ea580c]"
               >
                 <Mail className="h-4 w-4" />
                 Send invite

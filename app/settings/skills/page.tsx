@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Code, Globe, Database, Shield, Puzzle } from 'lucide-react'
+import { Plus, Code, Globe, Database, Shield, Puzzle, Sparkles, Cpu, FileCode, Layers } from 'lucide-react'
 
 interface Skill {
   id: string
@@ -9,15 +9,18 @@ interface Skill {
   description: string
   enabled: boolean
   icon: React.ElementType
-  category: string
 }
 
 const defaultSkills: Skill[] = [
-  { id: 'code-gen', name: 'Code Generation', description: 'Generate code from natural language', enabled: true, icon: Code, category: 'Core' },
-  { id: 'web-search', name: 'Web Search', description: 'Search the web for information', enabled: true, icon: Globe, category: 'Core' },
-  { id: 'db-query', name: 'Database Queries', description: 'Generate and optimize SQL queries', enabled: true, icon: Database, category: 'Core' },
-  { id: 'security-audit', name: 'Security Audit', description: 'Scan code for security vulnerabilities', enabled: false, icon: Shield, category: 'Advanced' },
-  { id: 'api-design', name: 'API Design', description: 'Design RESTful and GraphQL APIs', enabled: true, icon: Puzzle, category: 'Advanced' },
+  { id: 'code-gen', name: 'Code Generation', description: 'Generate production-ready code from natural language prompts', enabled: true, icon: Code },
+  { id: 'web-search', name: 'Web Search', description: 'Search the web for up-to-date information and documentation', enabled: true, icon: Globe },
+  { id: 'db-query', name: 'Database Queries', description: 'Generate, optimize, and debug SQL and NoSQL queries', enabled: true, icon: Database },
+  { id: 'api-design', name: 'API Design', description: 'Design RESTful and GraphQL APIs with best practices', enabled: true, icon: Puzzle },
+  { id: 'security-audit', name: 'Security Audit', description: 'Scan code for vulnerabilities and suggest fixes', enabled: true, icon: Shield },
+  { id: 'ai-assist', name: 'AI Assistant', description: 'General-purpose AI assistant for questions and explanations', enabled: true, icon: Sparkles },
+  { id: 'infra-gen', name: 'Infrastructure', description: 'Generate Docker, CI/CD, and cloud deployment configs', enabled: true, icon: Cpu },
+  { id: 'doc-gen', name: 'Documentation', description: 'Auto-generate README, API docs, and code comments', enabled: true, icon: FileCode },
+  { id: 'ui-gen', name: 'UI Generation', description: 'Create responsive UI components from descriptions or images', enabled: true, icon: Layers },
 ]
 
 export default function SkillsPage() {
@@ -35,7 +38,7 @@ export default function SkillsPage() {
         <h1 className="text-2xl font-semibold text-white">Skills</h1>
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-lg bg-[#1EAEDB] px-4 py-2 text-sm font-medium text-black transition hover:bg-[#1EAEDB]/90"
+          className="inline-flex items-center gap-2 rounded-lg bg-[#f97316] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#ea580c]"
         >
           <Plus className="h-4 w-4" />
           Add skill
@@ -55,24 +58,21 @@ export default function SkillsPage() {
               <skill.icon className="h-5 w-5 text-white/60" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-white">{skill.name}</span>
-                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/40">
-                  {skill.category}
-                </span>
-              </div>
+              <span className="text-sm font-medium text-white">{skill.name}</span>
               <p className="text-xs text-white/40">{skill.description}</p>
             </div>
             <button
               type="button"
+              role="switch"
+              aria-checked={skill.enabled}
               onClick={() => toggleSkill(skill.id)}
-              className={`relative h-5 w-9 rounded-full transition ${
-                skill.enabled ? 'bg-[#1EAEDB]' : 'bg-white/20'
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#f97316] focus:ring-offset-2 focus:ring-offset-[#0b0d0b] ${
+                skill.enabled ? 'bg-[#f97316]' : 'bg-white/20'
               }`}
             >
               <span
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                  skill.enabled ? 'translate-x-4' : 'translate-x-0.5'
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  skill.enabled ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>

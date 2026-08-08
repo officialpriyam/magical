@@ -28,8 +28,9 @@ import { useAuth } from '@/lib/auth'
 
 interface NavItem {
   name: string
-  href: string
+  href?: string
   icon: React.ElementType
+  badge?: string
 }
 
 const settingsNavigation: { section: string; items: NavItem[] }[] = [
@@ -62,16 +63,16 @@ const settingsNavigation: { section: string; items: NavItem[] }[] = [
     section: 'Build & deploy',
     items: [
       { name: 'Git', href: '/settings/git', icon: GitBranch },
-      { name: 'MCP server', href: '/settings/mcp', icon: Server },
-      { name: 'Workspace domains', href: '/settings/domains', icon: Globe },
+      { name: 'MCP server', icon: Server, badge: 'Upcoming' },
+      { name: 'Workspace domains', icon: Globe, badge: 'Upcoming' },
     ],
   },
   {
     section: 'Security',
     items: [
       { name: 'Privacy & security', href: '/settings/privacy', icon: Lock },
-      { name: 'Security center', href: '/settings/security', icon: ShieldCheck },
-      { name: 'Audit logs', href: '/settings/audit', icon: ScrollText },
+      { name: 'Security center', icon: ShieldCheck, badge: 'Upcoming' },
+      { name: 'Audit logs', icon: ScrollText, badge: 'Upcoming' },
     ],
   },
 ]
@@ -138,11 +139,29 @@ export default function SettingsLayout({
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const isActive = item.href && pathname === item.href
+                  const isUpcoming = !item.href
+
+                  if (isUpcoming) {
+                    return (
+                      <div
+                        key={item.name}
+                        className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-white/30"
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span className="flex-1">{item.name}</span>
+                        {item.badge && (
+                          <span className="rounded bg-[#f97316]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#f97316]">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  }
 
                   return (
                     <Link
                       key={item.name}
-                      href={item.href}
+                      href={item.href!}
                       className={cn(
                         'flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors',
                         isActive
