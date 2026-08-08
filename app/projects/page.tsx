@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Search, FolderOpen, Clock3, GitBranch, Grid3X3, List, LayoutGrid, ChevronDown, ArrowLeft, Trash2, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -49,8 +49,10 @@ function getProjectGitHubWorkspace(project: Project | null): GitHubWorkspace | n
 
 type ProjectShelfView = 'all' | 'recent' | 'github'
 
+const noop = () => {}
+
 export default function ProjectsPage() {
-  const { session } = useAuth(() => {}, () => {})
+  const { session } = useAuth(noop, noop)
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
 
   const [projects, setProjects] = useState<Project[]>([])
@@ -83,7 +85,7 @@ export default function ProjectsPage() {
     loadProjects()
   }, [session?.user?.id, supabase])
 
-  async function handleDeleteAllProjects() {
+  const handleDeleteAllProjects = useCallback(async () => {
     if (deleteAllInput !== 'DELETE ALL' || isDeletingAll) return
     setIsDeletingAll(true)
     try {
@@ -98,7 +100,7 @@ export default function ProjectsPage() {
     } finally {
       setIsDeletingAll(false)
     }
-  }
+  }, [deleteAllInput, isDeletingAll, projects, supabase])
 
   const filteredProjects = useMemo(() => {
     let filtered = [...projects]
