@@ -1875,7 +1875,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           isDashboardMode
             ? "w-full md:grid-cols-2"
             : shouldShowPreviewPanel
-              ? "w-full grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+              ? "w-full grid-cols-1 md:grid-cols-[2fr_3fr]"
               : "w-full grid-cols-1",
         )}
       >
@@ -2173,7 +2173,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             </div>
           ) : (
             <>
-              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 sm:px-3 sm:py-3 md:px-3 md:py-4">
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1 sm:px-3 sm:py-2 md:px-3 md:py-2">
                 {isLoadingProject ? (
                   <div className="flex h-full items-center justify-center">
                     <div className="text-sm text-white/55">Loading project...</div>
@@ -2192,11 +2192,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 )}
               </div>
 
-              <div className="shrink-0 p-2 pb-3 sm:p-3 sm:pb-4 md:p-4">
-                <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-[#111211]/90 p-3 shadow-lg backdrop-blur-md sm:p-4">
-                  {statusNotices}
-                  {promptInput}
-                </div>
+              <div className="shrink-0 border-t border-white/10 px-2 py-2 sm:px-3 sm:py-3 md:px-4">
+                {statusNotices}
+                {promptInput}
               </div>
             </>
             )}
