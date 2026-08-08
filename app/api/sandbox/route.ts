@@ -72,7 +72,7 @@ function convertE2BFilesToTree(e2bFiles: any[]): FileSystemNode[] {
     })
 }
 
-export const maxDuration = 60
+export const maxDuration = 120
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -288,7 +288,7 @@ export async function POST(req: Request) {
         })
 
         // Wait for server to start before getting tunnel URL
-        await new Promise(resolve => setTimeout(resolve, 5000))
+        await new Promise(resolve => setTimeout(resolve, 3000))
 
         const files = await listModalSandboxFiles(modalSandbox)
         const url = await getModalSandboxUrl(modalSandbox, fragment.port || 3000)

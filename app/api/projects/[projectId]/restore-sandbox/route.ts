@@ -44,7 +44,7 @@ import { validateGitHubIdentifier } from '@/lib/security'
 import type { FileSystemNode } from '@/components/file-tree'
 import type { TemplateId } from '@/lib/templates'
 
-export const maxDuration = 30
+export const maxDuration = 60
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -328,7 +328,7 @@ export async function POST(
       })
 
       // Wait for server to start before getting tunnel URL
-      await new Promise(resolve => setTimeout(resolve, 5000))
+      await new Promise(resolve => setTimeout(resolve, 3000))
 
       const tree = await listModalSandboxFiles(modalSandbox)
       const url = await getModalSandboxUrl(modalSandbox, fragment.port || 3000)
