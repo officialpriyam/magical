@@ -32,8 +32,10 @@ const roleColors: Record<string, string> = {
   Guest: 'bg-amber-400/15 text-amber-400',
 }
 
+const noop = () => {}
+
 export default function PeoplePage() {
-  const { session } = useAuth(() => {}, () => {})
+  const { session } = useAuth(noop, noop)
   const [members] = useState<Member[]>(() => {
     const email = session?.user?.email || ''
     const name = email.split('@')[0] || 'User'

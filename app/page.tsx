@@ -152,7 +152,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   )
   const [useMorphApply, setUseMorphApply] = useLocalStorage(
     'useMorphApply',
-    process.env.NEXT_PUBLIC_USE_MORPH_APPLY === 'true',
+    true,
   )
   const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'build')
   const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')

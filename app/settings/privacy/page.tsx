@@ -34,8 +34,10 @@ interface PrivacySettings {
   personalization: boolean
 }
 
+const noop = () => {}
+
 export default function PrivacySettings() {
-  const { session } = useAuth(() => {}, () => {})
+  const { session } = useAuth(noop, noop)
   const { userTeam } = useUserTeam()
   const { toast } = useToast()
   

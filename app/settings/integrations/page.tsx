@@ -185,8 +185,10 @@ function upsertLoadedIntegration(
   integrations.push(integration)
 }
 
+const noop = () => {}
+
 export default function IntegrationsSettings() {
-  const { session } = useAuth(() => {}, () => {})
+  const { session } = useAuth(noop, noop)
   const { toast } = useToast()
   const handledGitHubStatusRef = useRef(false)
   const handledSupabaseStatusRef = useRef(false)

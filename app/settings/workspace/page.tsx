@@ -3,8 +3,10 @@
 import { useAuth } from '@/lib/auth'
 import { useState } from 'react'
 
+const noop = () => {}
+
 export default function WorkspaceSettingsPage() {
-  const { session } = useAuth(() => {}, () => {})
+  const { session } = useAuth(noop, noop)
   const [workspaceName, setWorkspaceName] = useState(
     session?.user?.email?.split('@')[0] + "'s Workspace" || 'My Workspace'
   )

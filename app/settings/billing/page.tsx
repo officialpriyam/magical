@@ -4,8 +4,10 @@ import { useAuth } from '@/lib/auth'
 import { useState } from 'react'
 import { Check } from 'lucide-react'
 
+const noop = () => {}
+
 export default function BillingPage() {
-  const { session } = useAuth(() => {}, () => {})
+  const { session } = useAuth(noop, noop)
   const [creditsUsed] = useState(47)
 
   const userName = session?.user?.email?.split('@')[0] || 'User'
