@@ -3,6 +3,12 @@ import 'server-only'
 import crypto from 'node:crypto'
 import { createServerClient } from '@/lib/supabase-server'
 import type { GeneratedFile } from '@/lib/fragment-files'
+import type { FileSystemNode } from '@/components/file-tree'
+import {
+  kvCacheGet,
+  kvCacheSet,
+  kvCacheDelete,
+} from '@/lib/kv-cache'
 
 export type SandboxStorageFile = {
   path: string
@@ -28,6 +34,9 @@ type SandboxStorageResult =
 
 const MAX_SANDBOX_STORAGE_FILES = 1000
 const MAX_SANDBOX_STORAGE_FILE_BYTES = 1024 * 1024
+const FILES_TTL_SECONDS = 30
+const MAX_CACHE_BYTES = 3 * 1024 * 1024
+const STORAGE_REQUEST_TIMEOUT_MS = 3000
 
 export function hasSandboxStorageConfig() {
   return Boolean(process.env.SANDBOX_STORAGE_URL?.trim())
@@ -123,6 +132,7 @@ export async function saveProjectFilesToSandboxStorage({
     body: { files: normalizedFiles },
   })
 
+  await invalidateFilesCache(userId, projectId)
   await touchProjectSandboxStorage(userId, projectId, storageId, response.fileCount || normalizedFiles.length)
 
   return {
@@ -163,6 +173,7 @@ export async function saveProjectFileToSandboxStorage({
     method: 'PUT',
     body: file,
   })
+  await invalidateFilesCache(userId, projectId)
   await touchProjectSandboxStorage(userId, projectId, storageId)
 
   return { saved: true, storageId, fileCount: 1 }
@@ -191,6 +202,7 @@ export async function deleteProjectFileFromSandboxStorage({
     method: 'DELETE',
     body: { path },
   })
+  await invalidateFilesCache(userId, projectId)
   await touchProjectSandboxStorage(userId, projectId, storageId)
 
   return { saved: true, storageId }
@@ -221,11 +233,17 @@ export async function renameProjectFileInSandboxStorage({
     method: 'PATCH',
     body: { oldPath, newPath },
   })
+  await invalidateFilesCache(userId, projectId)
   await touchProjectSandboxStorage(userId, projectId, storageId)
 
   return { saved: true, storageId }
 }
 
+/**
+ * Fetch the flat list of files (path + content) from sandbox-storage.
+ * Uses a short-lived KV cache to avoid hammering the storage server on
+ * every file-tree render.
+ */
 export async function getProjectFilesFromSandboxStorage({
   userId,
   projectId,
@@ -235,6 +253,13 @@ export async function getProjectFilesFromSandboxStorage({
 }) {
   if (!hasSandboxStorageConfig()) {
     return []
+  }
+
+  const cacheKey = filesCacheKey(userId, projectId)
+  const cached = await kvCacheGet<SandboxStorageFile[]>(cacheKey)
+
+  if (cached && Array.isArray(cached)) {
+    return cached
   }
 
   const project = await getOwnedProject(userId, projectId)
@@ -251,7 +276,67 @@ export async function getProjectFilesFromSandboxStorage({
   }
 
   const response = await sandboxStorageFetch(`/v1/workspaces/${encodeURIComponent(storageId)}/files`)
-  return normalizeSandboxStorageFiles(response.files || [])
+  const files = normalizeSandboxStorageFiles(response.files || [])
+
+  if (countBytes(files) <= MAX_CACHE_BYTES) {
+    await kvCacheSet(cacheKey, files, FILES_TTL_SECONDS)
+  }
+
+  return files
+}
+
+/**
+ * Fetch a single file's content from sandbox-storage without
+ * pulling the whole file tree.
+ */
+export async function getProjectFileFromSandboxStorage({
+  userId,
+  projectId,
+  path,
+}: {
+  userId: string
+  projectId: string
+  path: string
+}): Promise<SandboxStorageFile | null> {
+  const normalizedPath = normalizeSandboxStoragePath(path)
+
+  if (!normalizedPath) {
+    return null
+  }
+
+  const files = await getProjectFilesFromSandboxStorage({ userId, projectId })
+  return files.find((file) => file.path === normalizedPath) || null
+}
+
+/**
+ * Build a FileSystemNode tree (files only, no content) from sandbox-storage
+ * so the IDE file-tree renders instantly without loading file contents.
+ */
+export async function getProjectFileTreeFromSandboxStorage({
+  userId,
+  projectId,
+}: {
+  userId: string
+  projectId: string
+}) {
+  if (!hasSandboxStorageConfig()) {
+    return []
+  }
+
+  const cacheKey = treeCacheKey(userId, projectId)
+  const cached = await kvCacheGet<FileSystemNode[]>(cacheKey)
+
+  if (cached && Array.isArray(cached)) {
+    return cached
+  }
+
+  const files = await getProjectFilesFromSandboxStorage({ userId, projectId })
+
+  if (files.length > 0) {
+    await kvCacheSet(cacheKey, buildFileTree(files), FILES_TTL_SECONDS)
+  }
+
+  return buildFileTree(files)
 }
 
 async function getOwnedProject(userId: string, projectId: string) {
@@ -331,56 +416,112 @@ async function sandboxStorageFetch(
   } = {},
 ) {
   const baseUrl = getSandboxStorageBaseUrl()
+  const encodedBody = body === undefined ? '' : JSON.stringify(body)
+  const headers = buildStorageHeaders(method, pathname, encodedBody)
+  const attempts = 2
+
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), STORAGE_REQUEST_TIMEOUT_MS)
+
+    let response: Response
+    try {
+      response = await fetch(`${baseUrl}${pathname}`, {
+        method,
+        headers,
+        body: method === 'GET' ? undefined : encodedBody || undefined,
+        signal: controller.signal,
+      })
+    } catch (error: any) {
+      clearTimeout(timeout)
+
+      if (error?.name === 'AbortError') {
+        lastError = new Error('Sandbox storage request timed out')
+      } else {
+        lastError = error
+      }
+
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)))
+      }
+      continue
+    }
+
+    clearTimeout(timeout)
+
+    if (attempt === 0 && response.status >= 500 && attempt < attempts - 1) {
+      response.body?.cancel().catch(() => {})
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      continue
+    }
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(data?.error || `Sandbox storage request failed with status ${response.status}`)
+    }
+
+    return data
+  }
+
+  throw lastError || new Error('Sandbox storage request failed')
+}
+
+function buildStorageHeaders(method: string, pathname: string, encodedBody: string) {
   const headers: Record<string, string> = {
     Accept: 'application/json',
   }
+
   const token = process.env.SANDBOX_STORAGE_TOKEN?.trim()
 
   if (token) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  if (body !== undefined) {
+  const accessKey = process.env.SANDBOX_STORAGE_ACCESS_KEY?.trim()
+  const accessSalt = process.env.SANDBOX_STORAGE_ACCESS_SALT?.trim()
+
+  if (encodedBody) {
     headers['Content-Type'] = 'application/json'
   }
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 3000)
+  if (accessKey && accessSalt) {
+    const timestamp = String(Date.now())
+    const bodyHash = crypto.createHash('sha256').update(encodedBody || '').digest('hex')
+    const payload = `${timestamp}:${method}:${pathname}:${bodyHash}`
+    const signature = createStorageSignature(accessKey, accessSalt, payload)
 
-  let response: Response
-  try {
-    response = await fetch(`${baseUrl}${pathname}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: controller.signal,
-    })
-  } catch (error: any) {
-    if (error?.name === 'AbortError') {
-      throw new Error('Sandbox storage request timed out')
-    }
-    throw error
-  } finally {
-    clearTimeout(timeout)
+    headers['x-sandbox-storage-key'] = accessKey
+    headers['x-sandbox-storage-signature'] = signature
+    headers['x-sandbox-storage-timestamp'] = timestamp
+    headers['x-request-id'] = crypto.randomUUID()
   }
 
-  const data = await response.json().catch(() => ({}))
+  return headers
+}
 
-  if (!response.ok) {
-    throw new Error(data?.error || `Sandbox storage request failed with status ${response.status}`)
-  }
-
-  return data
+function createStorageSignature(accessKey: string, accessSalt: string, payload: string) {
+  return crypto.createHmac('sha256', `${accessKey}:${accessSalt}`).update(payload).digest('hex')
 }
 
 function getSandboxStorageBaseUrl() {
-  const url = process.env.SANDBOX_STORAGE_URL?.trim().replace(/\/+$/, '')
+  const rawUrl = process.env.SANDBOX_STORAGE_URL?.trim().replace(/\/+$/, '')
 
-  if (!url) {
+  if (!rawUrl) {
     throw new Error('SANDBOX_STORAGE_URL is not configured.')
   }
 
-  return url
+  return normalizeStorageUrl(rawUrl)
+}
+
+function normalizeStorageUrl(value: string) {
+  if (/^https?:\/\//i.test(value)) {
+    return value
+  }
+
+  return `http://${value}`
 }
 
 function normalizeSandboxStorageFiles(files: Array<GeneratedFile | SandboxStorageFile>) {
@@ -439,6 +580,94 @@ function normalizeSandboxStoragePath(value: unknown) {
   }
 
   return normalizedPath
+}
+
+/**
+ * Convert a flat array of files into a FileSystemNode tree sorted with
+ * directories first, matching the existing FileTree component contract.
+ */
+export function buildFileTree(files: SandboxStorageFile[]): FileSystemNode[] {
+  const tree: FileSystemNode[] = []
+  const nodeMap = new Map<string, FileSystemNode>()
+
+  const paths = Array.from(new Set(files.map((file) => file.path)))
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+
+  for (const fullPath of paths) {
+    const parts = fullPath.split('/').filter(Boolean)
+
+    if (parts.length === 0) continue
+
+    let currentPath = ''
+
+    for (let index = 0; index < parts.length; index++) {
+      const name = parts[index]
+      currentPath = currentPath ? `${currentPath}/${name}` : name
+
+      if (nodeMap.has(currentPath)) continue
+
+      const isDirectory = index < parts.length - 1
+      const node: FileSystemNode = {
+        name,
+        isDirectory,
+        path: `/${currentPath}`,
+        ...(isDirectory ? { children: [] } : {}),
+      }
+      nodeMap.set(currentPath, node)
+
+      const parentKey = index === 0 ? '' : currentPath.slice(0, currentPath.lastIndexOf('/'))
+      const parentChildren = parentKey ? nodeMap.get(parentKey)?.children : tree
+
+      if (parentChildren) {
+        parentChildren.push(node)
+      }
+    }
+  }
+
+  return sortFileTree(tree)
+}
+
+function sortFileTree(nodes: FileSystemNode[]): FileSystemNode[] {
+  return nodes
+    .sort((a, b) => {
+      if (a.isDirectory !== b.isDirectory) {
+        return a.isDirectory ? -1 : 1
+      }
+      return a.name.localeCompare(b.name)
+    })
+    .map((node) => ({
+      ...node,
+      children: node.children ? sortFileTree(node.children) : node.children,
+    }))
+}
+
+function filesCacheKey(userId: string, projectId: string) {
+  return `sandbox:storage:files:${userId.slice(0, 12)}:${projectId}`
+}
+
+function treeCacheKey(userId: string, projectId: string) {
+  return `sandbox:storage:tree:${userId.slice(0, 12)}:${projectId}`
+}
+
+async function invalidateFilesCache(userId: string, projectId: string) {
+  await Promise.all([
+    kvCacheDelete(filesCacheKey(userId, projectId)),
+    kvCacheDelete(treeCacheKey(userId, projectId)),
+  ])
+}
+
+function countBytes(files: SandboxStorageFile[]) {
+  let bytes = 0
+
+  for (const file of files) {
+    bytes += Buffer.byteLength(file.path, 'utf8') + Buffer.byteLength(file.content, 'utf8')
+
+    if (bytes > MAX_CACHE_BYTES) {
+      return bytes
+    }
+  }
+
+  return bytes
 }
 
 function createStorageId(userId: string, projectId: string) {
