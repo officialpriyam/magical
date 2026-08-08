@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Search, FolderOpen, Clock3, GitBranch, Grid3X3, List, LayoutGrid, ChevronDown, ArrowLeft } from 'lucide-react'
+import { Search, FolderOpen, Clock3, GitBranch, Grid3X3, List, LayoutGrid, ChevronDown, ArrowLeft, Trash2, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
-import { getProjects, Project } from '@/lib/database'
+import { getProjects, deleteProject, Project } from '@/lib/database'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
@@ -61,6 +61,9 @@ export default function ProjectsPage() {
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'private' | 'public'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [gridLayout, setGridLayout] = useState<'grid' | 'list'>('grid')
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false)
+  const [deleteAllInput, setDeleteAllInput] = useState('')
+  const [isDeletingAll, setIsDeletingAll] = useState(false)
 
   useEffect(() => {
     if (!session?.user?.id) return
@@ -68,7 +71,7 @@ export default function ProjectsPage() {
     async function loadProjects() {
       setIsLoading(true)
       try {
-        const allProjects = await getProjects(supabase, false, session!.user.id)
+        const allProjects = await getProjects(supabase, false)
         setProjects(allProjects || [])
       } catch (error) {
         console.error('Failed to load projects:', error)
@@ -79,6 +82,23 @@ export default function ProjectsPage() {
 
     loadProjects()
   }, [session?.user?.id, supabase])
+
+  async function handleDeleteAllProjects() {
+    if (deleteAllInput !== 'DELETE ALL' || isDeletingAll) return
+    setIsDeletingAll(true)
+    try {
+      for (const project of projects) {
+        await deleteProject(supabase, project.id, false)
+      }
+      setProjects([])
+      setShowDeleteAllConfirm(false)
+      setDeleteAllInput('')
+    } catch (error) {
+      console.error('Failed to delete projects:', error)
+    } finally {
+      setIsDeletingAll(false)
+    }
+  }
 
   const filteredProjects = useMemo(() => {
     let filtered = [...projects]
@@ -142,7 +162,7 @@ export default function ProjectsPage() {
     <div className="min-h-screen bg-[#0a0a0a]">
       {/* Top nav */}
       <div className="sticky top-0 z-30 border-b border-white/10 bg-[#0a0a0a]/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 md:flex-nowrap">
           <div className="flex items-center gap-4">
             <Link
               href="/"
@@ -151,23 +171,23 @@ export default function ProjectsPage() {
               <ArrowLeft className="h-4 w-4" />
               Back
             </Link>
-            <div className="h-4 w-px bg-white/10" />
-            <div className="flex items-center gap-2">
+            <div className="hidden h-4 w-px bg-white/10 sm:block" />
+            <div className="hidden items-center gap-2 sm:flex">
               <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-[10px] font-bold text-black">
                 M
               </div>
               <span className="text-sm font-medium text-white">All Projects</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex w-full items-center gap-3 sm:w-auto">
+            <div className="relative flex-1 sm:flex-initial">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
               <input
                 type="text"
                 placeholder="Search your projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-72 rounded-lg border border-white/10 bg-white/[0.04] py-2 pl-9 pr-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-primary/50"
+                className="w-full rounded-lg border border-white/10 bg-white/[0.04] py-2 pl-9 pr-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-primary/50 sm:w-72"
               />
             </div>
             <select
@@ -218,14 +238,24 @@ export default function ProjectsPage() {
                 <Grid3X3 className="h-4 w-4" />
               </button>
             </div>
+            {projects.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllConfirm(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-500/20"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete all
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {/* View tabs */}
-        <div className="mb-6 flex items-center gap-1 text-xs text-white/60">
+        <div className="mb-6 flex flex-wrap items-center gap-1 text-xs text-white/60">
           <button
             type="button"
             onClick={() => setView('all')}
@@ -286,7 +316,7 @@ export default function ProjectsPage() {
             {groupedProjects.active.length > 0 && (
               <section>
                 <h2 className="mb-4 text-sm font-medium text-white/70">Active in last 14 days</h2>
-                <div className={gridLayout === 'grid' ? 'grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4' : 'space-y-2'}>
+                <div className={gridLayout === 'grid' ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4' : 'space-y-2'}>
                   {groupedProjects.active.map((project) => (
                     <ProjectCard key={project.id} project={project} layout={gridLayout} />
                   ))}
@@ -297,7 +327,7 @@ export default function ProjectsPage() {
             {groupedProjects.recent.length > 0 && (
               <section>
                 <h2 className="mb-4 text-sm font-medium text-white/70">Active in last 60 days</h2>
-                <div className={gridLayout === 'grid' ? 'grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4' : 'space-y-2'}>
+                <div className={gridLayout === 'grid' ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4' : 'space-y-2'}>
                   {groupedProjects.recent.map((project) => (
                     <ProjectCard key={project.id} project={project} layout={gridLayout} />
                   ))}
@@ -308,7 +338,7 @@ export default function ProjectsPage() {
             {groupedProjects.inactive.length > 0 && (
               <section>
                 <h2 className="mb-4 text-sm font-medium text-white/70">Inactive 60+ days</h2>
-                <div className={gridLayout === 'grid' ? 'grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4' : 'space-y-2'}>
+                <div className={gridLayout === 'grid' ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 xl:grid-cols-4' : 'space-y-2'}>
                   {groupedProjects.inactive.map((project) => (
                     <ProjectCard key={project.id} project={project} layout={gridLayout} />
                   ))}
@@ -318,6 +348,58 @@ export default function ProjectsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete All Confirmation Dialog */}
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111211] p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white">Delete all projects?</h3>
+            <p className="mt-2 text-sm text-white/60">
+              This will soft-delete all {projects.length} projects in your workspace. They can be recovered by an admin.
+            </p>
+            <p className="mt-3 text-sm text-white/60">
+              Type <span className="font-mono font-medium text-red-400">DELETE ALL</span> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteAllInput}
+              onChange={(e) => setDeleteAllInput(e.target.value)}
+              placeholder="DELETE ALL"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-red-500/50"
+            />
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteAllConfirm(false)
+                  setDeleteAllInput('')
+                }}
+                className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/70 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAllProjects}
+                disabled={deleteAllInput !== 'DELETE ALL' || isDeletingAll}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDeletingAll ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Delete all projects
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

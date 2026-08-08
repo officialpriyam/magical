@@ -39,7 +39,7 @@ export function Chat({
   return (
     <div
       id="chat-container"
-      className="flex h-full max-h-full flex-col gap-5 overflow-y-auto px-1 pb-6 pt-2"
+      className="flex h-full max-h-full flex-col gap-3 overflow-y-auto px-0 pb-6 pt-2 sm:gap-5 sm:px-1 md:gap-5 md:px-1"
     >
       {messages.length === 0 && !isLoading && !isPreviewLoading && (
         <div className="flex h-full items-center justify-center text-sm text-white/45">
@@ -51,7 +51,7 @@ export function Chat({
         <div
           className={`flex flex-col whitespace-pre-wrap text-sm leading-6 ${
             message.role === 'user'
-              ? 'self-end rounded-2xl bg-white/[0.07] px-4 py-2 text-white shadow-sm'
+              ? 'self-end max-w-[85%] rounded-2xl bg-white/[0.07] px-3 py-2 text-white shadow-sm sm:px-4 md:px-4'
               : 'w-full gap-3 text-white/90'
           }`}
           key={index}

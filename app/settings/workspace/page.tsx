@@ -16,7 +16,7 @@ export default function WorkspaceSettingsPage() {
   const workspaceId = session?.user?.id?.slice(0, 20) || 'workspace-id'
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10 md:px-8">
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-white">Workspace settings</h1>
         <p className="mt-1 text-sm text-white/50">

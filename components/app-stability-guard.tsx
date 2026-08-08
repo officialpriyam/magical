@@ -1,7 +1,7 @@
 'use client'
 
 import ErrorBoundary, { getErrorLog } from '@/components/error-boundary'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
 const PERFORMANCE_MODE_KEY = 'magical-performance-mode'
 const STALL_INTERVAL_MS = 1000
@@ -13,6 +13,29 @@ export function AppStabilityGuard({ children }: { children: React.ReactNode }) {
   const [showRecoveryNotice, setShowRecoveryNotice] = useState(false)
   const stallTimesRef = useRef<number[]>([])
   const recoveryEnabledRef = useRef(false)
+  const dismissTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const dismissNotice = useCallback(() => {
+    setShowRecoveryNotice(false)
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (showRecoveryNotice) {
+      dismissTimerRef.current = setTimeout(() => {
+        setShowRecoveryNotice(false)
+        dismissTimerRef.current = null
+      }, 8000)
+    }
+    return () => {
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current)
+      }
+    }
+  }, [showRecoveryNotice])
 
   useEffect(() => {
     const savedPerformanceMode = sessionStorage.getItem(PERFORMANCE_MODE_KEY) === '1'
@@ -131,7 +154,17 @@ export function AppStabilityGuard({ children }: { children: React.ReactNode }) {
       {children}
       {showRecoveryNotice && (
         <div className="fixed bottom-4 right-4 z-[100] w-[min(calc(100vw-2rem),22rem)] rounded-xl border border-amber-400/20 bg-[#111211]/95 p-4 text-sm text-white shadow-2xl backdrop-blur">
-          <div className="font-medium">Performance mode enabled</div>
+          <div className="flex items-start justify-between">
+            <div className="font-medium">Performance mode enabled</div>
+            <button
+              type="button"
+              onClick={dismissNotice}
+              className="ml-2 shrink-0 rounded-md p-0.5 text-white/40 hover:text-white"
+              aria-label="Dismiss"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
           <p className="mt-1 text-xs leading-5 text-white/60">
             Magical detected repeated browser stalls and reduced animations to keep the app responsive.
           </p>

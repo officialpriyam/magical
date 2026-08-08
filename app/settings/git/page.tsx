@@ -132,7 +132,7 @@ function GitPageContent() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10 md:px-8">
       {toast && (
         <div className={`mb-6 flex items-center gap-3 rounded-xl border p-4 text-sm ${
           toast.type === 'success'
@@ -147,7 +147,7 @@ function GitPageContent() {
         </div>
       )}
 
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">Git</h1>
           <p className="mt-1 text-sm text-white/50">
@@ -157,7 +157,7 @@ function GitPageContent() {
         <button
           type="button"
           onClick={fetchStatus}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/60 transition hover:bg-white/[0.08] hover:text-white"
+          className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/60 transition hover:bg-white/[0.08] hover:text-white"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Refresh
@@ -172,11 +172,11 @@ function GitPageContent() {
         {providers.map((provider) => (
           <div
             key={provider.id}
-            className="rounded-xl border border-white/10 bg-white/[0.03] p-5 transition hover:bg-white/[0.05]"
+            className="rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:bg-white/[0.05] sm:p-5"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/[0.08]">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/[0.08]">
                   {provider.icon}
                 </div>
                 <div>

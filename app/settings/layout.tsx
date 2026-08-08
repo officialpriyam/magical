@@ -20,10 +20,12 @@ import {
   ShieldCheck,
   ScrollText,
   ChevronDown,
+  Menu,
+  X,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 
 interface NavItem {
@@ -87,16 +89,45 @@ export default function SettingsLayout({
   const pathname = usePathname()
   const { session } = useAuth(noop, noop)
   const [searchQuery, setSearchQuery] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const userInitial = session?.user?.email?.[0]?.toUpperCase() || 'U'
   const userName = session?.user?.email?.split('@')[0] || 'User'
 
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [pathname])
+
   return (
     <div className="flex h-dvh min-h-dvh overflow-hidden bg-[#080809]">
+      {/* Mobile header */}
+      <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-white/10 bg-[#0b0d0b] px-4 md:hidden">
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
+        >
+          {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+        <Link href="/" className="text-sm text-white/60 hover:text-white">Go back</Link>
+      </div>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/60 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="flex w-64 flex-col border-r border-white/10 bg-[#0b0d0b]">
+      <div className={cn(
+        "flex w-64 flex-col border-r border-white/10 bg-[#0b0d0b] transition-all duration-300",
+        "fixed inset-y-0 left-0 z-40 md:relative md:z-auto",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      )}>
         {/* Back button */}
-        <div className="flex items-center gap-2 px-4 py-3">
+        <div className="hidden items-center gap-2 px-4 py-3 md:flex">
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-sm text-white/60 transition hover:text-white"
@@ -107,7 +138,7 @@ export default function SettingsLayout({
         </div>
 
         {/* Search */}
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3 pt-14 md:pt-3">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
             <input
@@ -181,7 +212,7 @@ export default function SettingsLayout({
       </div>
 
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pt-14 md:pt-0">
         {children}
       </div>
     </div>

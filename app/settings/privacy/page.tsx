@@ -137,7 +137,7 @@ export default function PrivacySettings() {
   )
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10 md:px-8">
       <div className="mb-2">
         <h1 className="text-2xl font-semibold text-white">Privacy & security</h1>
       </div>

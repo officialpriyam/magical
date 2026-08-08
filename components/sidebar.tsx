@@ -264,10 +264,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div 
         className={`bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col items-center py-4 transition-all duration-300 ease-in-out ${
           isOpen ? 'w-0 opacity-0 overflow-hidden' : 'w-16 opacity-100'
-        }`}
+        } ${isMobile ? 'fixed top-0 left-0 z-50 h-[100dvh] rounded-r-2xl shadow-2xl' : ''}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={{ borderRadius: '0 16px 16px 0' }}
+        style={isMobile ? { borderRadius: '0 16px 16px 0' } : { borderRadius: '0 16px 16px 0' }}
       >
         {/* Top section with menu and new icons */}
         <div className="flex flex-col items-center space-y-2">
@@ -343,7 +343,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isMobile && isOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/55 md:hidden"
+          className="fixed inset-0 z-40 bg-black/55"
           aria-label="Close sidebar"
           onClick={handleCloseSidebar}
         />

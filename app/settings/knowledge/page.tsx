@@ -19,7 +19,7 @@ export default function KnowledgePage() {
   const [showUpload, setShowUpload] = useState(false)
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10 md:px-8">
       <div className="mb-2 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-white">Knowledge</h1>
         <button

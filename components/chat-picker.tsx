@@ -12,7 +12,7 @@ import type { TemplateId, Templates } from '@/lib/templates'
 import 'core-js/actual/object/group-by'
 import { Sparkles, Zap, Wand2 } from 'lucide-react'
 import Image from 'next/image'
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 
 export const MAGIC_FREE_MODELS: LLMModel[] = [
   { id: 'openai/gpt-oss-20b:free', name: 'GPT-OSS 20B', provider: 'OpenAI', providerId: 'openrouter' },
@@ -59,10 +59,25 @@ export function ChatPicker({
   languageModel: LLMModelConfig
   onLanguageModelChange: (config: LLMModelConfig) => void
 }) {
+  const magicModelRef = useRef<LLMModel | null>(null)
+  const magicPlusModelRef = useRef<LLMModel | null>(null)
+
   const resolvedModel = useMemo(() => {
     const modelId = languageModel.model
-    if (modelId === 'magic') return getRandomModel(MAGIC_FREE_MODELS)
-    if (modelId === 'magic+') return getRandomModel(MAGIC_PLUS_MODELS)
+    if (modelId === 'magic') {
+      if (!magicModelRef.current) {
+        magicModelRef.current = getRandomModel(MAGIC_FREE_MODELS)
+      }
+      return magicModelRef.current
+    }
+    if (modelId === 'magic+') {
+      if (!magicPlusModelRef.current) {
+        magicPlusModelRef.current = getRandomModel(MAGIC_PLUS_MODELS)
+      }
+      return magicPlusModelRef.current
+    }
+    magicModelRef.current = null
+    magicPlusModelRef.current = null
     return models.find((m) => m.id === modelId)
   }, [languageModel.model, models])
 

@@ -367,13 +367,24 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return true
   }), [availableModels])
 
+  const magicModelRef = useRef<any>(null)
+  const magicPlusModelRef = useRef<any>(null)
+
   const currentModel = useMemo(() => {
     if (languageModel.model === 'magic') {
-      return MAGIC_FREE_MODELS[Math.floor(Math.random() * MAGIC_FREE_MODELS.length)]
+      if (!magicModelRef.current) {
+        magicModelRef.current = MAGIC_FREE_MODELS[Math.floor(Math.random() * MAGIC_FREE_MODELS.length)]
+      }
+      return magicModelRef.current
     }
     if (languageModel.model === 'magic+') {
-      return MAGIC_PLUS_MODELS[Math.floor(Math.random() * MAGIC_PLUS_MODELS.length)]
+      if (!magicPlusModelRef.current) {
+        magicPlusModelRef.current = MAGIC_PLUS_MODELS[Math.floor(Math.random() * MAGIC_PLUS_MODELS.length)]
+      }
+      return magicPlusModelRef.current
     }
+    magicModelRef.current = null
+    magicPlusModelRef.current = null
     return (
       filteredModels.find((model: any) => model.id === languageModel.model) ||
       filteredModels.find((model: any) => model.id === DEFAULT_MODEL_ID) ||
@@ -859,8 +870,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        const details = data.details ? `: ${data.details}` : ''
-        throw new Error(data.error || 'Failed to restore saved workspace.' + details)
+        console.warn('Workspace restore skipped:', data.error)
+        setAutoFixMessage('')
+        setIsPreviewLoading(false)
+        return
       }
 
       const restoredResult = data as ExecutionResult
@@ -873,10 +886,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setCurrentTab('ide')
       setAutoFixMessage('')
     } catch (error) {
-      console.error('Workspace restore failed:', error)
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to restore saved workspace.')
+      console.warn('Workspace restore skipped:', error)
       setAutoFixMessage('')
     } finally {
+      restoringProjectRef.current = ''
       setIsPreviewLoading(false)
     }
   }, [sandboxProvider, session?.access_token, userTeam?.id])
@@ -1868,7 +1881,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       >
         <div
           className={cn(
-            "relative flex h-screen w-full flex-col",
+            "relative flex h-[100dvh] w-full flex-col",
             isDashboardMode
               ? "col-span-2 mx-auto max-w-none p-2 md:p-4"
               : "min-w-0 bg-[#111211]",
@@ -1876,8 +1889,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           )}
         >
           {!isDashboardMode && (
-            <div className="flex h-[64px] md:h-[76px] shrink-0 items-center justify-between gap-2 md:gap-3 border-b border-white/10 px-3 md:px-4 py-2 md:py-3">
-              <div className="min-w-0">
+            <div className="flex h-[64px] md:h-[76px] shrink-0 items-center justify-between gap-2 border-b border-white/10 px-2 py-2 md:gap-3 md:px-4 md:py-3">
+              <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-white">
                   {projectHeaderTitle}
                 </div>
@@ -1891,7 +1904,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   <button
                     type="button"
                     onClick={handleToggleProjectVisibility}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 text-xs text-white/70 transition hover:bg-white/[0.08] hover:text-white"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 text-xs text-white/70 transition hover:bg-white/[0.08] hover:text-white md:px-2.5"
                     title={currentProject.is_public ? 'Public project' : 'Private project'}
                   >
                     {currentProject.is_public ? (
@@ -1951,11 +1964,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               className="relative flex min-h-0 flex-1 overflow-hidden text-white"
             >
               <div className="relative z-10 flex w-full flex-col">
-                <div className="flex flex-1 flex-col items-center justify-center px-4 pt-16 text-center">
-                  <div className="mb-6">
+                <div className="flex flex-1 flex-col items-center justify-center px-3 pt-12 text-center sm:px-4 sm:pt-16">
+                  <div className="mb-4 sm:mb-6">
                     <HeroPillSecond />
                   </div>
-                  <h1 className="mb-7 max-w-3xl text-3xl font-semibold tracking-normal text-white md:text-4xl">
+                  <h1 className="mb-5 max-w-3xl text-2xl font-semibold tracking-normal text-white sm:mb-7 sm:text-3xl md:text-4xl">
                     Let&apos;s build something, {displayName}
                   </h1>
                   {!session && (
@@ -1973,8 +1986,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   </div>
                 </div>
 
-                <div className="mx-auto mt-6 md:mt-8 w-[calc(100%-1rem)] max-w-7xl border-t border-white/10 bg-[#111315]/80 p-3 backdrop-blur-md sm:w-[calc(100%-2rem)] md:p-4 lg:p-5">
-                  <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="mx-auto mt-4 w-[calc(100%-1rem)] max-w-7xl border-t border-white/10 bg-[#111315]/80 p-2 backdrop-blur-md sm:mt-6 sm:w-[calc(100%-2rem)] sm:p-3 md:mt-8 md:p-4 lg:p-5">
+                  <div className="mb-4 flex flex-col gap-3 sm:mb-5 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex flex-wrap gap-1 text-xs text-white/60">
                       <button
                         type="button"
@@ -2160,7 +2173,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             </div>
           ) : (
             <>
-              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 md:px-3 md:py-4">
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 sm:px-3 sm:py-3 md:px-3 md:py-4">
                 {isLoadingProject ? (
                   <div className="flex h-full items-center justify-center">
                     <div className="text-sm text-white/55">Loading project...</div>
@@ -2179,8 +2192,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 )}
               </div>
 
-              <div className="shrink-0 p-3 pb-4 md:p-4">
-                <div className="rounded-2xl border border-white/10 bg-[#111211]/80 p-3 backdrop-blur-md md:p-4">
+              <div className="shrink-0 p-2 pb-3 sm:p-3 sm:pb-4 md:p-4">
+                <div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-[#111211]/90 p-3 shadow-lg backdrop-blur-md sm:p-4">
                   {statusNotices}
                   {promptInput}
                 </div>
@@ -2189,33 +2202,38 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             )}
         </div>
           {shouldShowPreviewPanel && (
-            <Preview
-              teamID={userTeam?.id}
-              accessToken={session?.access_token}
-              selectedTab={currentTab}
-              onSelectedTabChange={setCurrentTab}
-              isChatLoading={isPromptLoading}
-              isPreviewLoading={isPreviewLoading}
-              fragment={fragment}
-              projectId={currentProject?.id}
-              projectTitle={currentProject?.title}
-              onGitHubWorkspaceSaved={handleGitHubWorkspaceSaved}
-              githubSaveRequired={false}
-              isGitHubWorkspaceConnected={isGitHubWorkspaceConnected}
-              onSaveBlocked={() => {
-                setErrorMessage('Save this project to GitHub before editing files. Use Save to GitHub in the preview panel.')
-                setIsPreviewPanelOpen(true)
-              }}
-              result={previewExecutionResult}
-              onClose={() => {
-                setCurrentPreview({ fragment: undefined, result: undefined })
-                setIsPreviewPanelOpen(false)
-              }}
-              code={fragment?.code || ''}
-              onSave={handleSaveFile}
-              onRedeploy={handleRedeploy}
-              executeCode={handleExecuteCode}
-            />
+            <div className={cn(
+              "flex-1 overflow-hidden",
+              "fixed inset-0 z-40 bg-[#111211] md:relative md:z-auto"
+            )}>
+              <Preview
+                teamID={userTeam?.id}
+                accessToken={session?.access_token}
+                selectedTab={currentTab}
+                onSelectedTabChange={setCurrentTab}
+                isChatLoading={isPromptLoading}
+                isPreviewLoading={isPreviewLoading}
+                fragment={fragment}
+                projectId={currentProject?.id}
+                projectTitle={currentProject?.title}
+                onGitHubWorkspaceSaved={handleGitHubWorkspaceSaved}
+                githubSaveRequired={false}
+                isGitHubWorkspaceConnected={isGitHubWorkspaceConnected}
+                onSaveBlocked={() => {
+                  setErrorMessage('Save this project to GitHub before editing files. Use Save to GitHub in the preview panel.')
+                  setIsPreviewPanelOpen(true)
+                }}
+                result={previewExecutionResult}
+                onClose={() => {
+                  setCurrentPreview({ fragment: undefined, result: undefined })
+                  setIsPreviewPanelOpen(false)
+                }}
+                code={fragment?.code || ''}
+                onSave={handleSaveFile}
+                onRedeploy={handleRedeploy}
+                executeCode={handleExecuteCode}
+              />
+            </div>
           )}
       </div>
     </main>
