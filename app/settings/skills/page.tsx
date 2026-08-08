@@ -38,7 +38,7 @@ export default function SkillsPage() {
         <h1 className="text-2xl font-semibold text-white">Skills</h1>
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-lg bg-[#f97316] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#ea580c]"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/80"
         >
           <Plus className="h-4 w-4" />
           Add skill
@@ -66,8 +66,8 @@ export default function SkillsPage() {
               role="switch"
               aria-checked={skill.enabled}
               onClick={() => toggleSkill(skill.id)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#f97316] focus:ring-offset-2 focus:ring-offset-[#0b0d0b] ${
-                skill.enabled ? 'bg-[#f97316]' : 'bg-white/20'
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#0b0d0b] ${
+                skill.enabled ? 'bg-primary' : 'bg-white/20'
               }`}
             >
               <span

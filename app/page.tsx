@@ -194,7 +194,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   const setProjectShelfViewAndReset = useCallback((view: ProjectShelfView) => {
     setProjectShelfView(view)
-    setShowAllProjects(false)
   }, [])
   const setAuthDialogCallback = useCallback((isOpen: boolean) => {
     setAuthDialog(isOpen)
@@ -211,8 +210,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [projectPreviews, setProjectPreviews] = useState<Record<string, ProjectPreviewCard>>({})
   const [activePreviewProjectId, setActivePreviewProjectId] = useState('')
   const currentProjectRef = useRef<Project | null>(null)
-  const magicGlowRef = useRef<HTMLDivElement | null>(null)
-  const magicAnimationFrameRef = useRef<number | null>(null)
   const [isLoadingProject, setIsLoadingProject] = useState(Boolean(initialProjectId))
   const [chatHistoryRefreshKey, setChatHistoryRefreshKey] = useState(0)
   const [projectMessagesRefreshKey, setProjectMessagesRefreshKey] = useState(0)
@@ -264,9 +261,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       planAbortControllerRef.current?.abort()
       Object.values(syncTimers).forEach(clearTimeout)
-      if (magicAnimationFrameRef.current !== null) {
-        cancelAnimationFrame(magicAnimationFrameRef.current)
-      }
     }
   }, [])
 
@@ -1734,30 +1728,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setIsPricingModalOpen(true)
   }
 
-  function handleMagicPointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (event.pointerType === 'touch') {
-      return
-    }
-
-    const glow = magicGlowRef.current
-
-    if (!glow) return
-
-    const rect = event.currentTarget.getBoundingClientRect()
-    const x = ((event.clientX - rect.left) / rect.width) * 100
-    const y = ((event.clientY - rect.top) / rect.height) * 100
-
-    if (magicAnimationFrameRef.current !== null) {
-      return
-    }
-
-    magicAnimationFrameRef.current = requestAnimationFrame(() => {
-      glow.style.setProperty('--magic-x', `${x}%`)
-      glow.style.setProperty('--magic-y', `${y}%`)
-      magicAnimationFrameRef.current = null
-    })
-  }
-
   const isDashboardMode =
     !initialProjectId &&
     !currentProject &&
@@ -1999,7 +1969,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                         className={cn(
                           'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'all'
-                            ? 'border-[#f97316]/50 bg-[#f97316]/15 text-[#f97316]'
+                            ? 'border-primary/50 bg-primary/15 text-primary'
                             : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
                         )}
                       >
@@ -2012,7 +1982,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                         className={cn(
                           'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'recent'
-                            ? 'border-[#f97316]/50 bg-[#f97316]/15 text-[#f97316]'
+                            ? 'border-primary/50 bg-primary/15 text-primary'
                             : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
                         )}
                       >
@@ -2025,7 +1995,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                         className={cn(
                           'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'github'
-                            ? 'border-[#f97316]/50 bg-[#f97316]/15 text-[#f97316]'
+                            ? 'border-primary/50 bg-primary/15 text-primary'
                             : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
                         )}
                       >

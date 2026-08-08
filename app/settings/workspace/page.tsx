@@ -36,7 +36,7 @@ export default function WorkspaceSettingsPage() {
               <div className="text-sm font-medium text-white">Avatar</div>
               <div className="text-xs text-white/40">Set an avatar for your workspace.</div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f97316] text-sm font-bold text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
               {userInitial}
             </div>
           </div>

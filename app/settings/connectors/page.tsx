@@ -482,7 +482,7 @@ export default function ConnectorsPage() {
             placeholder="Search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-white/[0.04] py-2 pl-9 pr-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-[#f97316]/50"
+            className="w-full rounded-lg border border-white/10 bg-white/[0.04] py-2 pl-9 pr-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-primary/50"
           />
         </div>
 
@@ -543,7 +543,7 @@ export default function ConnectorsPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-4xl px-8 py-8">
           {/* Header Banner */}
-          <div className="mb-8 rounded-2xl border border-white/10 bg-gradient-to-r from-[#f97316]/10 via-[#ea580c]/5 to-transparent p-6">
+          <div className="mb-8 rounded-2xl border border-white/10 bg-gradient-to-r from-primary/10 via-primary/80/5 to-transparent p-6">
             <h1 className="mb-2 text-xl font-semibold text-white">Build from what you already use</h1>
             <p className="mb-4 text-sm text-white/50">
               Connectors let your Magical AI app talk to external tools like Stripe, Slack, and Google. Ask the agent to get started.
@@ -558,7 +558,7 @@ export default function ConnectorsPage() {
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#f97316] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#ea580c]"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary/80"
               >
                 Got it
               </button>
@@ -599,7 +599,7 @@ export default function ConnectorsPage() {
                       </span>
                     )}
                     {connector.isNew && !connector.connected && (
-                      <span className="rounded bg-[#f97316]/15 px-1.5 py-0.5 text-[9px] font-medium text-[#f97316]">
+                      <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[9px] font-medium text-primary">
                         New
                       </span>
                     )}

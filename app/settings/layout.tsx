@@ -122,7 +122,7 @@ export default function SettingsLayout({
 
         {/* Workspace selector */}
         <div className="mx-3 mb-4 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f97316] text-[10px] font-bold text-white">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
             {userInitial}
           </div>
           <span className="flex-1 truncate text-sm text-white">{userName}&apos;s Workspace</span>
@@ -150,7 +150,7 @@ export default function SettingsLayout({
                         <item.icon className="h-4 w-4 shrink-0" />
                         <span className="flex-1">{item.name}</span>
                         {item.badge && (
-                          <span className="rounded bg-[#f97316]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#f97316]">
+                          <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                             {item.badge}
                           </span>
                         )}

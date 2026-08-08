@@ -115,7 +115,7 @@ export default function LoginPage() {
 
           {/* Logo */}
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#f97316] to-[#ea580c]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80">
               <span className="text-lg font-bold text-white">M</span>
             </div>
             <span className="text-xl font-semibold text-white">Magical AI</span>
@@ -193,7 +193,7 @@ export default function LoginPage() {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
-                  className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-[#f97316]/50 focus:bg-white/[0.06]"
+                  className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:bg-white/[0.06]"
                 />
                 <input
                   type="text"
@@ -201,7 +201,7 @@ export default function LoginPage() {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   required
-                  className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-[#f97316]/50 focus:bg-white/[0.06]"
+                  className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:bg-white/[0.06]"
                 />
               </div>
             )}
@@ -212,7 +212,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-[#f97316]/50 focus:bg-white/[0.06]"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:bg-white/[0.06]"
             />
 
             <input
@@ -221,7 +221,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-[#f97316]/50 focus:bg-white/[0.06]"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:bg-white/[0.06]"
             />
 
             {mode === 'register' && (
@@ -231,7 +231,7 @@ export default function LoginPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-[#f97316]/50 focus:bg-white/[0.06]"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-primary/50 focus:bg-white/[0.06]"
               />
             )}
 
@@ -241,13 +241,13 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={agreed}
                   onChange={(e) => setAgreed(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/[0.04] text-[#f97316] focus:ring-[#f97316]/50"
+                  className="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/[0.04] text-primary focus:ring-primary/50"
                 />
                 <span className="text-xs text-white/40">
                   I agree to the{' '}
-                  <a href="#" className="text-[#f97316] hover:underline">Terms of Service</a>{' '}
+                  <a href="#" className="text-primary hover:underline">Terms of Service</a>{' '}
                   and{' '}
-                  <a href="#" className="text-[#f97316] hover:underline">Privacy Policy</a>
+                  <a href="#" className="text-primary hover:underline">Privacy Policy</a>
                 </span>
               </label>
             )}
@@ -259,7 +259,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || (mode === 'register' && !agreed)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#f97316] to-[#ea580c] px-4 py-3 text-sm font-semibold text-white transition hover:from-[#ea580c] hover:to-[#dc2626] disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-4 py-3 text-sm font-semibold text-white transition hover:from-primary/80 hover:to-[#dc2626] disabled:opacity-50"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {mode === 'login' ? 'Sign in' : 'Create account'}
@@ -275,7 +275,7 @@ export default function LoginPage() {
                 setMode(mode === 'login' ? 'register' : 'login')
                 setError(null)
               }}
-              className="font-medium text-[#f97316] hover:underline"
+              className="font-medium text-primary hover:underline"
             >
               {mode === 'login' ? 'Sign up' : 'Sign in'}
             </button>
@@ -284,9 +284,9 @@ export default function LoginPage() {
       </div>
 
       {/* Right side - Feature showcase */}
-      <div className="hidden w-[480px] flex-col justify-center bg-gradient-to-br from-[#f97316]/20 via-[#ea580c]/10 to-[#0a0a0a] p-12 lg:flex">
+      <div className="hidden w-[480px] flex-col justify-center bg-gradient-to-br from-primary/20 via-primary/80/10 to-[#0a0a0a] p-12 lg:flex">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#f97316] to-[#ea580c]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80">
             <span className="text-xl font-bold text-white">M</span>
           </div>
           <span className="text-2xl font-bold text-white">Magical AI</span>
@@ -301,8 +301,8 @@ export default function LoginPage() {
         <ul className="space-y-4">
           {features.map((feature) => (
             <li key={feature} className="flex items-center gap-3">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#f97316]/20">
-                <Check className="h-3 w-3 text-[#f97316]" />
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20">
+                <Check className="h-3 w-3 text-primary" />
               </div>
               <span className="text-sm text-white/70">{feature}</span>
             </li>

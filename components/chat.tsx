@@ -178,7 +178,7 @@ function GeneratedArtifactCard({
               : message.object?.template || 'Artifact ready'}
           </div>
         </div>
-        <Terminal strokeWidth={2} className="h-4 w-4 shrink-0 text-[#FFB84D]" />
+        <Terminal strokeWidth={2} className="h-4 w-4 shrink-0 text-foreground/50" />
       </div>
 
       {files.length > 0 && (
@@ -239,9 +239,9 @@ function PlanActionCard({
   const isContinueDisabled = disabled || !onAcceptPlan || (hasQuestion && !answer)
 
   return (
-    <div className="w-full max-w-[36rem] whitespace-normal rounded-2xl border border-[#FFB84D]/25 bg-[#151410] p-4 shadow-[0_0_0_1px_rgba(255,184,77,0.08)]">
+    <div className="w-full max-w-[36rem] whitespace-normal rounded-2xl border border-foreground/50/25 bg-[#151410] p-4 shadow-[0_0_0_1px_rgba(255,184,77,0.08)]">
       <div className="mb-3 flex items-start gap-2">
-        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#FFB84D]/30 bg-[#FFB84D]/10 text-[#FFB84D]">
+        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-foreground/50/30 bg-foreground/50/10 text-foreground/50">
           <Sparkles className="h-3.5 w-3.5" />
         </div>
         <div className="min-w-0">
@@ -256,7 +256,7 @@ function PlanActionCard({
 
       {plan.question && (
         <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#FFB84D]/85">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/50/85">
             Question
           </div>
           <div className="text-sm leading-6 text-white/85">{plan.question}</div>
@@ -275,7 +275,7 @@ function PlanActionCard({
                     }}
                     className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition ${
                       selected
-                        ? 'border-[#FFB84D]/70 bg-[#FFB84D]/15 text-white'
+                        ? 'border-foreground/50/70 bg-foreground/50/15 text-white'
                         : 'border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white'
                     }`}
                   >
@@ -297,7 +297,7 @@ function PlanActionCard({
                 }
               }}
               placeholder="Type your answer..."
-              className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-[#FFB84D]/45"
+              className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-foreground/50/45"
             />
           )}
         </div>
@@ -308,7 +308,7 @@ function PlanActionCard({
           type="button"
           onClick={() => onAcceptPlan?.(plan, answer || undefined)}
           disabled={isContinueDisabled}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#FFB84D]/40 bg-[#FFB84D]/15 px-3 text-sm font-semibold text-white transition hover:bg-[#FFB84D]/25 disabled:pointer-events-none disabled:opacity-45"
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-foreground/50/40 bg-foreground/50/15 px-3 text-sm font-semibold text-white transition hover:bg-foreground/50/25 disabled:pointer-events-none disabled:opacity-45"
         >
           <Check className="h-4 w-4" />
           {hasQuestion ? 'Continue with answer' : 'Accept and continue'}
@@ -355,7 +355,7 @@ function GenerationStatusCard({
     <div className="mt-2 w-full max-w-[36rem] rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 shadow-sm">
       <div className="flex items-center justify-between gap-3 text-sm font-medium text-white">
         <div className="flex min-w-0 items-center gap-2">
-          <Sparkles strokeWidth={2} className="h-4 w-4 shrink-0 animate-pulse text-[#FF8800]" />
+          <Sparkles strokeWidth={2} className="h-4 w-4 shrink-0 animate-pulse text-foreground/70" />
           <span className="min-w-0 break-words">{status.title}</span>
         </div>
         {onStop && (
@@ -380,7 +380,7 @@ function GenerationStatusCard({
       )}
 
       {currentFilePath && (
-        <div className="mt-2 flex items-center gap-2 rounded-md border border-[#f97316]/20 bg-[#f97316]/5 px-2.5 py-1.5 text-xs text-[#f97316]/80">
+        <div className="mt-2 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-xs text-primary/80">
           <FileCode2 className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">Writing {currentFilePath}</span>
           <LoaderIcon strokeWidth={2} className="h-3 w-3 shrink-0 animate-spin ml-auto" />
@@ -397,7 +397,7 @@ function GenerationStatusCard({
               <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/36" />
               <span className="truncate">{file.path}</span>
               {idx === files.length - 1 && hasCode && (
-                <LoaderIcon strokeWidth={2} className="h-3 w-3 shrink-0 animate-spin ml-auto text-[#f97316]/60" />
+                <LoaderIcon strokeWidth={2} className="h-3 w-3 shrink-0 animate-spin ml-auto text-primary/60" />
               )}
             </div>
           ))}

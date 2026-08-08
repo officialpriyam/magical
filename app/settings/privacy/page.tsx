@@ -90,7 +90,7 @@ export default function PrivacySettings() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-white">{setting.label}</span>
           {setting.badge && (
-            <span className="rounded bg-[#f97316]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#f97316]">
+            <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
               {setting.badge}
             </span>
           )}
@@ -102,8 +102,8 @@ export default function PrivacySettings() {
         role="switch"
         aria-checked={setting.enabled}
         onClick={() => toggleItem(setter, setting.id)}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#f97316] focus:ring-offset-2 focus:ring-offset-[#0b0d0b] ${
-          setting.enabled ? 'bg-[#f97316]' : 'bg-white/20'
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#0b0d0b] ${
+          setting.enabled ? 'bg-primary' : 'bg-white/20'
         }`}
       >
         <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ${setting.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -117,7 +117,7 @@ export default function PrivacySettings() {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-white">{setting.label}</span>
           {setting.badge && (
-            <span className="rounded bg-[#f97316]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#f97316]">
+            <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
               {setting.badge}
             </span>
           )}
@@ -127,7 +127,7 @@ export default function PrivacySettings() {
       <select
         value={setting.value}
         onChange={(e) => setter(e.target.value)}
-        className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-[#f97316]/50"
+        className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-primary/50"
       >
         {setting.options.map((opt) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -159,7 +159,7 @@ export default function PrivacySettings() {
               <select
                 value={defaultAccess}
                 onChange={(e) => setDefaultAccess(e.target.value)}
-                className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-[#f97316]/50"
+                className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-primary/50"
               >
                 <option value="all">All members</option>
                 <option value="restricted">Restricted</option>
@@ -190,14 +190,14 @@ export default function PrivacySettings() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-white">Default website access</span>
-                  <span className="rounded bg-[#f97316]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#f97316]">Business</span>
+                  <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">Business</span>
                 </div>
                 <p className="mt-0.5 text-xs text-white/40">Choose who can view newly published websites.</p>
               </div>
               <select
                 value={defaultWebsiteAccess}
                 onChange={(e) => setDefaultWebsiteAccess(e.target.value)}
-                className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-[#f97316]/50"
+                className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-primary/50"
               >
                 <option value="public">Public</option>
                 <option value="members">Members only</option>
@@ -228,14 +228,14 @@ export default function PrivacySettings() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-white">App login methods</span>
-                  <span className="rounded bg-[#f97316]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#f97316]">Business</span>
+                  <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">Business</span>
                 </div>
                 <p className="mt-0.5 text-xs text-white/40">Control which login methods projects in this workspace may use for generated apps.</p>
               </div>
               <select
                 value={appLoginMethods}
                 onChange={(e) => setAppLoginMethods(e.target.value)}
-                className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-[#f97316]/50"
+                className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-primary/50"
               >
                 <option value="email">Email</option>
                 <option value="all">All methods</option>
@@ -268,7 +268,7 @@ export default function PrivacySettings() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-white">Mark as abandoned after</span>
-                  <span className="rounded bg-[#f97316]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#f97316]">Enterprise</span>
+                  <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">Enterprise</span>
                 </div>
                 <p className="mt-0.5 text-xs text-white/40">Projects with no activity for this period are marked abandoned.</p>
               </div>
@@ -277,7 +277,7 @@ export default function PrivacySettings() {
                   type="text"
                   value={abandonedAfter}
                   onChange={(e) => setAbandonedAfter(e.target.value)}
-                  className="w-16 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-center text-sm text-white outline-none focus:border-[#f97316]/50"
+                  className="w-16 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-center text-sm text-white outline-none focus:border-primary/50"
                 />
                 <span className="text-xs text-white/40">days</span>
               </div>
@@ -292,7 +292,7 @@ export default function PrivacySettings() {
               <select
                 value={deleteAfter}
                 onChange={(e) => setDeleteAfter(e.target.value)}
-                className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-[#f97316]/50"
+                className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-sm text-white outline-none focus:border-primary/50"
               >
                 <option value="off">Off</option>
                 <option value="7">7 days</option>

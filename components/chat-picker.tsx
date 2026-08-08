@@ -123,8 +123,8 @@ export function ChatPicker({
           <SelectTrigger className="whitespace-nowrap border-none shadow-none focus:ring-0 px-0 py-0 h-6 text-xs bg-transparent">
             <SelectValue>
               <div className="flex items-center space-x-1.5">
-                {languageModel.model === 'magic' && <Wand2 className="h-3 w-3 text-[#f97316]" />}
-                {languageModel.model === 'magic+' && <Zap className="h-3 w-3 text-[#f97316]" />}
+                {languageModel.model === 'magic' && <Wand2 className="h-3 w-3 text-primary" />}
+                {languageModel.model === 'magic+' && <Zap className="h-3 w-3 text-primary" />}
                 {languageModel.model !== 'magic' && languageModel.model !== 'magic+' && resolvedModel && (
                   <Image
                     className="flex"
@@ -143,14 +143,14 @@ export function ChatPicker({
               <SelectLabel>Magical AI</SelectLabel>
               <SelectItem value="magic">
                 <div className="flex items-center space-x-2">
-                  <Wand2 className="h-3.5 w-3.5 text-[#f97316]" />
+                  <Wand2 className="h-3.5 w-3.5 text-primary" />
                   <span className="font-medium">Magic</span>
                   <span className="text-[10px] text-white/40">Fast & free</span>
                 </div>
               </SelectItem>
               <SelectItem value="magic+">
                 <div className="flex items-center space-x-2">
-                  <Zap className="h-3.5 w-3.5 text-[#f97316]" />
+                  <Zap className="h-3.5 w-3.5 text-primary" />
                   <span className="font-medium">Magic+</span>
                   <span className="text-[10px] text-white/40">Best quality</span>
                 </div>

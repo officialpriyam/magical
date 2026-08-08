@@ -158,7 +158,7 @@ export default function GitPage() {
                 </div>
                 <span className="text-sm text-white/60">{conn.projects}</span>
                 <div className="flex items-center gap-2">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#f97316] text-[9px] font-bold text-white">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">
                     {conn.email[0]?.toUpperCase()}
                   </div>
                   <span className="text-xs text-white/50">{conn.email}</span>

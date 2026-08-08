@@ -6,16 +6,51 @@ import Link from 'next/link'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { getProjects, Project } from '@/lib/database'
 import { useAuth } from '@/lib/auth'
-import { useUserTeam } from '@/lib/user-team-provider'
-import { getProjectGitHubWorkspace } from '@/lib/database'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
+
+interface GitHubWorkspace {
+  fullName: string
+  owner: string
+  repo: string
+  branch: string
+  pathPrefix: string
+  autoSync: boolean
+  lastCommitSha: string | null
+}
+
+function getProjectGitHubWorkspace(project: Project | null): GitHubWorkspace | null {
+  const workspace = project?.metadata?.githubWorkspace
+
+  if (!workspace || typeof workspace !== 'object') {
+    return null
+  }
+
+  const fullName =
+    typeof workspace.fullName === 'string'
+      ? workspace.fullName
+      : `${workspace.owner || ''}/${workspace.repo || ''}`
+  const [owner, repo] = fullName.split('/')
+
+  if (!owner || !repo) {
+    return null
+  }
+
+  return {
+    fullName: `${owner}/${repo}`,
+    owner,
+    repo,
+    branch: typeof workspace.branch === 'string' && workspace.branch ? workspace.branch : 'main',
+    pathPrefix: typeof workspace.pathPrefix === 'string' ? workspace.pathPrefix : '',
+    autoSync: workspace.autoSync !== false,
+    lastCommitSha: typeof workspace.lastCommitSha === 'string' ? workspace.lastCommitSha : null,
+  }
+}
 
 type ProjectShelfView = 'all' | 'recent' | 'github'
 
 export default function ProjectsPage() {
   const { session } = useAuth(() => {}, () => {})
-  const { userTeam } = useUserTeam()
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
 
   const [projects, setProjects] = useState<Project[]>([])
@@ -33,7 +68,7 @@ export default function ProjectsPage() {
     async function loadProjects() {
       setIsLoading(true)
       try {
-        const allProjects = await getProjects(supabase, session!.user.id)
+        const allProjects = await getProjects(supabase, false, session!.user.id)
         setProjects(allProjects || [])
       } catch (error) {
         console.error('Failed to load projects:', error)
@@ -118,7 +153,7 @@ export default function ProjectsPage() {
             </Link>
             <div className="h-4 w-px bg-white/10" />
             <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#f97316] text-[10px] font-bold text-white">
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-[10px] font-bold text-white">
                 M
               </div>
               <span className="text-sm font-medium text-white">All Projects</span>
@@ -132,7 +167,7 @@ export default function ProjectsPage() {
                 placeholder="Search your projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-72 rounded-lg border border-white/10 bg-white/[0.04] py-2 pl-9 pr-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-[#f97316]/50"
+                className="w-72 rounded-lg border border-white/10 bg-white/[0.04] py-2 pl-9 pr-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-primary/50"
               />
             </div>
             <select
@@ -197,7 +232,7 @@ export default function ProjectsPage() {
             className={cn(
               'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
               view === 'all'
-                ? 'border-[#f97316]/50 bg-[#f97316]/15 text-[#f97316]'
+                ? 'border-primary/50 bg-primary/15 text-primary'
                 : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
             )}
           >
@@ -211,7 +246,7 @@ export default function ProjectsPage() {
             className={cn(
               'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
               view === 'recent'
-                ? 'border-[#f97316]/50 bg-[#f97316]/15 text-[#f97316]'
+                ? 'border-primary/50 bg-primary/15 text-primary'
                 : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
             )}
           >
@@ -224,7 +259,7 @@ export default function ProjectsPage() {
             className={cn(
               'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
               view === 'github'
-                ? 'border-[#f97316]/50 bg-[#f97316]/15 text-[#f97316]'
+                ? 'border-primary/50 bg-primary/15 text-primary'
                 : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
             )}
           >

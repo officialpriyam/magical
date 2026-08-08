@@ -56,30 +56,30 @@ export default function BillingPage() {
         </div>
 
         {/* Pro */}
-        <div className="rounded-2xl border border-[#f97316]/30 bg-[#f97316]/[0.06] p-5">
-          <div className="mb-1 text-sm text-[#f97316]">Pro</div>
+        <div className="rounded-2xl border border-primary/30 bg-primary/[0.06] p-5">
+          <div className="mb-1 text-sm text-primary">Pro</div>
           <div className="mb-4 text-3xl font-semibold text-white">$20</div>
           <button
             type="button"
-            className="mb-4 w-full rounded-lg bg-[#f97316] px-3 py-2 text-sm font-medium text-white transition hover:bg-[#ea580c]"
+            className="mb-4 w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-primary/80"
           >
             Upgrade
           </button>
           <ul className="space-y-2 text-sm text-white/60">
             <li className="flex items-start gap-2">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#f97316]" />
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span>500 credits per month</span>
             </li>
             <li className="flex items-start gap-2">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#f97316]" />
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span>Priority support</span>
             </li>
             <li className="flex items-start gap-2">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#f97316]" />
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span>Advanced models</span>
             </li>
             <li className="flex items-start gap-2">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#f97316]" />
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span>Team collaboration</span>
             </li>
           </ul>
@@ -142,7 +142,7 @@ export default function BillingPage() {
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-[#f97316] transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: '94%' }}
             />
           </div>

@@ -64,7 +64,7 @@ export function WorkspaceDropdown({ onSignOut, onOpenPricing }: WorkspaceDropdow
           onClick={() => setIsOpen(!isOpen)}
           className="flex w-full items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left transition hover:bg-white/[0.08]"
         >
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#f97316] text-[10px] font-bold text-white">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary text-[10px] font-bold text-white">
             {currentWorkspace?.name[0] || 'W'}
           </div>
           <div className="flex-1 min-w-0">
@@ -78,7 +78,7 @@ export function WorkspaceDropdown({ onSignOut, onOpenPricing }: WorkspaceDropdow
             {/* Current workspace info */}
             <div className="mb-2 rounded-lg bg-white/[0.04] p-3">
               <div className="mb-2 flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f97316] text-xs font-bold text-white">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-bold text-white">
                   {currentWorkspace?.name[0] || 'W'}
                 </div>
                 <div>
@@ -102,12 +102,12 @@ export function WorkspaceDropdown({ onSignOut, onOpenPricing }: WorkspaceDropdow
               </div>
               <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#f97316] to-[#ea580c] transition-all duration-1000 ease-out"
+                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-1000 ease-out"
                   style={{ width: `${creditsPercent}%` }}
                 />
               </div>
               <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-white/35">
-                <div className="h-1.5 w-1.5 rounded-full bg-[#f97316]" />
+                <div className="h-1.5 w-1.5 rounded-full bg-primary" />
                 Daily credits reset at midnight UTC
               </div>
             </div>
@@ -123,12 +123,12 @@ export function WorkspaceDropdown({ onSignOut, onOpenPricing }: WorkspaceDropdow
                     onClick={close}
                     className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
                   >
-                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#f97316]/80 text-[9px] font-bold text-white">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/80 text-[9px] font-bold text-white">
                       {ws.name[0]}
                     </div>
                     <span className="flex-1 truncate text-xs text-white/70">{ws.name}</span>
                     <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-white/40">{ws.plan}</span>
-                    {ws.isCurrent && <Check className="h-3.5 w-3.5 text-[#f97316]" />}
+                    {ws.isCurrent && <Check className="h-3.5 w-3.5 text-primary" />}
                   </button>
                 ))}
               </div>
@@ -205,7 +205,7 @@ function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="mb-6 flex justify-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#f97316] to-[#ea580c]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80">
             <span className="text-xl font-bold text-white">M</span>
           </div>
         </div>
@@ -222,7 +222,7 @@ function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Enter workspace name"
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-[#f97316]/50"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-primary/50"
           />
         </div>
 
@@ -237,7 +237,7 @@ function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             disabled={!name.trim()}
-            className="flex-1 rounded-xl bg-gradient-to-r from-[#f97316] to-[#ea580c] py-2.5 text-sm font-semibold text-white transition hover:from-[#ea580c] hover:to-[#dc2626] disabled:opacity-40"
+            className="flex-1 rounded-xl bg-gradient-to-r from-primary to-primary/80 py-2.5 text-sm font-semibold text-white transition hover:from-primary/80 hover:to-[#dc2626] disabled:opacity-40"
           >
             Continue to plan
           </button>
