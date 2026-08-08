@@ -58,6 +58,44 @@ export function Chat({
         >
           {message.content.map((content, id) => {
             if (content.type === 'text') {
+              const text = content.text || ''
+              const searchMatch = text.match(/^\[Search:\s*(.*?)\]\s*$/)
+              const thinkMatch = text.match(/^\[Think:\s*(.*?)\]\s*$/)
+              const canvasMatch = text.match(/^\[Canvas:\s*(.*?)\]\s*$/)
+
+              if (searchMatch) {
+                return (
+                  <span key={id} className="block">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1EAEDB]/30 bg-[#1EAEDB]/10 px-2 py-0.5 text-[11px] text-[#1EAEDB] mb-1">
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                      Web search
+                    </span>
+                    <span className="block text-white/90">{searchMatch[1]}</span>
+                  </span>
+                )
+              }
+              if (thinkMatch) {
+                return (
+                  <span key={id} className="block">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/30 bg-purple-400/10 px-2 py-0.5 text-[11px] text-purple-300 mb-1">
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a7 7 0 0 1 7 7c0 2.5-1.5 4.5-3 6-1 1-2 2.5-2 4h-4c0-1.5-1-3-2-4-1.5-1.5-3-3.5-3-6a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg>
+                      Thinking
+                    </span>
+                    <span className="block text-white/90">{thinkMatch[1]}</span>
+                  </span>
+                )
+              }
+              if (canvasMatch) {
+                return (
+                  <span key={id} className="block">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-300 mb-1">
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                      Canvas
+                    </span>
+                    <span className="block text-white/90">{canvasMatch[1]}</span>
+                  </span>
+                )
+              }
               return <span key={id}>{content.text}</span>
             }
             if (content.type === 'image') {

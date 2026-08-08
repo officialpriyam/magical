@@ -1,38 +1,80 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
-import { MagicalPageShell } from '@/components/magical-page-shell'
 import { cn } from '@/lib/utils'
 import { 
-  User, 
   Shield, 
   Settings as SettingsIcon,
   ChevronLeft,
-  Plug
+  Plug,
+  CreditCard,
+  Users,
+  BookOpen,
+  GitBranch,
+  Globe,
+  Lock,
+  Search,
+  Zap,
+  FileText,
+  Layers,
+  Server,
+  ShieldCheck,
+  ScrollText,
+  ChevronDown,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
+import { useAuth } from '@/lib/auth'
 
-const settingsNavigation = [
+interface NavItem {
+  name: string
+  href?: string
+  icon: React.ElementType
+  badge?: string
+  children?: NavItem[]
+}
+
+const settingsNavigation: { section: string; items: NavItem[] }[] = [
   {
-    name: 'Profile',
-    href: '/settings/profile',
-    icon: User,
+    section: 'Workspace',
+    items: [
+      { name: 'Workspace settings', href: '/settings/workspace', icon: SettingsIcon },
+      { name: 'Plans & credit usage', href: '/settings/billing', icon: CreditCard },
+    ],
   },
   {
-    name: 'Account',
-    href: '/settings/account',
-    icon: SettingsIcon,
+    section: 'Access',
+    items: [
+      { name: 'People', href: '/settings/people', icon: Users },
+      { name: 'Groups', icon: Users, badge: 'Business' },
+      { name: 'Identity', icon: Shield, badge: 'Business' },
+    ],
   },
   {
-    name: 'Privacy',
-    href: '/settings/privacy',
-    icon: Shield,
+    section: 'Customization',
+    items: [
+      { name: 'Knowledge', href: '/settings/knowledge', icon: BookOpen },
+      { name: 'Skills', href: '/settings/skills', icon: Zap },
+      { name: 'Templates', icon: FileText, badge: 'Business' },
+      { name: 'Design systems', icon: Layers, badge: 'Enterprise' },
+      { name: 'Connectors', href: '/settings/connectors', icon: Plug },
+    ],
   },
   {
-    name: 'Integrations',
-    href: '/settings/integrations',
-    icon: Plug,
+    section: 'Build & deploy',
+    items: [
+      { name: 'Git', href: '/settings/git', icon: GitBranch },
+      { name: 'MCP server', icon: Server },
+      { name: 'Workspace domains', icon: Globe },
+    ],
+  },
+  {
+    section: 'Security',
+    items: [
+      { name: 'Privacy & security', href: '/settings/privacy', icon: Lock },
+      { name: 'Security center', icon: ShieldCheck, badge: 'Business' },
+      { name: 'Audit logs', icon: ScrollText, badge: 'Enterprise' },
+    ],
   },
 ]
 
@@ -42,55 +84,110 @@ export default function SettingsLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const { session } = useAuth(() => {}, () => {})
+  const [searchQuery, setSearchQuery] = useState('')
 
-  function handleBackToWorkspace() {
-    window.location.assign('/')
-  }
+  const userInitial = session?.user?.email?.[0]?.toUpperCase() || 'U'
+  const userName = session?.user?.email?.split('@')[0] || 'User'
 
   return (
-    <MagicalPageShell contentClassName="container mx-auto px-4 py-6">
-        <div className="flex items-center gap-4 mb-8">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleBackToWorkspace}
-            aria-label="Back to workspace"
-            className="border border-white/10 bg-white/5 text-white hover:bg-white/10"
+    <div className="flex h-dvh min-h-dvh overflow-hidden bg-[#080809]">
+      {/* Sidebar */}
+      <div className="flex w-64 flex-col border-r border-white/10 bg-[#0b0d0b]">
+        {/* Back button */}
+        <div className="flex items-center gap-2 px-4 py-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-white/60 transition hover:text-white"
           >
             <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-2xl font-semibold text-white">Settings</h1>
+            Go back
+          </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-1">
-            <nav className="space-y-1 rounded-lg border border-white/10 bg-white/[0.04] p-2 backdrop-blur">
-              {settingsNavigation.map((item) => {
-                const isActive = pathname === item.href
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-white/[0.12] text-white'
-                        : 'text-white/60 hover:text-white hover:bg-white/[0.08]'
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.name}
-                  </Link>
-                )
-              })}
-            </nav>
-          </div>
-
-          <div className="lg:col-span-3">
-            {children}
+        {/* Search */}
+        <div className="px-3 pb-3">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
+            <input
+              type="text"
+              placeholder="Search settings"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-white/[0.04] py-1.5 pl-8 pr-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-white/20 focus:bg-white/[0.06]"
+            />
           </div>
         </div>
-    </MagicalPageShell>
+
+        {/* Workspace selector */}
+        <div className="mx-3 mb-4 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1EAEDB] text-[10px] font-bold text-black">
+            {userInitial}
+          </div>
+          <span className="flex-1 truncate text-sm text-white">{userName}&apos;s Workspace</span>
+          <ChevronDown className="h-3.5 w-3.5 text-white/40" />
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {settingsNavigation.map((group) => (
+            <div key={group.section}>
+              <div className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-white/35">
+                {group.section}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const isActive = item.href && pathname === item.href
+                  const isDisabled = !item.href
+
+                  if (isDisabled) {
+                    return (
+                      <div
+                        key={item.name}
+                        className="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-white/30"
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span className="flex-1">{item.name}</span>
+                        {item.badge && (
+                          <span className="rounded bg-[#1EAEDB]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#1EAEDB]">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href!}
+                      className={cn(
+                        'flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors',
+                        isActive
+                          ? 'bg-white/[0.1] text-white'
+                          : 'text-white/60 hover:text-white hover:bg-white/[0.06]'
+                      )}
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className="flex-1">{item.name}</span>
+                      {item.badge && (
+                        <span className="rounded bg-[#1EAEDB]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#1EAEDB]">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto">
+        {children}
+      </div>
+    </div>
   )
 }
