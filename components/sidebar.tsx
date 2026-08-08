@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, Gift, Settings, HelpCircle, CreditCard, LogOut, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch, Home } from 'lucide-react';
+import { MessageCircle, Search, Gift, HelpCircle, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch, Home } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -8,13 +8,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { HelpModal } from '@/components/help-center';
-import { PricingModal } from '@/components/pricing';
 import { WorkspaceDropdown } from '@/components/workspace-dropdown';
+import { PricingModal } from '@/components/pricing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import { getProjects, Project, deleteProject } from '@/lib/database';
 import { formatDistanceToNow } from 'date-fns';
@@ -264,7 +262,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="flex h-dvh shrink-0 md:h-screen">
       {/* Always visible icons */}
       <div 
-        className={`bg-[#0b0b0c] border-r border-white/10 flex flex-col items-center py-4 transition-all duration-300 ease-in-out ${
+        className={`bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col items-center py-4 transition-all duration-300 ease-in-out ${
           isOpen ? 'w-0 opacity-0 overflow-hidden' : 'w-16 opacity-100'
         }`}
         onMouseEnter={handleMouseEnter}
@@ -338,45 +336,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Gift className="h-5 w-5" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            asChild
-            className="h-8 w-8 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-            aria-label="Settings"
-          >
-            <Link href="/settings">
-              <Settings className="h-5 w-5" />
-            </Link>
-          </Button>
-          <HelpModal trigger={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-              aria-label="Help Center"
-            >
-              <HelpCircle className="h-5 w-5" />
-            </Button>
-          } />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsPricingModalOpen(true)}
-            className="h-8 w-8 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-            aria-label="My Subscription"
-          >
-            <CreditCard className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onSignOut}
-            className="h-8 w-8 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-            aria-label="Sign Out"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
         </div>
       </div>
 
@@ -391,7 +350,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Collapsible Sidebar Content */}
       <div
-        className={`h-dvh bg-[#0b0b0c] border-r border-white/10 flex flex-col transition-all duration-300 ease-in-out md:h-screen ${
+        className={`h-dvh bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col transition-all duration-300 ease-in-out md:h-screen ${
           isOpen
             ? 'fixed inset-y-0 left-0 z-50 w-[min(82vw,18rem)] opacity-100 translate-x-0 md:relative md:z-auto md:w-64'
             : 'w-0 opacity-0 -translate-x-full overflow-hidden'
@@ -401,7 +360,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Header Section */}
         <div className="p-3 border-b border-white/10">
-          <WorkspaceDropdown />
+          <WorkspaceDropdown onSignOut={onSignOut} onOpenPricing={() => setIsPricingModalOpen(true)} />
         </div>
 
         <div className="p-3 space-y-1">
@@ -509,50 +468,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ))}
             </div>
           )}
-        </div>
-
-        <Separator />
-
-        {/* Utility / Navigation Links */}
-        <div className="p-4 space-y-1">
-          <Button
-            variant="ghost"
-            asChild
-            className="w-full justify-start gap-3 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-          >
-            <Link href="/settings">
-              <Settings className="h-4 w-4" />
-              Settings
-            </Link>
-          </Button>
-
-          <HelpModal trigger={
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-            >
-              <HelpCircle className="h-4 w-4" />
-              Help Center
-            </Button>
-          } />
-
-          <Button
-            variant="ghost"
-            onClick={() => setIsPricingModalOpen(true)}
-            className="w-full justify-start gap-3 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-          >
-            <CreditCard className="h-4 w-4" />
-            My Subscription
-          </Button>
-
-          <Button
-            variant="ghost"
-            onClick={onSignOut}
-            className="w-full justify-start gap-3 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </Button>
         </div>
 
         {/* User Information */}

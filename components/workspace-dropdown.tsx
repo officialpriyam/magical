@@ -1,8 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, Check, Plus, Settings } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { ChevronDown, Check, Plus, Settings, HelpCircle, CreditCard, LogOut, User } from 'lucide-react'
 import Link from 'next/link'
+import { HelpModal } from '@/components/help-center'
+
+interface WorkspaceDropdownProps {
+  onSignOut?: () => void
+  onOpenPricing?: () => void
+}
 
 interface Workspace {
   id: string
@@ -16,19 +22,43 @@ const demoWorkspaces: Workspace[] = [
   { id: '1', name: "Priyam's Workspace", plan: 'Free', isCurrent: true, memberCount: 1 },
 ]
 
-export function WorkspaceDropdown() {
+export function WorkspaceDropdown({ onSignOut, onOpenPricing }: WorkspaceDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [workspaces] = useState<Workspace[]>(demoWorkspaces)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const currentWorkspace = workspaces.find((w) => w.isCurrent)
   const creditsUsed = 47
   const creditsTotal = 50
   const creditsPercent = (creditsUsed / creditsTotal) * 100
 
+  const close = useCallback(() => setIsOpen(false), [])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        close()
+      }
+    }
+
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') close()
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen, close])
+
   return (
     <>
-      <div className="relative">
+      <div className="relative" ref={dropdownRef}>
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
@@ -44,90 +74,114 @@ export function WorkspaceDropdown() {
         </button>
 
         {isOpen && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-            <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-white/10 bg-[#111315] p-2 shadow-2xl">
-              {/* Current workspace info */}
-              <div className="mb-2 rounded-lg bg-white/[0.04] p-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f97316] text-xs font-bold text-white">
-                    {currentWorkspace?.name[0] || 'W'}
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-white">{currentWorkspace?.name}</div>
-                    <div className="text-xs text-white/40">{currentWorkspace?.plan} Plan · {currentWorkspace?.memberCount} member</div>
-                  </div>
+          <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-white/10 bg-[#111315] p-2 shadow-2xl">
+            {/* Current workspace info */}
+            <div className="mb-2 rounded-lg bg-white/[0.04] p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f97316] text-xs font-bold text-white">
+                  {currentWorkspace?.name[0] || 'W'}
                 </div>
-                <button
-                  type="button"
-                  className="w-full rounded-lg border border-white/10 bg-white/[0.04] py-1.5 text-xs text-white/60 transition hover:bg-white/[0.08] hover:text-white"
-                >
-                  Invite members
-                </button>
-              </div>
-
-              {/* Credits */}
-              <div className="mb-2 px-1">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="text-xs font-medium text-white/60">Credits</span>
-                  <span className="text-xs text-white/40">{creditsTotal - creditsUsed} left ›</span>
-                </div>
-                <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#f97316] to-[#ea580c] transition-all duration-1000 ease-out"
-                    style={{ width: `${creditsPercent}%` }}
-                  />
-                </div>
-                <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-white/35">
-                  <div className="h-1.5 w-1.5 rounded-full bg-[#f97316]" />
-                  Daily credits reset at midnight UTC
+                <div>
+                  <div className="text-sm font-medium text-white">{currentWorkspace?.name}</div>
+                  <div className="text-xs text-white/40">{currentWorkspace?.plan} Plan · {currentWorkspace?.memberCount} member</div>
                 </div>
               </div>
+              <button
+                type="button"
+                className="w-full rounded-lg border border-white/10 bg-white/[0.04] py-1.5 text-xs text-white/60 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                Invite members
+              </button>
+            </div>
 
-              {/* Workspaces list */}
-              <div className="mb-2">
-                <div className="mb-1 px-1 text-[10px] font-medium uppercase tracking-wider text-white/30">Workspaces</div>
-                <div className="space-y-0.5">
-                  {workspaces.map((ws) => (
-                    <button
-                      key={ws.id}
-                      type="button"
-                      onClick={() => setIsOpen(false)}
-                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
-                    >
-                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#f97316]/80 text-[9px] font-bold text-white">
-                        {ws.name[0]}
-                      </div>
-                      <span className="flex-1 truncate text-xs text-white/70">{ws.name}</span>
-                      <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-white/40">{ws.plan}</span>
-                      {ws.isCurrent && <Check className="h-3.5 w-3.5 text-[#f97316]" />}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setShowCreateModal(true); setIsOpen(false) }}
-                  className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
-                >
-                  <div className="flex h-6 w-6 items-center justify-center rounded-md border border-dashed border-white/20">
-                    <Plus className="h-3 w-3 text-white/40" />
-                  </div>
-                  <span className="text-xs text-white/50">New workspace</span>
-                </button>
+            {/* Credits */}
+            <div className="mb-2 px-1">
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-xs font-medium text-white/60">Credits</span>
+                <span className="text-xs text-white/40">{creditsTotal - creditsUsed} left ›</span>
               </div>
-
-              <div className="border-t border-white/10 pt-1">
-                <Link
-                  href="/settings"
-                  onClick={() => setIsOpen(false)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
-                >
-                  <Settings className="h-3.5 w-3.5 text-white/40" />
-                  <span className="text-xs text-white/60">Settings</span>
-                </Link>
+              <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#f97316] to-[#ea580c] transition-all duration-1000 ease-out"
+                  style={{ width: `${creditsPercent}%` }}
+                />
+              </div>
+              <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-white/35">
+                <div className="h-1.5 w-1.5 rounded-full bg-[#f97316]" />
+                Daily credits reset at midnight UTC
               </div>
             </div>
-          </>
+
+            {/* Workspaces list */}
+            <div className="mb-2">
+              <div className="mb-1 px-1 text-[10px] font-medium uppercase tracking-wider text-white/30">Workspaces</div>
+              <div className="space-y-0.5">
+                {workspaces.map((ws) => (
+                  <button
+                    key={ws.id}
+                    type="button"
+                    onClick={close}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
+                  >
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#f97316]/80 text-[9px] font-bold text-white">
+                      {ws.name[0]}
+                    </div>
+                    <span className="flex-1 truncate text-xs text-white/70">{ws.name}</span>
+                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-white/40">{ws.plan}</span>
+                    {ws.isCurrent && <Check className="h-3.5 w-3.5 text-[#f97316]" />}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowCreateModal(true); close() }}
+                className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-md border border-dashed border-white/20">
+                  <Plus className="h-3 w-3 text-white/40" />
+                </div>
+                <span className="text-xs text-white/50">New workspace</span>
+              </button>
+            </div>
+
+            {/* Bottom actions */}
+            <div className="border-t border-white/10 pt-1 space-y-0.5">
+              <Link
+                href="/settings"
+                onClick={close}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
+              >
+                <Settings className="h-3.5 w-3.5 text-white/40" />
+                <span className="text-xs text-white/60">Settings</span>
+              </Link>
+              <HelpModal trigger={
+                <button
+                  type="button"
+                  onClick={close}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
+                >
+                  <HelpCircle className="h-3.5 w-3.5 text-white/40" />
+                  <span className="text-xs text-white/60">Help Center</span>
+                </button>
+              } />
+              <button
+                type="button"
+                onClick={() => { onOpenPricing?.(); close() }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
+              >
+                <CreditCard className="h-3.5 w-3.5 text-white/40" />
+                <span className="text-xs text-white/60">My Subscription</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { onSignOut?.(); close() }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[0.06]"
+              >
+                <LogOut className="h-3.5 w-3.5 text-white/40" />
+                <span className="text-xs text-white/60">Sign Out</span>
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

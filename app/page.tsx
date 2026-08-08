@@ -6,6 +6,7 @@ import { Chat } from '@/components/chat';
 import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS } from '@/components/chat-picker';
 import { PromptInputBox } from '@/components/ui/ai-prompt-box';
 import { useAuth } from '@/lib/auth';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { Project, saveMessage, getProjectMessages, generateProjectTitle, getProject, updateProject, getProjects } from '@/lib/database';
 import { Message, MessagePlan, formatPlanForModel, toAISDKMessages, toMessageImage } from '@/lib/messages';
@@ -190,7 +191,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false)
   const [projectShelfView, setProjectShelfView] = useState<ProjectShelfView>('recent')
-  const [showAllProjects, setShowAllProjects] = useState(false)
 
   const setProjectShelfViewAndReset = useCallback((view: ProjectShelfView) => {
     setProjectShelfView(view)
@@ -1966,17 +1966,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           {isDashboardMode ? (
             <div
               className="relative flex min-h-0 flex-1 overflow-hidden text-white"
-              onPointerMove={handleMagicPointerMove}
             >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(249,115,22,0.15),transparent_50%),radial-gradient(circle_at_18%_75%,rgba(234,88,12,0.08),transparent_35%)]" />
-              <div
-                ref={magicGlowRef}
-                className="pointer-events-none absolute inset-0 hidden opacity-90 transition-opacity duration-200 md:block"
-                style={{
-                  background: 'radial-gradient(circle at var(--magic-x, 50%) var(--magic-y, 24%), rgba(249,115,22,0.2), rgba(234,88,12,0.08) 12%, transparent 26%)',
-                }}
-              />
-
               <div className="relative z-10 flex w-full flex-col">
                 <div className="flex flex-1 flex-col items-center justify-center px-4 pt-16 text-center">
                   <div className="mb-6">
@@ -2051,7 +2041,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   </div>
                   <div className="max-h-[480px] overflow-y-auto overscroll-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {dashboardProjects.length > 0 ? dashboardProjects.slice(0, showAllProjects ? undefined : 6).map((project) => {
+                      {dashboardProjects.length > 0 ? dashboardProjects.slice(0, 6).map((project) => {
                       const workspace = getProjectGitHubWorkspace(project)
                       const r2Workspace = getProjectR2Workspace(project)
                       const preview = getProjectPreviewCard(project, projectPreviews[project.id])
@@ -2158,26 +2148,14 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     )}
                     </div>
                   </div>
-                  {dashboardProjects.length > 6 && !showAllProjects && (
+                  {dashboardProjects.length > 6 && (
                     <div className="mt-3 flex justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setShowAllProjects(true)}
+                      <Link
+                        href="/projects"
                         className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-xs font-medium text-white/60 transition hover:bg-white/[0.08] hover:text-white"
                       >
                         Browse all {dashboardProjects.length} projects
-                      </button>
-                    </div>
-                  )}
-                  {showAllProjects && dashboardProjects.length > 6 && (
-                    <div className="mt-3 flex justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setShowAllProjects(false)}
-                        className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-xs font-medium text-white/60 transition hover:bg-white/[0.08] hover:text-white"
-                      >
-                        Show less
-                      </button>
+                      </Link>
                     </div>
                   )}
                 </div>
