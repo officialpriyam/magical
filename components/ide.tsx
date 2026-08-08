@@ -51,6 +51,8 @@ export function IDE({
   const selectedFileRef = useRef(selectedFile)
   const fileContentCacheRef = useRef<Map<string, string>>(new Map())
   const fetchInFlightRef = useRef(false)
+  const isOpeningRef = useRef(false)
+  const initialFilesSyncedRef = useRef(false)
   const initialFilesRef = useRef(initialFiles)
 
   useEffect(() => {
@@ -278,6 +280,115 @@ export function IDE({
   }, [session, isSandboxMode, fetchFiles])
 
   useEffect(() => {
+    if (isSandboxMode && !initialFilesSyncedRef.current && initialFiles && initialFiles.length > 0 && files.length === 0) {
+      initialFilesSyncedRef.current = true
+      setFiles(initialFiles)
+    }
+  }, [isSandboxMode, initialFiles, files.length])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+
+      const pendingSave = pendingSaveRef.current
+      if (pendingSave) {
+        pendingSaveRef.current = null
+        void persistFile(pendingSave.path, pendingSave.content)
+      }
+    }
+  }, [persistFile])
+
+  const handleSelectFile = useCallback(async (path: string) => {
+    const cached = fileContentCacheRef.current.get(path)
+    if (cached !== undefined) {
+      setSelectedFile({ path, content: cached })
+      return
+    }
+
+    if (isOpeningRef.current) {
+      return
+    }
+
+    if (pendingSaveRef.current) {
+      void flushPendingSave()
+    }
+
+    isOpeningRef.current = true
+    setIsOpeningFile(true)
+    setOpeningPath(path)
+    try {
+      if (isSandboxMode && sandboxId) {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 8000)
+
+        try {
+          const response = await fetch(
+            `/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`,
+            { signal: controller.signal },
+          )
+
+          if (response.ok) {
+            const { content } = await response.json()
+            fileContentCacheRef.current.set(path, content)
+            setSelectedFile({ path, content })
+            setLoadError(null)
+          } else {
+            const errorData = await response.json().catch(() => null)
+            setLoadError(
+              errorData?.error ||
+                `"${path}" could not be loaded from the sandbox.`,
+            )
+          }
+        } catch (error: any) {
+          if (error?.name === 'AbortError') {
+            setLoadError(
+              `Loading "${path}" timed out. The sandbox may be unreachable.`,
+            )
+          } else {
+            setLoadError(
+              `Could not reach the sandbox to load "${path}". Check the sandbox connection.`,
+            )
+          }
+        } finally {
+          clearTimeout(timeout)
+        }
+      } else if (session) {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 8000)
+
+        try {
+          const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`, {
+            signal: controller.signal,
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => null)
+            setLoadError(
+              errorData?.error || `Failed to load "${path}".`,
+            )
+            return
+          }
+          const { content } = await response.json()
+          fileContentCacheRef.current.set(path, content)
+          setSelectedFile({ path, content })
+        } catch (error: any) {
+          if (error?.name === 'AbortError') {
+            setLoadError(`Loading "${path}" timed out. The workspace server may be slow.`)
+          }
+        } finally {
+          clearTimeout(timeout)
+        }
+      }
+    } finally {
+      isOpeningRef.current = false
+      setIsOpeningFile(false)
+      setOpeningPath(null)
+    }
+  }, [isSandboxMode, sandboxId, session, flushPendingSave])
+
+  useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
@@ -297,129 +408,6 @@ export function IDE({
         <Spinner />
       </div>
     )
-  }
-
-  async function handleSelectFile(path: string) {
-    const cached = fileContentCacheRef.current.get(path)
-    if (cached !== undefined) {
-      setSelectedFile({ path, content: cached })
-      return
-    }
-
-    if (isOpeningFile) {
-      return
-    }
-
-    if (pendingSaveRef.current) {
-      void flushPendingSave()
-    }
-
-    setIsOpeningFile(true)
-    setOpeningPath(path)
-    try {
-      if (isSandboxMode && sandboxId && projectId) {
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 8000)
-        let response: Response | null = null
-
-        try {
-          response = await fetch(`/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(path)}`, {
-            signal: controller.signal,
-          })
-        } catch (error: any) {
-          if (error?.name === 'AbortError') {
-            setLoadError(`Loading "${path}" timed out. The sandbox storage may be unreachable or slow.`)
-          } else {
-            setLoadError(`Could not reach sandbox storage to load "${path}". Check that the storage server is running.`)
-          }
-          throw error
-        } finally {
-          clearTimeout(timeout)
-        }
-
-        if (response.ok) {
-          const { content } = await response.json()
-          fileContentCacheRef.current.set(path, content)
-          setSelectedFile({ path, content })
-          setLoadError(null)
-        } else if (response.status === 404) {
-          const fallbackController = new AbortController()
-          const fallbackTimeout = setTimeout(() => fallbackController.abort(), 8000)
-
-          try {
-            const fallbackResponse = await fetch(
-              `/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`,
-              { signal: fallbackController.signal },
-            )
-
-            if (fallbackResponse.ok) {
-              const { content } = await fallbackResponse.json()
-              await persistFile(path, content)
-              fileContentCacheRef.current.set(path, content)
-              setSelectedFile({ path, content })
-            } else {
-              const errorData = await fallbackResponse.json().catch(() => null)
-              setLoadError(
-                errorData?.error ||
-                  `"${path}" was not found in the project workspace. It may only exist inside the running sandbox and could not be loaded.`,
-              )
-              throw new Error('Failed to load file from sandbox-storage and live sandbox')
-            }
-          } catch (error: any) {
-            if (error?.name === 'AbortError') {
-              setLoadError(
-                `Loading "${path}" from the live sandbox timed out. Files must be saved to the workspace before editing them here.`,
-              )
-            } else {
-              setLoadError(
-                `Could not reach the live sandbox to load "${path}". Check the sandbox connection and try again.`,
-              )
-            }
-            throw error
-          } finally {
-            clearTimeout(fallbackTimeout)
-          }
-        } else {
-          const errorData = await response.json().catch(() => null)
-          setLoadError(
-            errorData?.error || `Failed to load "${path}" (HTTP ${response.status}).`,
-          )
-          throw new Error('Failed to load file from sandbox-storage')
-        }
-      } else if (session) {
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 8000)
-
-        try {
-          const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`, {
-            signal: controller.signal,
-          })
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => null)
-            setLoadError(
-              errorData?.error || `Failed to load "${path}".`,
-            )
-            throw new Error('Failed to load workspace file')
-          }
-          const { content } = await response.json()
-          fileContentCacheRef.current.set(path, content)
-          setSelectedFile({ path, content })
-        } catch (error: any) {
-          if (error?.name === 'AbortError') {
-            setLoadError(`Loading "${path}" timed out. The workspace server may be slow.`)
-          }
-          throw error
-        } finally {
-          clearTimeout(timeout)
-        }
-      }
-    } catch (error) {
-      console.error('Error opening file:', error)
-    } finally {
-      setIsOpeningFile(false)
-      setOpeningPath(null)
-    }
   }
 
   function handleEditorChange(content: string | undefined) {
