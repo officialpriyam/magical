@@ -1697,6 +1697,19 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }
 
+  async function handleRedeploy() {
+    if (!fragment?.code) return
+    try {
+      const newResult = await handleExecuteCode(fragment.code)
+      if (newResult) {
+        setResult(newResult)
+        setCurrentPreview({ fragment, result: newResult })
+      }
+    } catch (err) {
+      console.error('Redeploy failed:', err)
+    }
+  }
+
   function handleUndo() {
     autoFixAttemptsRef.current = 0
     lastAutoFixSignatureRef.current = ''
@@ -2200,6 +2213,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               }}
               code={fragment?.code || ''}
               onSave={handleSaveFile}
+              onRedeploy={handleRedeploy}
               executeCode={handleExecuteCode}
             />
           )}

@@ -14,7 +14,7 @@ import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
 import { getFragmentFiles } from '@/lib/fragment-files'
 import { DeepPartial } from 'ai'
-import { ChevronsRight, LoaderCircle, Terminal, Code, Folder } from 'lucide-react'
+import { ChevronsRight, LoaderCircle, Terminal, Code, Folder, RotateCcw } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react'
 import ErrorBoundary from '@/components/error-boundary'
@@ -49,6 +49,7 @@ export function Preview({
   onClose,
   code,
   onSave,
+  onRedeploy,
   executeCode,
 }: {
   teamID: string | undefined
@@ -68,10 +69,12 @@ export function Preview({
   onClose: () => void
   code?: string
   onSave?: (path: string, content: string) => Promise<void>
+  onRedeploy?: () => Promise<void>
   executeCode?: (code: string) => Promise<any>
 }) {
   const [sandboxFiles, setSandboxFiles] = useState(result?.files || [])
   const [isGitHubSaveOpen, setIsGitHubSaveOpen] = useState(false)
+  const [isRedeploying, setIsRedeploying] = useState(false)
   const isGitHubSaveBlocked = githubSaveRequired && !isGitHubWorkspaceConnected
   const fragmentFiles = useMemo(() => getFragmentFiles(fragment), [fragment])
 
@@ -82,6 +85,18 @@ export function Preview({
   function handleOpenRequiredGitHubSave() {
     onSaveBlocked?.()
     setIsGitHubSaveOpen(true)
+  }
+
+  async function handleRedeploy() {
+    if (!onRedeploy || isRedeploying) return
+    setIsRedeploying(true)
+    try {
+      await onRedeploy()
+    } catch (err) {
+      console.error('Redeploy failed:', err)
+    } finally {
+      setIsRedeploying(false)
+    }
   }
 
   return (
@@ -157,6 +172,24 @@ export function Preview({
             </TabsList>
           </div>
           <div className="flex items-center justify-end gap-2">
+            {result?.sbxId && (
+              <TooltipProvider>
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-white"
+                      onClick={handleRedeploy}
+                      disabled={isRedeploying}
+                    >
+                      <RotateCcw className={`h-4 w-4 ${isRedeploying ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Redeploy sandbox</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             <GitHubSave
               fragment={fragment}
               result={result}
@@ -241,6 +274,7 @@ export function Preview({
                     sandboxId={result?.sbxId}
                     projectId={projectId}
                     onSave={onSave}
+                    onRedeploy={onRedeploy}
                     githubSaveRequired={githubSaveRequired}
                     githubWorkspaceConnected={isGitHubWorkspaceConnected}
                     onSaveBlocked={handleOpenRequiredGitHubSave}

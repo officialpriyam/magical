@@ -6,7 +6,7 @@ import { CodeEditor } from '@/components/code-editor'
 import { GitHubImport } from '@/components/github-import'
 import { useAuth } from '@/lib/auth'
 import { Button } from './ui/button'
-import { GitBranch, RefreshCw, Search, AlertTriangle, Wifi, WifiOff } from 'lucide-react'
+import { GitBranch, RefreshCw, Search, AlertTriangle, Wifi, WifiOff, Save, Download, RotateCcw } from 'lucide-react'
 import Spinner from './ui/spinner'
 
 type StorageStatus = 'idle' | 'loading' | 'ok' | 'error' | 'degraded'
@@ -15,6 +15,7 @@ interface IDEProps {
   sandboxId?: string
   projectId?: string
   onSave?: (path: string, content: string) => Promise<void>
+  onRedeploy?: () => Promise<void>
   githubSaveRequired?: boolean
   githubWorkspaceConnected?: boolean
   onSaveBlocked?: () => void
@@ -24,6 +25,7 @@ export function IDE({
   sandboxId,
   projectId,
   onSave,
+  onRedeploy,
   githubSaveRequired = false,
   githubWorkspaceConnected = false,
   onSaveBlocked,
@@ -53,6 +55,7 @@ export function IDE({
   const fetchInFlightRef = useRef(false)
   const isOpeningRef = useRef(false)
   const mountedRef = useRef(true)
+  const [isRedeploying, setIsRedeploying] = useState(false)
 
   useEffect(() => {
     mountedRef.current = true
@@ -571,6 +574,39 @@ export function IDE({
     }
   }
 
+  function handleManualSave() {
+    const currentFile = selectedFileRef.current
+    if (!currentFile) return
+    void flushPendingSave()
+  }
+
+  function handleDownloadFile() {
+    const currentFile = selectedFileRef.current
+    if (!currentFile) return
+
+    const blob = new Blob([currentFile.content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = currentFile.path.split('/').pop() || 'file'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleRedeploy() {
+    if (!onRedeploy || isRedeploying) return
+    setIsRedeploying(true)
+    try {
+      await onRedeploy()
+    } catch (err) {
+      console.error('Redeploy failed:', err)
+    } finally {
+      setIsRedeploying(false)
+    }
+  }
+
   if (showGitHubImport) {
     return (
       <div className="h-full overflow-auto bg-[#181818] p-4 text-white">
@@ -709,6 +745,39 @@ export function IDE({
           ) : (
             <div className="px-3 text-xs text-white/45">IDE</div>
           )}
+          <div className="ml-auto flex items-center gap-0.5 pr-1">
+            {selectedFile && (
+              <>
+                <button
+                  onClick={handleManualSave}
+                  className="flex h-7 items-center gap-1 rounded px-2 text-xs text-white/60 transition hover:bg-white/10 hover:text-white"
+                  title="Save file (Ctrl+S)"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline">Save</span>
+                </button>
+                <button
+                  onClick={handleDownloadFile}
+                  className="flex h-7 items-center gap-1 rounded px-2 text-xs text-white/60 transition hover:bg-white/10 hover:text-white"
+                  title="Download file"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline">Download</span>
+                </button>
+              </>
+            )}
+            {isSandboxMode && (
+              <button
+                onClick={handleRedeploy}
+                disabled={isRedeploying}
+                className="flex h-7 items-center gap-1 rounded px-2 text-xs text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                title="Redeploy sandbox"
+              >
+                <RotateCcw className={`h-3.5 w-3.5 ${isRedeploying ? 'animate-spin' : ''}`} />
+                <span className="hidden md:inline">{isRedeploying ? 'Redeploying...' : 'Redeploy'}</span>
+              </button>
+            )}
+          </div>
         </div>
         <div className="min-h-0 flex-1">
           {isOpeningFile && !selectedFile ? (

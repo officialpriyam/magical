@@ -1,28 +1,146 @@
-Proprietary License
+PROPRIETARY SOFTWARE LICENSE
+Copyright (c) 2026 priyx (officialpriyam). All rights reserved.
 
-Copyright (c) 2026 priyx. All rights reserved.
+IMPORTANT — READ CAREFULLY BEFORE USING THIS SOFTWARE
 
-Magical AI, including its source code, assets, documentation, configuration,
-branding, and related materials, is proprietary software owned by priyx.
+1. DEFINITIONS
+   "Software" means Magical AI, including but not limited to all source code,
+   object code, scripts, binaries, assets, graphics, images, audio, video,
+   text, documentation, configuration files, build scripts, database schemas,
+   API definitions, branding materials, logos, trademarks, trade dress,
+   and all related materials.
+   "Author" means priyx (officialpriyam), the sole and exclusive owner of
+   all rights, title, and interest in and to the Software.
+   "Fork" means any copy, derivative work, modified version, redistribution,
+   or reproduction of the Software, in whole or in part, whether or not
+   such work is based on or incorporates any portion of the Software.
+   "Claim" means any representation, assertion, or implication, whether
+   express or implied, that a person or entity is the author, owner,
+   creator, developer, or originator of the Software or any Fork thereof.
 
-No permission is granted to use, copy, modify, merge, publish, distribute,
-sublicense, sell, host, make available, or otherwise exploit this software, in
-whole or in part, without prior written permission from priyx.
+2. GRANT OF RIGHTS
+   No rights are granted. All rights in and to the Software are reserved
+   exclusively by the Author. This License does not授权任何使用、复制、修改、
+   分发、再许可、销售、托管、公开表演、公开展示、反向工程、创建衍生作品、
+   或以任何方式利用本软件的权利。
 
-Unauthorized access, reproduction, redistribution, reverse engineering,
-commercial use, or public deployment of this software is prohibited to the
-fullest extent permitted by law.
+3. PROHIBITED ACTIONS
+   You shall not, under any circumstances:
+   (a) Copy, reproduce, or duplicate the Software, in whole or in part;
+   (b) Modify, adapt, translate, reverse engineer, decompile, or disassemble
+       the Software;
+   (c) Create any Fork, derivative work, or modified version of the Software;
+   (d) Distribute, publish, sublicense, sell, lease, rent, loan, or otherwise
+       transfer the Software to any third party;
+   (e) Remove, alter, obscure, or modify any copyright notices, attribution
+       notices, trademark notices, or other proprietary notices in the Software;
+   (f) Use the Software to train, fine-tune, or improve any artificial
+       intelligence model, machine learning system, or similar technology;
+   (g) Use the Software in any manner that competes with, substitutes for,
+       or diminishes the value of the Author's products or services;
+   (h) Represent, claim, or imply that you are the author, creator, owner,
+       developer, or originator of the Software or any portion thereof;
+   (i) Use the Author's name, likeness, trademarks, or branding in any manner
+       that suggests endorsement, sponsorship, or affiliation without
+       express written permission;
+   (j) Host, deploy, or make the Software publicly available in any form;
+   (k) Circumvent, disable, or interfere with any security features,
+       access controls, or usage restrictions of the Software;
+   (l) Use the Software for any illegal, unauthorized, or unintended purpose;
+   (m) Assign, transfer, or sublicense any rights under this License.
 
-Authorized recipients may use this software only for the purpose expressly
-approved by priyx and must keep all non-public source code, assets, secrets,
-and documentation confidential.
+4. ANTI-FORK AND ANTI-CLAIM PROVISIONS
+   (a) Any Fork or derivative work created without the Author's express
+       written consent is null and void ab initio and constitutes an
+       immediate material breach of this License.
+   (b) You shall not, in any Fork or derivative work, remove, alter, or
+       obscure the Author's name, attribution, copyright notices, or
+       any other identifying marks from the Software.
+   (c) You shall not, in any Fork or derivative work, add, insert, or
+       imply any attribution, credit, copyright notice, or branding that
+       suggests you or any third party is the author, creator, or owner
+       of the Software.
+   (d) Any Fork must retain, in its entirety and without modification, all
+       copyright notices, attribution notices, and licensing statements
+       present in the original Software.
+   (e) You shall not register any trademark, service mark, domain name,
+       or other intellectual property right that is identical or confusingly
+       similar to "Magical AI", "priyx", "officialpriyam", or any variation
+       thereof.
+   (f) You shall not claim ownership, authorship, or creation credit for
+       the Software or any portion thereof in any public or private forum,
+       repository, publication, or communication.
 
-Third-party dependencies included or referenced by this project remain governed
-by their respective licenses. This license does not grant any rights to those
-third-party works beyond the rights provided by their owners.
+5. INTELLECTUAL PROPERTY
+   The Software and all copies, modifications, and derivative works thereof
+   are and shall remain the exclusive property of the Author. This License
+   does not transfer any ownership interest in the Software. All rights not
+   expressly granted herein are reserved by the Author.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR
-A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL PRIYX BE LIABLE
-FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE
-SOFTWARE OR THE USE OF THE SOFTWARE.
+6. CONFIDENTIALITY
+   To the extent the Software contains confidential or proprietary information,
+   you agree to maintain the confidentiality thereof and not disclose such
+   information to any third party without the Author's prior written consent.
+
+7. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, AND ANY
+   WARRANTIES ARISING FROM COURSE OF DEALING OR USAGE OF TRADE. THE AUTHOR
+   DOES NOT WARRANT THAT THE SOFTWARE WILL BE UNINTERRUPTED, ERROR-FREE,
+   SECURE, OR FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS.
+
+8. LIMITATION OF LIABILITY
+   IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+   INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES
+   (INCLUDING BUT NOT LIMITED TO PROCUREMENT OF SUBSTITUTE GOODS OR
+   SERVICES; LOSS OF USE, DATA, OR PROFITS; BUSINESS INTERRUPTION;
+   OR COMPUTER FAILURE OR MALFUNCTION) ARISING OUT OF OR IN CONNECTION
+   WITH THE USE OF THE SOFTWARE, HOWEVER CAUSED AND UNDER ANY THEORY
+   OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE), EVEN IF THE AUTHOR HAS BEEN
+   ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+9. INDEMNIFICATION
+   You agree to indemnify, defend, and hold harmless the Author from and
+   against any and all claims, liabilities, damages, losses, costs, and
+   expenses (including reasonable attorneys' fees) arising out of or
+   relating to your use of the Software, any Fork or derivative work
+   created by you, or any breach of this License.
+
+10. TERMINATION
+    This License is effective until terminated. The Author may terminate
+    this License at any time if you fail to comply with any term herein.
+    Upon termination, you must immediately destroy all copies of the
+    Software in your possession or control. Termination does not limit
+    any other remedies available to the Author.
+
+11. GOVERNING LAW AND JURISDICTION
+    This License shall be governed by and construed in accordance with
+    the laws of India, without regard to its conflict of laws principles.
+    Any dispute arising out of or relating to this License shall be
+    subject to the exclusive jurisdiction of the courts of India.
+
+12. ENTIRE AGREEMENT
+    This License constitutes the entire agreement between you and the
+    Author with respect to the Software and supersedes all prior or
+    contemporaneous agreements, representations, warranties, and
+    understandings, whether oral or written.
+
+13. SEVERABILITY
+    If any provision of this License is held to be invalid, illegal, or
+    unenforceable, the remaining provisions shall continue in full force
+    and effect.
+
+14. NO WAIVER
+    The Author's failure to enforce any provision of this License shall
+    not constitute a waiver of that provision or any other provision.
+
+15. CONTACT
+    For any inquiries regarding this License or to obtain written
+    permission to use the Software, contact: officialpriyam
+    on GitHub (https://github.com/officialpriyam/magical)
+
+ALL RIGHTS RESERVED. UNAUTHORIZED USE, COPYING, DISTRIBUTION, MODIFICATION,
+OR CREATION OF DERIVATIVE WORKS IS STRICTLY PROHIBITED AND WILL BE
+PROSECUTED TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW.
