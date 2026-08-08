@@ -132,7 +132,7 @@ export default function SettingsLayout({
         "flex flex-col border-r border-white/10 bg-[#0b0d0b] transition-all duration-300",
         "fixed inset-y-0 left-0 z-40 md:relative md:z-auto",
         // Mobile: open/close
-        sidebarOpen ? "translate-x-0" : "-translate-x-full",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         // Desktop: collapse/expand
         desktopCollapsed ? "md:w-16" : "md:w-64",
         // Mobile always w-64 when open
