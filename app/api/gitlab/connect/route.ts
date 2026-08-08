@@ -4,32 +4,33 @@ import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const GITHUB_SCOPES = ['repo', 'read:org', 'user:email']
+const GITLAB_SCOPES = ['api', 'read_repository', 'write_repository']
 
 export async function GET(request: NextRequest) {
   const baseUrl = getConnectBaseUrl(request)
   const redirectToSettings = (status: string) =>
-    NextResponse.redirect(`${baseUrl}/settings/git?github=${status}`)
+    NextResponse.redirect(`${baseUrl}/settings/git?gitlab=${status}`)
 
-  if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+  if (!process.env.GITLAB_CLIENT_ID || !process.env.GITLAB_CLIENT_SECRET) {
     return redirectToSettings('not_configured')
   }
 
   const state = randomUUID()
-  const redirectUri = `${baseUrl}/api/github/callback`
+  const redirectUri = `${baseUrl}/api/gitlab/callback`
   const params = new URLSearchParams({
-    client_id: process.env.GITHUB_CLIENT_ID,
+    client_id: process.env.GITLAB_CLIENT_ID,
     redirect_uri: redirectUri,
-    scope: GITHUB_SCOPES.join(' '),
+    scope: GITLAB_SCOPES.join('+'),
     state,
-    allow_signup: 'true',
+    response_type: 'code',
   })
 
+  const gitlabHost = process.env.GITLAB_HOST || 'https://gitlab.com'
   const response = NextResponse.redirect(
-    `https://github.com/login/oauth/authorize?${params.toString()}`,
+    `${gitlabHost}/oauth/authorize?${params.toString()}`,
   )
 
-  response.cookies.set('github_oauth_state', state, {
+  response.cookies.set('gitlab_oauth_state', state, {
     httpOnly: true,
     secure: request.nextUrl.protocol === 'https:' || process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -61,12 +62,6 @@ function getConnectBaseUrl(request: NextRequest) {
 
 function normalizeBaseUrl(url: string) {
   const trimmedUrl = url.trim().replace(/\/+$/, '')
-
-  if (!trimmedUrl) {
-    return ''
-  }
-
-  return trimmedUrl.startsWith('http')
-    ? trimmedUrl
-    : `https://${trimmedUrl}`
+  if (!trimmedUrl) return ''
+  return trimmedUrl.startsWith('http') ? trimmedUrl : `https://${trimmedUrl}`
 }

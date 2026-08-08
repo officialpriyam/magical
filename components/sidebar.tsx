@@ -397,9 +397,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             asChild
             className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
           >
-            <Link href="/settings/integrations">
+            <Link href="/settings/git">
               <GitBranch className="h-4 w-4" />
-              Connectors
+              Git
             </Link>
           </Button>
         </div>

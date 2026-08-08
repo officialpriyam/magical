@@ -153,7 +153,7 @@ export default function ProjectsPage() {
             </Link>
             <div className="h-4 w-px bg-white/10" />
             <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-[10px] font-bold text-white">
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-[10px] font-bold text-black">
                 M
               </div>
               <span className="text-sm font-medium text-white">All Projects</span>

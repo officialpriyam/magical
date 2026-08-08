@@ -19,7 +19,7 @@ type GitHubTokenResponse = {
 export async function GET(request: NextRequest) {
   const baseUrl = getAppBaseUrl(request)
   const redirectToSettings = (status: string) =>
-    NextResponse.redirect(`${baseUrl}/settings/integrations?github=${status}`)
+    NextResponse.redirect(`${baseUrl}/settings/git?github=${status}`)
 
   const code = request.nextUrl.searchParams.get('code')
   const state = request.nextUrl.searchParams.get('state')

@@ -2007,6 +2007,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       <span>{recentProjects.length} project{recentProjects.length === 1 ? '' : 's'}</span>
                       <span className="h-1 w-1 rounded-full bg-white/25" />
                       <span>{githubProjectCount} connected to GitHub</span>
+                      <Link
+                        href="/projects"
+                        className="ml-2 inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-0.5 text-[11px] font-medium text-white/70 transition hover:bg-white/[0.1] hover:text-white"
+                      >
+                        Browse all
+                      </Link>
                     </div>
                   </div>
                   <div className="max-h-[480px] overflow-y-auto overscroll-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

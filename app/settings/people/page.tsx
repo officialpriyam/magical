@@ -59,7 +59,7 @@ export default function PeoplePage() {
         <button
           type="button"
           onClick={() => setShowInvite(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/80"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-black transition hover:bg-primary/80"
         >
           <UserPlus className="h-4 w-4" />
           Add member
@@ -184,7 +184,7 @@ export default function PeoplePage() {
                     setInviteEmail('')
                   }
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/80"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-black transition hover:bg-primary/80"
               >
                 <Mail className="h-4 w-4" />
                 Send invite

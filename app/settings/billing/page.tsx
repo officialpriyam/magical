@@ -61,7 +61,7 @@ export default function BillingPage() {
           <div className="mb-4 text-3xl font-semibold text-white">$20</div>
           <button
             type="button"
-            className="mb-4 w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-primary/80"
+            className="mb-4 w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-black transition hover:bg-primary/80"
           >
             Upgrade
           </button>

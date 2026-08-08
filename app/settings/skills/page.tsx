@@ -38,7 +38,7 @@ export default function SkillsPage() {
         <h1 className="text-2xl font-semibold text-white">Skills</h1>
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-primary/80"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-black transition hover:bg-primary/80"
         >
           <Plus className="h-4 w-4" />
           Add skill

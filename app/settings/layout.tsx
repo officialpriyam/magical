@@ -45,8 +45,8 @@ const settingsNavigation: { section: string; items: NavItem[] }[] = [
     section: 'Access',
     items: [
       { name: 'People', href: '/settings/people', icon: Users },
-      { name: 'Groups', href: '/settings/groups', icon: Users },
-      { name: 'Identity', href: '/settings/identity', icon: Shield },
+      { name: 'Groups', icon: Users, badge: 'Upcoming' },
+      { name: 'Identity', icon: Shield, badge: 'Upcoming' },
     ],
   },
   {
@@ -54,8 +54,8 @@ const settingsNavigation: { section: string; items: NavItem[] }[] = [
     items: [
       { name: 'Knowledge', href: '/settings/knowledge', icon: BookOpen },
       { name: 'Skills', href: '/settings/skills', icon: Zap },
-      { name: 'Templates', href: '/settings/templates', icon: FileText },
-      { name: 'Design systems', href: '/settings/design-systems', icon: Layers },
+      { name: 'Templates', icon: FileText, badge: 'Upcoming' },
+      { name: 'Design systems', icon: Layers, badge: 'Upcoming' },
       { name: 'Connectors', href: '/settings/connectors', icon: Plug },
     ],
   },
@@ -122,7 +122,7 @@ export default function SettingsLayout({
 
         {/* Workspace selector */}
         <div className="mx-3 mb-4 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-black">
             {userInitial}
           </div>
           <span className="flex-1 truncate text-sm text-white">{userName}&apos;s Workspace</span>

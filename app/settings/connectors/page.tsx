@@ -558,7 +558,7 @@ export default function ConnectorsPage() {
               </button>
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary/80"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-black transition hover:bg-primary/80"
               >
                 Got it
               </button>
