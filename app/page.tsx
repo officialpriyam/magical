@@ -1881,7 +1881,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       >
         <div
           className={cn(
-            "relative flex h-[100dvh] w-full flex-col",
+            "relative flex h-[100dvh] w-full flex-col overflow-hidden",
             isDashboardMode
               ? "col-span-2 mx-auto max-w-none p-2 md:p-4"
               : "min-w-0 bg-[#111211]",
@@ -1974,7 +1974,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   <div className="mb-4 sm:mb-6">
                     <HeroPillSecond />
                   </div>
-                  <h1 className="mb-5 max-w-3xl text-2xl font-semibold tracking-normal text-white sm:mb-7 sm:text-3xl md:text-4xl">
+                  <h1 className="mb-5 max-w-3xl text-xl font-semibold tracking-normal text-white sm:text-2xl sm:mb-7 md:text-4xl">
                     Let&apos;s build something, {displayName}
                   </h1>
                   {!session && (

@@ -260,14 +260,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="flex h-dvh shrink-0 md:h-screen">
-      {/* Always visible icons */}
+      {/* Always visible icons - hidden on mobile */}
       <div 
-        className={`bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col items-center py-4 transition-all duration-300 ease-in-out ${
+        className={`bg-[#0b0b0c] border-r border-white/[0.06] flex-col items-center py-4 transition-all duration-300 ease-in-out ${
           isOpen ? 'w-0 opacity-0 overflow-hidden' : 'w-16 opacity-100'
-        } ${isMobile ? 'fixed top-0 left-0 z-50 h-[100dvh] rounded-r-2xl shadow-2xl' : ''}`}
+        } hidden md:flex`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={isMobile ? { borderRadius: '0 16px 16px 0' } : { borderRadius: '0 16px 16px 0' }}
+        style={{ borderRadius: '0 16px 16px 0' }}
       >
         {/* Top section with menu and new icons */}
         <div className="flex flex-col items-center space-y-2">
@@ -354,7 +354,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`h-dvh bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col transition-all duration-300 ease-in-out md:h-screen ${
           isOpen
             ? 'fixed inset-y-0 left-0 z-50 w-[min(82vw,18rem)] opacity-100 translate-x-0 shadow-2xl md:relative md:z-auto md:w-64 md:shadow-none'
-            : 'w-0 opacity-0 -translate-x-full overflow-hidden'
+            : 'w-0 opacity-0 overflow-hidden md:-translate-x-full'
         }`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
