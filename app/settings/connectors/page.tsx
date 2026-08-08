@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, ExternalLink, Plus, ChevronRight, Check } from 'lucide-react'
+import { Search, Plus, Check } from 'lucide-react'
+import Link from 'next/link'
 
 interface Connector {
   id: string
@@ -175,12 +176,12 @@ export default function ConnectorsPage() {
                   </div>
                   <p className="text-xs text-white/40">{connector.description}</p>
                 </div>
-                <button
-                  type="button"
+                <Link
+                  href="/settings/integrations"
                   className="rounded-lg border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs text-white transition hover:bg-white/[0.1]"
                 >
                   {connector.connected ? 'Settings' : 'Install'}
-                </button>
+                </Link>
               </div>
             ))}
           </div>

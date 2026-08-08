@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { X, MessageCircle, Search, Gift, Settings, HelpCircle, CreditCard, LogOut, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch, Home } from 'lucide-react';
+import { MessageCircle, Search, Gift, Settings, HelpCircle, CreditCard, LogOut, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch, Home } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { HelpModal } from '@/components/help-center';
 import { PricingModal } from '@/components/pricing';
+import { WorkspaceDropdown } from '@/components/workspace-dropdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -399,24 +400,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onMouseLeave={handleMouseLeave}
       >
         {/* Header Section */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <div>
-            <div className="text-xl font-bold text-white">
-              Magical AI
-            </div>
-            <div className="text-xs text-white/55">
-              Developed by priyx
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleCloseSidebar}
-            className="h-8 w-8 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-            aria-label="Close sidebar"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+        <div className="p-3 border-b border-white/10">
+          <WorkspaceDropdown />
         </div>
 
         <div className="p-3 space-y-1">
