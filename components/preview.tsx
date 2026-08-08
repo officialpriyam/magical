@@ -17,6 +17,7 @@ import { DeepPartial } from 'ai'
 import { ChevronsRight, LoaderCircle, Terminal, Code, Folder } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react'
+import ErrorBoundary from '@/components/error-boundary'
 
 export type PreviewTab = 'code' | 'fragment' | 'terminal' | 'ide'
 
@@ -215,15 +216,37 @@ export function Preview({
             </TabsContent>
             <TabsContent value="ide" className="h-full m-0 p-0">
               <div className="h-full w-full">
-                <IDE
-                  sandboxId={result?.sbxId}
-                  projectId={projectId}
-                  initialFiles={sandboxFiles}
-                  onSave={onSave}
-                  githubSaveRequired={githubSaveRequired}
-                  githubWorkspaceConnected={isGitHubWorkspaceConnected}
-                  onSaveBlocked={handleOpenRequiredGitHubSave}
-                />
+                <ErrorBoundary
+                  name="IDE"
+                  fallback={
+                    <div className="flex h-full flex-col items-center justify-center bg-[#181818] p-6 text-center">
+                      <div className="max-w-sm space-y-3">
+                        <div className="text-sm font-medium text-red-400">IDE crashed</div>
+                        <p className="text-xs text-white/40">
+                          The code editor hit an error and had to restart. Your project files are safe.
+                        </p>
+                        <Button
+                          onClick={() => window.location.reload()}
+                          size="sm"
+                          variant="outline"
+                          className="border-white/10 text-xs"
+                        >
+                          Reload page
+                        </Button>
+                      </div>
+                    </div>
+                  }
+                >
+                  <IDE
+                    sandboxId={result?.sbxId}
+                    projectId={projectId}
+                    initialFiles={sandboxFiles}
+                    onSave={onSave}
+                    githubSaveRequired={githubSaveRequired}
+                    githubWorkspaceConnected={isGitHubWorkspaceConnected}
+                    onSaveBlocked={handleOpenRequiredGitHubSave}
+                  />
+                </ErrorBoundary>
               </div>
             </TabsContent>
           </div>

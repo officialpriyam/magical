@@ -1,19 +1,41 @@
 'use client'
 
-import React from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import React, { useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, RefreshCw, Copy } from 'lucide-react'
 
 interface ErrorBoundaryState {
   hasError: boolean
   error?: Error
+  errorInfo?: React.ErrorInfo
+  errorId?: string
 }
 
 interface ErrorBoundaryProps {
   children: React.ReactNode
   fallback?: React.ReactNode
+  name?: string
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void
 }
+
+let errorLog: Array<{
+  id: string
+  timestamp: string
+  name: string
+  message: string
+  stack?: string
+  componentStack?: string
+}> = []
+
+export function getErrorLog() {
+  return errorLog
+}
+
+export function clearErrorLog() {
+  errorLog = []
+}
+
+let errorCounter = 0
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
@@ -22,14 +44,69 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    errorCounter++
+    const id = `err-${Date.now()}-${errorCounter}`
     return {
       hasError: true,
-      error
+      error,
+      errorId: id,
     }
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo)
+    const boundaryName = this.props.name || 'unknown'
+    const errorId = this.state.errorId || `err-${Date.now()}`
+
+    const entry = {
+      id: errorId,
+      timestamp: new Date().toISOString(),
+      name: boundaryName,
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack || undefined,
+    }
+
+    errorLog = [...errorLog.slice(-49), entry]
+
+    console.error(`[ErrorBoundary:${boundaryName}]`, error, errorInfo)
+
+    this.props.onError?.(error, errorInfo)
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined, errorId: undefined })
+  }
+
+  handleReload = () => {
+    window.location.reload()
+  }
+
+  handleCopyError = async () => {
+    const { error, errorInfo, errorId } = this.state
+    const boundaryName = this.props.name || 'unknown'
+    const text = [
+      `Error ID: ${errorId}`,
+      `Component: ${boundaryName}`,
+      `Time: ${new Date().toISOString()}`,
+      `Message: ${error?.message}`,
+      '',
+      'Stack:',
+      error?.stack,
+      '',
+      'Component Stack:',
+      errorInfo?.componentStack,
+    ].filter(Boolean).join('\n')
+
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
   }
 
   render() {
@@ -38,51 +115,77 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         return this.props.fallback
       }
 
+      const { error, errorInfo, errorId } = this.state
+      const boundaryName = this.props.name || 'Component'
+
       return (
-        <Card className="border-red-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5" />
-              Something went wrong
-            </CardTitle>
-            <CardDescription>
-              An error occurred while loading this section. This might be due to missing configuration or network issues.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {process.env.NODE_ENV === 'development' && this.state.error && (
-                <details className="text-sm">
-                  <summary className="cursor-pointer text-red-600 font-medium">
-                    Error details (development only)
-                  </summary>
-                  <pre className="mt-2 p-2 bg-red-50 rounded text-xs overflow-auto">
-                    {this.state.error.message}
-                    {this.state.error.stack}
-                  </pre>
-                </details>
-              )}
-              
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => this.setState({ hasError: false })}
-                  variant="outline"
-                  size="sm"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Try again
-                </Button>
-                
-                <Button 
-                  onClick={() => window.location.reload()}
-                  size="sm"
-                >
-                  Reload page
-                </Button>
+        <div className="flex h-full min-h-[200px] items-center justify-center bg-[#181818] p-4">
+          <div className="w-full max-w-lg rounded-xl border border-red-500/20 bg-[#1a1212] p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-red-400 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-red-300">
+                  {boundaryName} crashed
+                </div>
+                <p className="mt-1 text-xs text-white/50">
+                  {error?.message || 'An unknown error occurred'}
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+
+            <details className="mt-3 group">
+              <summary className="cursor-pointer text-xs text-white/40 hover:text-white/60 select-none">
+                Error details
+              </summary>
+              <div className="mt-2 rounded-lg border border-white/5 bg-black/30 p-3">
+                {errorId && (
+                  <div className="mb-2 text-[10px] text-white/30">
+                    ID: {errorId}
+                  </div>
+                )}
+                <pre className="max-h-40 overflow-auto text-[11px] leading-4 text-red-300/80 whitespace-pre-wrap break-all">
+                  {error?.message}
+                  {'\n\n'}
+                  {error?.stack}
+                  {errorInfo?.componentStack && (
+                    <>
+                      {'\n\nComponent Stack:\n'}
+                      {errorInfo.componentStack}
+                    </>
+                  )}
+                </pre>
+              </div>
+            </details>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                onClick={this.handleCopyError}
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 border-white/10 text-xs text-white/60 hover:bg-white/5"
+              >
+                <Copy className="h-3 w-3" />
+                Copy error
+              </Button>
+              <Button
+                onClick={this.handleReset}
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 border-white/10 text-xs text-white/60 hover:bg-white/5"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Try again
+              </Button>
+              <Button
+                onClick={this.handleReload}
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+              >
+                Reload page
+              </Button>
+            </div>
+          </div>
+        </div>
       )
     }
 
@@ -92,16 +195,13 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 export default ErrorBoundary
 
-// Hook version for functional components
 export function useErrorHandler() {
-  return (error: Error, errorInfo?: any) => {
+  return useCallback((error: Error, errorInfo?: any) => {
     console.error('Error:', error, errorInfo)
-    // You could send this to an error reporting service
-  }
+  }, [])
 }
 
-// Simple loading fallback component
-export function LoadingFallback({ message = "Loading..." }: { message?: string }) {
+export function LoadingFallback({ message = 'Loading...' }: { message?: string }) {
   return (
     <div className="flex items-center justify-center py-8">
       <div className="text-center">
@@ -112,7 +212,6 @@ export function LoadingFallback({ message = "Loading..." }: { message?: string }
   )
 }
 
-// Settings section wrapper with error boundary
 export function SettingsSection({ children, title, description }: {
   children: React.ReactNode
   title?: string
@@ -120,18 +219,17 @@ export function SettingsSection({ children, title, description }: {
 }) {
   return (
     <ErrorBoundary
+      name={title || 'Settings Section'}
       fallback={
-        <Card className="border-yellow-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-600">
-              <AlertTriangle className="h-5 w-5" />
-              {title || 'Section'} Unavailable
-            </CardTitle>
-            <CardDescription>
-              {description || 'This section could not be loaded. Some features may require additional setup.'}
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+          <div className="flex items-center gap-2 text-sm text-amber-400">
+            <AlertTriangle className="h-4 w-4" />
+            {title || 'Section'} Unavailable
+          </div>
+          <p className="mt-1 text-xs text-white/40">
+            {description || 'This section could not be loaded.'}
+          </p>
+        </div>
       }
     >
       {children}

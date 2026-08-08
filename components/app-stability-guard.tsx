@@ -1,6 +1,6 @@
 'use client'
 
-import ErrorBoundary from '@/components/error-boundary'
+import ErrorBoundary, { getErrorLog } from '@/components/error-boundary'
 import { useEffect, useRef, useState } from 'react'
 
 const PERFORMANCE_MODE_KEY = 'magical-performance-mode'
@@ -88,23 +88,33 @@ export function AppStabilityGuard({ children }: { children: React.ReactNode }) {
       longTaskObserver.observe({ entryTypes: ['longtask'] })
     }
 
-    function handleChunkFailure(event: ErrorEvent | PromiseRejectionEvent) {
-      const reason = 'reason' in event ? event.reason : event.error || event.message
-      const message = String(reason?.message || reason || '')
+    function handleError(event: ErrorEvent) {
+      const message = String(event.message || event.error?.message || '')
+      console.error('[GlobalError]', event.error)
 
       if (/chunk|loading css chunk|module script|failed to fetch dynamically imported module/i.test(message)) {
         setShowRecoveryNotice(true)
       }
     }
 
-    window.addEventListener('error', handleChunkFailure)
-    window.addEventListener('unhandledrejection', handleChunkFailure)
+    function handleRejection(event: PromiseRejectionEvent) {
+      const reason = event.reason
+      const message = String(reason?.message || reason || '')
+      console.error('[UnhandledRejection]', reason)
+
+      if (/chunk|loading css chunk|module script|failed to fetch dynamically imported module/i.test(message)) {
+        setShowRecoveryNotice(true)
+      }
+    }
+
+    window.addEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handleRejection)
 
     return () => {
       window.clearInterval(lagTimer)
       longTaskObserver?.disconnect()
-      window.removeEventListener('error', handleChunkFailure)
-      window.removeEventListener('unhandledrejection', handleChunkFailure)
+      window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handleRejection)
     }
   }, [])
 
@@ -117,7 +127,7 @@ export function AppStabilityGuard({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <ErrorBoundary fallback={<AppCrashRecovery />}>
+    <ErrorBoundary name="App" fallback={<AppCrashRecovery />}>
       {children}
       {showRecoveryNotice && (
         <div className="fixed bottom-4 right-4 z-[100] w-[min(calc(100vw-2rem),22rem)] rounded-xl border border-amber-400/20 bg-[#111211]/95 p-4 text-sm text-white shadow-2xl backdrop-blur">
@@ -148,6 +158,29 @@ export function AppStabilityGuard({ children }: { children: React.ReactNode }) {
 }
 
 function AppCrashRecovery() {
+  const [showDetails, setShowDetails] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const errors = getErrorLog()
+
+  async function copyAllErrors() {
+    const text = errors.map((e) =>
+      `[${e.timestamp}] ${e.name}: ${e.message}\n${e.stack || ''}\n${e.componentStack || ''}`
+    ).join('\n---\n')
+
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <main className="flex min-h-dvh items-center justify-center bg-[#080809] p-6 text-white">
       <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#111211] p-6 shadow-2xl">
@@ -155,6 +188,36 @@ function AppCrashRecovery() {
         <p className="mt-2 text-sm leading-6 text-white/60">
           The app hit a render error. Reloading clears the current UI state and keeps your saved projects intact.
         </p>
+
+        {errors.length > 0 && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              className="text-xs text-white/40 hover:text-white/60"
+            >
+              {showDetails ? 'Hide' : 'Show'} error details ({errors.length})
+            </button>
+            {showDetails && (
+              <div className="mt-2 max-h-40 overflow-auto rounded-lg border border-white/5 bg-black/30 p-2">
+                {errors.map((e) => (
+                  <div key={e.id} className="mb-2 border-b border-white/5 pb-2 text-[10px] last:mb-0 last:border-0 last:pb-0">
+                    <div className="text-white/30">{e.timestamp} — {e.name}</div>
+                    <div className="text-red-300/80">{e.message}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={copyAllErrors}
+              className="mt-2 flex items-center gap-1.5 text-xs text-white/40 hover:text-white/60"
+            >
+              {copied ? 'Copied!' : 'Copy all errors'}
+            </button>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => window.location.reload()}
