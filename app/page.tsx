@@ -847,7 +847,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to restore saved workspace.')
+        const details = data.details ? `: ${data.details}` : ''
+        throw new Error(data.error || 'Failed to restore saved workspace.' + details)
       }
 
       const restoredResult = data as ExecutionResult

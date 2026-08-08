@@ -374,6 +374,7 @@ export async function POST(
       {
         error: 'Failed to restore project sandbox from saved workspace.',
         details: error?.message || 'Unknown error',
+        stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
       },
       { status: 500 },
     )

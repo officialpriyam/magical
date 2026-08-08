@@ -14,7 +14,6 @@ type StorageStatus = 'idle' | 'loading' | 'ok' | 'error' | 'degraded'
 interface IDEProps {
   sandboxId?: string
   projectId?: string
-  initialFiles?: FileSystemNode[]
   onSave?: (path: string, content: string) => Promise<void>
   githubSaveRequired?: boolean
   githubWorkspaceConnected?: boolean
@@ -24,14 +23,13 @@ interface IDEProps {
 export function IDE({
   sandboxId,
   projectId,
-  initialFiles,
   onSave,
   githubSaveRequired = false,
   githubWorkspaceConnected = false,
   onSaveBlocked,
 }: IDEProps = {}) {
   const { session, loading } = useAuth(() => {}, () => {})
-  const [files, setFiles] = useState<FileSystemNode[]>(initialFiles ?? [])
+  const [files, setFiles] = useState<FileSystemNode[]>([])
   const [selectedFile, setSelectedFile] = useState<{
     path: string
     content: string
@@ -52,12 +50,6 @@ export function IDE({
   const fileContentCacheRef = useRef<Map<string, string>>(new Map())
   const fetchInFlightRef = useRef(false)
   const isOpeningRef = useRef(false)
-  const initialFilesSyncedRef = useRef(false)
-  const initialFilesRef = useRef(initialFiles)
-
-  useEffect(() => {
-    initialFilesRef.current = initialFiles
-  }, [initialFiles])
 
   const blockGitHubSave = useCallback(() => {
     onSaveBlocked?.()
@@ -109,12 +101,7 @@ export function IDE({
               return
             }
 
-            const fallback = initialFilesRef.current
-            if (fallback && fallback.length > 0) {
-              setFiles(fallback)
-            } else {
-              setFiles([])
-            }
+            setFiles([])
             setStorageSlow(false)
             setStorageStatus('degraded')
             setLoadError(
@@ -133,10 +120,6 @@ export function IDE({
             errorData?.error || `Failed to fetch files (HTTP ${storageResponse.status}).`
           setLoadError(message)
           setStorageStatus('error')
-          const fallback = initialFilesRef.current
-          if (fallback && fallback.length > 0) {
-            setFiles(fallback)
-          }
         }
       } catch (error: any) {
         if (error?.name === 'AbortError') {
@@ -278,13 +261,6 @@ export function IDE({
       fetchFiles()
     }
   }, [session, isSandboxMode, fetchFiles])
-
-  useEffect(() => {
-    if (isSandboxMode && !initialFilesSyncedRef.current && initialFiles && initialFiles.length > 0 && files.length === 0) {
-      initialFilesSyncedRef.current = true
-      setFiles(initialFiles)
-    }
-  }, [isSandboxMode, initialFiles, files.length])
 
   useEffect(() => {
     return () => {

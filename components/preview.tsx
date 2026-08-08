@@ -240,7 +240,6 @@ export function Preview({
                   <IDE
                     sandboxId={result?.sbxId}
                     projectId={projectId}
-                    initialFiles={sandboxFiles}
                     onSave={onSave}
                     githubSaveRequired={githubSaveRequired}
                     githubWorkspaceConnected={isGitHubWorkspaceConnected}
