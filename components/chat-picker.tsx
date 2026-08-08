@@ -14,7 +14,7 @@ import { Sparkles, Zap, Wand2 } from 'lucide-react'
 import Image from 'next/image'
 import { useMemo } from 'react'
 
-const MAGIC_FREE_MODELS: LLMModel[] = [
+export const MAGIC_FREE_MODELS: LLMModel[] = [
   { id: 'openai/gpt-oss-20b:free', name: 'GPT-OSS 20B', provider: 'OpenAI', providerId: 'openrouter' },
   { id: 'qwen/qwen3-4b:free', name: 'Qwen3 4B', provider: 'Qwen', providerId: 'openrouter' },
   { id: 'qwen/qwen3-8b:free', name: 'Qwen3 8B', provider: 'Qwen', providerId: 'openrouter' },
@@ -27,7 +27,7 @@ const MAGIC_FREE_MODELS: LLMModel[] = [
   { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', provider: 'Mistral', providerId: 'openrouter' },
 ]
 
-const MAGIC_PLUS_MODELS: LLMModel[] = [
+export const MAGIC_PLUS_MODELS: LLMModel[] = [
   { id: 'qwen/qwen3-235b-a22b:free', name: 'Qwen3 235B', provider: 'Qwen', providerId: 'openrouter' },
   { id: 'meta-llama/llama-4-maverick:free', name: 'Llama 4 Maverick', provider: 'Meta', providerId: 'openrouter' },
   { id: 'meta-llama/llama-4-scout:free', name: 'Llama 4 Scout', provider: 'Meta', providerId: 'openrouter' },

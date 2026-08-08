@@ -3,6 +3,7 @@
 import { ViewType } from '@/components/auth';
 import { AuthDialog } from '@/components/auth-dialog';
 import { Chat } from '@/components/chat';
+import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS } from '@/components/chat-picker';
 import { PromptInputBox } from '@/components/ui/ai-prompt-box';
 import { useAuth } from '@/lib/auth';
 import dynamic from 'next/dynamic';
@@ -372,10 +373,19 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return true
   }), [availableModels])
 
-  const currentModel =
-    filteredModels.find((model: any) => model.id === languageModel.model) ||
-    filteredModels.find((model: any) => model.id === DEFAULT_MODEL_ID) ||
-    filteredModels[0]
+  const currentModel = useMemo(() => {
+    if (languageModel.model === 'magic') {
+      return MAGIC_FREE_MODELS[Math.floor(Math.random() * MAGIC_FREE_MODELS.length)]
+    }
+    if (languageModel.model === 'magic+') {
+      return MAGIC_PLUS_MODELS[Math.floor(Math.random() * MAGIC_PLUS_MODELS.length)]
+    }
+    return (
+      filteredModels.find((model: any) => model.id === languageModel.model) ||
+      filteredModels.find((model: any) => model.id === DEFAULT_MODEL_ID) ||
+      filteredModels[0]
+    )
+  }, [languageModel.model, filteredModels])
 
   // Determine which API to use based on morph toggle and existing fragment
   const shouldUseMorph = useMorphApply && fragment && fragment.code && fragment.file_path
@@ -463,6 +473,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   useEffect(() => {
     if (filteredModels.length === 0) return
+
+    if (languageModel.model === 'magic' || languageModel.model === 'magic+') return
 
     const selectedModelExists = filteredModels.some(
       (model: any) => model.id === languageModel.model,
@@ -1808,7 +1820,23 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       {(error || errorMessage) && (
         <div className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
           <span>{errorMessage || error?.message || 'AI generation failed.'}</span>
-          <button onClick={retry} className="ml-4 p-1 rounded-md hover:bg-red-500/20">Retry</button>
+          <div className="flex items-center gap-1">
+            {fragment && (
+              <button
+                onClick={() => {
+                  if (fragment) {
+                    autoFixAttemptsRef.current = 0
+                    lastAutoFixSignatureRef.current = ''
+                    startAutoFix(fragment, errorMessage || error?.message || 'Unknown error')
+                  }
+                }}
+                className="ml-2 px-2 py-1 rounded-md hover:bg-amber-500/20 text-amber-500 text-xs font-medium"
+              >
+                Auto Fix
+              </button>
+            )}
+            <button onClick={retry} className="ml-1 p-1 rounded-md hover:bg-red-500/20">Retry</button>
+          </div>
         </div>
       )}
     </>

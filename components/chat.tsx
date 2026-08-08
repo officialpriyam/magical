@@ -347,6 +347,9 @@ function GenerationStatusCard({
   const migrations = Array.isArray(currentFragment?.supabase_migrations)
     ? currentFragment.supabase_migrations
     : []
+  const commentary = cleanText(currentFragment?.commentary) || ''
+  const currentFilePath = cleanText(currentFragment?.file_path)
+  const hasCode = Boolean(cleanText(currentFragment?.code))
 
   return (
     <div className="mt-2 w-full max-w-[36rem] rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 shadow-sm">
@@ -369,17 +372,38 @@ function GenerationStatusCard({
         <LoaderIcon strokeWidth={2} className="h-3.5 w-3.5 shrink-0 animate-spin" />
         <span className="min-w-0 break-words">{status.detail}</span>
       </div>
+
+      {commentary && (
+        <div className="mt-2.5 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-xs leading-relaxed text-white/50">
+          {commentary.length > 200 ? `${commentary.slice(0, 200)}...` : commentary}
+        </div>
+      )}
+
+      {currentFilePath && (
+        <div className="mt-2 flex items-center gap-2 rounded-md border border-[#f97316]/20 bg-[#f97316]/5 px-2.5 py-1.5 text-xs text-[#f97316]/80">
+          <FileCode2 className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">Writing {currentFilePath}</span>
+          <LoaderIcon strokeWidth={2} className="h-3 w-3 shrink-0 animate-spin ml-auto" />
+        </div>
+      )}
+
       {files.length > 0 && (
         <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-          {files.slice(0, 6).map((file) => (
+          {files.slice(0, 8).map((file, idx) => (
             <div
               key={file.path}
               className="flex min-w-0 items-center gap-2 rounded-md border border-white/10 bg-black/15 px-2 py-1.5 text-xs text-white/62"
             >
               <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/36" />
               <span className="truncate">{file.path}</span>
+              {idx === files.length - 1 && hasCode && (
+                <LoaderIcon strokeWidth={2} className="h-3 w-3 shrink-0 animate-spin ml-auto text-[#f97316]/60" />
+              )}
             </div>
           ))}
+          {files.length > 8 && (
+            <div className="text-xs text-white/42">+{files.length - 8} more files</div>
+          )}
         </div>
       )}
       {migrations.length > 0 && (
@@ -433,17 +457,31 @@ function getGenerationStatus({
 
   const files = getFragmentFiles(latestObject)
 
-  if (files.length > 0) {
+  if (files.length > 3) {
     return {
-      title: 'Writing project files',
-      detail: `Generating ${files.length} file${files.length === 1 ? '' : 's'} for ${title || promptTarget}`,
+      title: 'Building your project',
+      detail: `Generated ${files.length} files — installing dependencies and setting up the project`,
     }
   }
 
-  if (code || filePath || title || template) {
+  if (files.length > 0) {
     return {
-      title: 'Writing project files',
+      title: 'Creating project files',
+      detail: `Writing ${files.length} file${files.length === 1 ? '' : 's'} for ${title || promptTarget}`,
+    }
+  }
+
+  if (code || filePath) {
+    return {
+      title: 'Writing code',
       detail: `Generating ${generatedTarget}`,
+    }
+  }
+
+  if (title || template) {
+    return {
+      title: 'Planning implementation',
+      detail: `Setting up ${title || template || promptTarget}`,
     }
   }
 
@@ -455,8 +493,8 @@ function getGenerationStatus({
   }
 
   return {
-    title: 'Planning implementation',
-    detail: `Generating ${promptTarget}`,
+    title: 'Thinking',
+    detail: `Planning how to build ${promptTarget}`,
   }
 }
 
