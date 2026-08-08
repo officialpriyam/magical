@@ -29,7 +29,7 @@ import type { GitHubWorkspace } from '@/components/github-save';
 import type { PreviewTab } from '@/components/preview';
 import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo } from 'lucide-react';
 
-const DEFAULT_MODEL_ID = 'models/gemini-2.0-flash'
+const DEFAULT_MODEL_ID = 'magic'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
 const MAX_AUTO_FIX_ATTEMPTS = 2
 
@@ -1937,19 +1937,17 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
           {isDashboardMode ? (
             <div
-              className="relative flex min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b0d0b] text-white shadow-2xl"
+              className="relative flex min-h-0 flex-1 overflow-hidden text-white"
               onPointerMove={handleMagicPointerMove}
             >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,196,87,0.30),transparent_28%),radial-gradient(circle_at_18%_75%,rgba(40,127,96,0.20),transparent_28%),linear-gradient(180deg,#151913_0%,#0b0d0b_52%,#100d08_100%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(249,115,22,0.15),transparent_50%),radial-gradient(circle_at_18%_75%,rgba(234,88,12,0.08),transparent_35%)]" />
               <div
                 ref={magicGlowRef}
                 className="pointer-events-none absolute inset-0 hidden opacity-90 transition-opacity duration-200 md:block"
                 style={{
-                  background: 'radial-gradient(circle at var(--magic-x, 50%) var(--magic-y, 24%), rgba(255, 219, 122, 0.34), rgba(255, 176, 65, 0.12) 12%, transparent 26%)',
+                  background: 'radial-gradient(circle at var(--magic-x, 50%) var(--magic-y, 24%), rgba(249,115,22,0.2), rgba(234,88,12,0.08) 12%, transparent 26%)',
                 }}
               />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,8,9,0.16),rgba(8,8,9,0)_48%,rgba(8,8,9,0.24))]" />
-              <div className="absolute inset-x-8 top-0 h-px bg-white/10" />
 
               <div className="relative z-10 flex w-full flex-col">
                 <div className="flex flex-1 flex-col items-center justify-center px-4 pt-16 text-center">
@@ -1974,7 +1972,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   </div>
                 </div>
 
-                <div className="mx-auto mt-8 w-[calc(100%-2rem)] max-w-7xl rounded-t-2xl border border-white/10 bg-[#111315]/92 p-4 shadow-2xl backdrop-blur-md sm:w-[calc(100%-3rem)] sm:p-5">
+                <div className="mx-auto mt-8 w-[calc(100%-2rem)] max-w-7xl border-t border-white/10 bg-[#111315]/80 p-4 backdrop-blur-md sm:w-[calc(100%-3rem)] sm:p-5">
                   <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex flex-wrap gap-1 text-xs text-white/60">
                       <button
@@ -1983,7 +1981,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                         className={cn(
                           'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'all'
-                            ? 'border-white/70 bg-white text-[#101214]'
+                            ? 'border-[#f97316]/50 bg-[#f97316]/15 text-[#f97316]'
                             : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
                         )}
                       >
@@ -1996,7 +1994,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                         className={cn(
                           'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'recent'
-                            ? 'border-white/70 bg-white text-[#101214]'
+                            ? 'border-[#f97316]/50 bg-[#f97316]/15 text-[#f97316]'
                             : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
                         )}
                       >
@@ -2009,7 +2007,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                         className={cn(
                           'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'github'
-                            ? 'border-white/70 bg-white text-[#101214]'
+                            ? 'border-[#f97316]/50 bg-[#f97316]/15 text-[#f97316]'
                             : 'border-white/10 bg-white/[0.035] text-white/65 hover:bg-white/[0.08] hover:text-white',
                         )}
                       >
@@ -2154,6 +2152,14 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       </button>
                     </div>
                   )}
+                </div>
+
+                {/* Footer links */}
+                <div className="flex items-center justify-center gap-6 py-6 text-xs text-white/30">
+                  <a href="https://discord.gg/p6Sz3X3YFe" target="_blank" rel="noopener noreferrer" className="transition hover:text-white/60">Discord</a>
+                  <a href="#" className="transition hover:text-white/60">Terms</a>
+                  <a href="#" className="transition hover:text-white/60">Privacy</a>
+                  <span>Made by priyx</span>
                 </div>
               </div>
             </div>

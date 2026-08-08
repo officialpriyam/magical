@@ -8,9 +8,9 @@
   --card-foreground: 240 10% 3.9%;
   --popover: 0 0% 100%;
   --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --primary-hover: 200 100% 47%;
+  --primary: 24 95% 53%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 20 90% 48%;
   --secondary: 240 4.8% 95.9%;
   --secondary-foreground: 240 5.9% 10%;
   --muted: 240 4.8% 95.9%;
@@ -21,7 +21,7 @@
   --destructive-foreground: 0 0% 98%;
   --border: 240 5.9% 90%;
   --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
+  --ring: 24 95% 53%;
   --radius: 0.5rem;
   --font-sans: "Inter", "Circularpro book", sans-serif;
   --font-mono: "Jetbrainsmono", monospace;
@@ -31,8 +31,8 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  --torch-core: rgba(255, 213, 145, 0.42);
-  --torch-warm: rgba(247, 142, 57, 0.16);
+  --torch-core: rgba(249, 115, 22, 0.42);
+  --torch-warm: rgba(234, 88, 12, 0.16);
   --torch-fade: rgba(255, 255, 255, 0);
 }
 
@@ -43,9 +43,9 @@
   --card-foreground: 0 0% 98%;
   --popover: 240 10% 3.9%;
   --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --primary-hover: 200 100% 47%;
+  --primary: 24 95% 53%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 20 90% 48%;
   --secondary: 240 3.7% 15.9%;
   --secondary-foreground: 0 0% 98%;
   --muted: 240 3.7% 15.9%;
@@ -56,9 +56,9 @@
   --destructive-foreground: 0 0% 98%;
   --border: 240 3.7% 15.9%;
   --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
-  --torch-core: rgba(255, 190, 96, 0.28);
-  --torch-warm: rgba(236, 112, 37, 0.14);
+  --ring: 24 95% 53%;
+  --torch-core: rgba(249, 115, 22, 0.28);
+  --torch-warm: rgba(234, 88, 12, 0.14);
   --torch-fade: rgba(9, 9, 11, 0);
 }
 
