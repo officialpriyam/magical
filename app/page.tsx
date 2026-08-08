@@ -1889,7 +1889,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           )}
         >
           {!isDashboardMode && (
-            <div className="flex h-[64px] md:h-[76px] shrink-0 items-center justify-between gap-2 border-b border-white/10 px-2 py-2 md:gap-3 md:px-4 md:py-3">
+            <div className="flex h-[56px] shrink-0 items-center justify-between gap-1 border-b border-white/10 px-2 py-2 md:h-[64px] md:gap-3 md:px-4">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-white">
                   {projectHeaderTitle}
@@ -1946,14 +1946,20 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       setCurrentTab('ide')
                     }
                   }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/65 transition hover:bg-white/[0.08] hover:text-white"
-                  title={shouldShowPreviewPanel ? 'Close panel' : 'Open IDE panel'}
+                  className={cn(
+                    "inline-flex h-8 items-center justify-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition",
+                    shouldShowPreviewPanel
+                      ? "border-white/20 bg-white/10 text-white"
+                      : "border-white/10 bg-white/[0.04] text-white/65 hover:bg-white/[0.08] hover:text-white"
+                  )}
+                  title={shouldShowPreviewPanel ? 'Close IDE' : 'Open IDE'}
                 >
                   {shouldShowPreviewPanel ? (
                     <PanelRightClose className="h-4 w-4" />
                   ) : (
                     <PanelRightOpen className="h-4 w-4" />
                   )}
+                  <span className="hidden sm:inline">{shouldShowPreviewPanel ? 'Close' : 'IDE'}</span>
                 </button>
               </div>
             </div>
@@ -2194,7 +2200,38 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
               <div className="shrink-0 border-t border-white/10 px-2 py-2 sm:px-3 sm:py-3 md:px-4">
                 {statusNotices}
-                {promptInput}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 min-w-0">
+                    {promptInput}
+                  </div>
+                  {fragment && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (shouldShowPreviewPanel) {
+                          setCurrentPreview({ fragment: undefined, result: undefined })
+                          setIsPreviewPanelOpen(false)
+                        } else {
+                          setIsPreviewPanelOpen(true)
+                          setCurrentTab('ide')
+                        }
+                      }}
+                      className={cn(
+                        "hidden md:flex shrink-0 h-10 w-10 items-center justify-center rounded-xl border transition-all",
+                        shouldShowPreviewPanel
+                          ? "border-white/20 bg-white/10 text-white"
+                          : "border-white/10 bg-white/[0.04] text-white/50 hover:bg-white/[0.08] hover:text-white"
+                      )}
+                      title={shouldShowPreviewPanel ? 'Close IDE' : 'Open IDE'}
+                    >
+                      {shouldShowPreviewPanel ? (
+                        <PanelRightClose className="h-5 w-5" />
+                      ) : (
+                        <PanelRightOpen className="h-5 w-5" />
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             </>
             )}
