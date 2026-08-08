@@ -37,6 +37,7 @@ export function IDE({
   const [fileSearchQuery, setFileSearchQuery] = useState('')
   const [showGitHubImport, setShowGitHubImport] = useState(false)
   const [isOpeningFile, setIsOpeningFile] = useState(false)
+  const [openingPath, setOpeningPath] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [storageSlow, setStorageSlow] = useState(false)
@@ -89,19 +90,38 @@ export function IDE({
           const storageData = await storageResponse.json()
 
           if (Array.isArray(storageData.files)) {
-            setFiles(storageData.files)
-            setLoadError(null)
-            setStorageSlow(Boolean(storageData.slow))
+            if (storageData.files.length > 0) {
+              setFiles(storageData.files)
+              setLoadError(null)
+              setStorageSlow(Boolean(storageData.slow))
+              return
+            }
+
+            // Storage is empty or degraded. Keep showing the live-sandbox
+            // tree (initialFiles) instead of wiping it, and tell the user why.
+            if (initialFiles && initialFiles.length > 0) {
+              setFiles(initialFiles)
+            } else {
+              setFiles([])
+            }
+            setStorageSlow(false)
+            setLoadError(
+              storageData.error ||
+                'Sandbox storage returned no files. Save a file to sync the workspace, then refresh.',
+            )
             return
           }
 
-          setFiles([])
+          setFiles(initialFiles && initialFiles.length > 0 ? initialFiles : [])
           setLoadError('Sandbox storage returned no files.')
         } else {
           const errorData = await storageResponse.json().catch(() => null)
-          setLoadError(
-            errorData?.error || `Failed to fetch files (HTTP ${storageResponse.status}).`,
-          )
+          const message =
+            errorData?.error || `Failed to fetch files (HTTP ${storageResponse.status}).`
+          setLoadError(message)
+          if (initialFiles && initialFiles.length > 0) {
+            setFiles(initialFiles)
+          }
         }
       } catch (error: any) {
         if (error?.name === 'AbortError') {
@@ -141,7 +161,7 @@ export function IDE({
         setIsRefreshing(false)
       }
     }
-  }, [session, isSandboxMode, sandboxId, projectId])
+  }, [session, isSandboxMode, sandboxId, projectId, initialFiles])
 
   const persistFile = useCallback(async (path: string, content: string) => {
     if (isGitHubSaveBlocked) {
@@ -289,16 +309,28 @@ export function IDE({
     }
 
     setIsOpeningFile(true)
+    setOpeningPath(path)
     try {
       if (isSandboxMode && sandboxId && projectId) {
         const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 6000)
-        
-        const response = await fetch(`/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(path)}`, {
-          signal: controller.signal,
-        })
-        clearTimeout(timeout)
-        
+        const timeout = setTimeout(() => controller.abort(), 8000)
+        let response: Response | null = null
+
+        try {
+          response = await fetch(`/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(path)}`, {
+            signal: controller.signal,
+          })
+        } catch (error: any) {
+          if (error?.name === 'AbortError') {
+            setLoadError(`Loading "${path}" timed out. The sandbox storage may be unreachable or slow.`)
+          } else {
+            setLoadError(`Could not reach sandbox storage to load "${path}". Check that the storage server is running.`)
+          }
+          throw error
+        } finally {
+          clearTimeout(timeout)
+        }
+
         if (response.ok) {
           const { content } = await response.json()
           fileContentCacheRef.current.set(path, content)
@@ -306,46 +338,82 @@ export function IDE({
           setLoadError(null)
         } else if (response.status === 404) {
           // File exists in the live sandbox but not yet in storage: try the live sandbox.
-          const fallbackResponse = await fetch(
-            `/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`,
-          )
+          const fallbackController = new AbortController()
+          const fallbackTimeout = setTimeout(() => fallbackController.abort(), 8000)
 
-          if (fallbackResponse.ok) {
-            const { content } = await fallbackResponse.json()
-            await persistFile(path, content)
-            fileContentCacheRef.current.set(path, content)
-            setSelectedFile({ path, content })
-          } else {
-            setLoadError(
-              `"${path}" was not found in the project workspace. It may only exist inside the running sandbox and could not be loaded.`,
+          try {
+            const fallbackResponse = await fetch(
+              `/api/sandbox/${sandboxId}/files/content?path=${encodeURIComponent(path)}`,
+              { signal: fallbackController.signal },
             )
-            throw new Error('Failed to load file from sandbox-storage and live sandbox')
+
+            if (fallbackResponse.ok) {
+              const { content } = await fallbackResponse.json()
+              await persistFile(path, content)
+              fileContentCacheRef.current.set(path, content)
+              setSelectedFile({ path, content })
+            } else {
+              const errorData = await fallbackResponse.json().catch(() => null)
+              setLoadError(
+                errorData?.error ||
+                  `"${path}" was not found in the project workspace. It may only exist inside the running sandbox and could not be loaded.`,
+              )
+              throw new Error('Failed to load file from sandbox-storage and live sandbox')
+            }
+          } catch (error: any) {
+            if (error?.name === 'AbortError') {
+              setLoadError(
+                `Loading "${path}" from the live sandbox timed out. Files must be saved to the workspace before editing them here.`,
+              )
+            } else {
+              setLoadError(
+                `Could not reach the live sandbox to load "${path}". Check the sandbox connection and try again.`,
+              )
+            }
+            throw error
+          } finally {
+            clearTimeout(fallbackTimeout)
           }
         } else {
-          setLoadError(`Failed to load "${path}" (HTTP ${response.status}).`)
+          const errorData = await response.json().catch(() => null)
+          setLoadError(
+            errorData?.error || `Failed to load "${path}" (HTTP ${response.status}).`,
+          )
           throw new Error('Failed to load file from sandbox-storage')
         }
       } else if (session) {
         const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 3000)
-        
-        const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`, {
-          signal: controller.signal,
-        })
-        clearTimeout(timeout)
-        
-        if (!response.ok) {
-          setLoadError(`Failed to load "${path}".`)
-          throw new Error('Failed to load workspace file')
+        const timeout = setTimeout(() => controller.abort(), 8000)
+
+        try {
+          const response = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`, {
+            signal: controller.signal,
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => null)
+            setLoadError(
+              errorData?.error || `Failed to load "${path}".`,
+            )
+            throw new Error('Failed to load workspace file')
+          }
+          const { content } = await response.json()
+          fileContentCacheRef.current.set(path, content)
+          setSelectedFile({ path, content })
+        } catch (error: any) {
+          if (error?.name === 'AbortError') {
+            setLoadError(`Loading "${path}" timed out. The workspace server may be slow.`)
+          }
+          throw error
+        } finally {
+          clearTimeout(timeout)
         }
-        const { content } = await response.json()
-        fileContentCacheRef.current.set(path, content)
-        setSelectedFile({ path, content })
       }
     } catch (error) {
       console.error('Error opening file:', error)
     } finally {
       setIsOpeningFile(false)
+      setOpeningPath(null)
     }
   }
 
@@ -618,7 +686,12 @@ export function IDE({
           )}
         </div>
         <div className="min-h-0 flex-1">
-        {selectedFile ? (
+        {isOpeningFile && !selectedFile ? (
+          <div className="flex h-full items-center justify-center gap-2 px-6 text-center text-sm text-white/45">
+            <Spinner />
+            <span>Loading {openingPath || 'file'}…</span>
+          </div>
+        ) : selectedFile ? (
           isGitHubSaveBlocked ? (
             <div className="flex h-full items-center justify-center p-6 text-center">
               <div className="max-w-sm space-y-3 rounded-lg border border-white/10 bg-white/[0.04] p-5 shadow-sm">

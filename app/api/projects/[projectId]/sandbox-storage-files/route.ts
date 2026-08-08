@@ -55,12 +55,20 @@ export async function GET(
   const sandboxStorage = getSandboxStorageMetadata(project.metadata)
 
   if (!sandboxStorage) {
-    return NextResponse.json({ files: [] })
+    return NextResponse.json({
+      files: [],
+      degraded: true,
+      error: 'This project has not been saved to external sandbox storage yet. Files are only listed once they are saved.',
+    })
   }
 
   if (!hasSandboxStorageConfig()) {
     return NextResponse.json(
-      { error: 'External sandbox storage is not configured', files: [], degraded: true },
+      {
+        error: 'External sandbox storage is not configured for this deployment.',
+        files: [],
+        degraded: true,
+      },
       { status: 503 },
     )
   }
@@ -83,7 +91,7 @@ export async function GET(
     const status = isTimeout ? 504 : 500
     const message = isTimeout
       ? 'Sandbox storage is taking too long to respond. The storage server may be overloaded or unreachable.'
-      : 'Failed to fetch sandbox-storage files'
+      : `Failed to fetch sandbox-storage files (${error?.message || error || 'unknown error'})`
 
     return NextResponse.json(
       {
