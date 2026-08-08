@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const GITLAB_SCOPES = ['api', 'read_repository', 'write_repository']
+const GITLAB_SCOPES = ['api']
 
 export async function GET(request: NextRequest) {
   const baseUrl = getConnectBaseUrl(request)
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const params = new URLSearchParams({
     client_id: process.env.GITLAB_CLIENT_ID,
     redirect_uri: redirectUri,
-    scope: GITLAB_SCOPES.join('+'),
+    scope: GITLAB_SCOPES.join(' '),
     state,
     response_type: 'code',
   })
