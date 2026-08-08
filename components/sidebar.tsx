@@ -267,6 +267,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        style={{ borderRadius: '0 16px 16px 0' }}
       >
         {/* Top section with menu and new icons */}
         <div className="flex flex-col items-center space-y-2">
@@ -352,11 +353,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div
         className={`h-dvh bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col transition-all duration-300 ease-in-out md:h-screen ${
           isOpen
-            ? 'fixed inset-y-0 left-0 z-50 w-[min(82vw,18rem)] opacity-100 translate-x-0 md:relative md:z-auto md:w-64'
+            ? 'fixed inset-y-0 left-0 z-50 w-[min(82vw,18rem)] opacity-100 translate-x-0 shadow-2xl md:relative md:z-auto md:w-64 md:shadow-none'
             : 'w-0 opacity-0 -translate-x-full overflow-hidden'
         }`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        style={{ borderRadius: isOpen ? '0 16px 16px 0' : undefined }}
       >
         {/* Header Section */}
         <div className="p-3 border-b border-white/10">

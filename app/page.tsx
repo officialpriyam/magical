@@ -1780,17 +1780,17 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const statusNotices = (
     <>
       {autoFixMessage && (
-        <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-600 dark:text-amber-400 text-sm">
-          <span>{autoFixMessage}</span>
+        <div className="flex items-center justify-between gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-600 dark:text-amber-400 text-sm">
+          <span className="min-w-0 flex-1 truncate">{autoFixMessage}</span>
           {autoFixMessage.includes('Automatic fix') && (
-            <button onClick={handleStopGeneration} className="ml-4 p-1 rounded-md hover:bg-amber-500/20">Stop</button>
+            <button onClick={handleStopGeneration} className="px-3 py-1.5 rounded-lg hover:bg-amber-500/20 text-xs font-medium transition-colors shrink-0">Stop</button>
           )}
         </div>
       )}
       {(error || errorMessage) && (
-        <div className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
-          <span>{errorMessage || error?.message || 'AI generation failed.'}</span>
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm">
+          <span className="min-w-0 flex-1 truncate">{errorMessage || error?.message || 'AI generation failed.'}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
             {fragment && (
               <button
                 onClick={() => {
@@ -1800,12 +1800,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     startAutoFix(fragment, errorMessage || error?.message || 'Unknown error')
                   }
                 }}
-                className="ml-2 px-2 py-1 rounded-md hover:bg-amber-500/20 text-amber-500 text-xs font-medium"
+                className="px-3 py-1.5 rounded-lg hover:bg-amber-500/20 text-amber-500 text-xs font-medium transition-colors"
               >
                 Auto Fix
               </button>
             )}
-            <button onClick={retry} className="ml-1 p-1 rounded-md hover:bg-red-500/20">Retry</button>
+            <button onClick={retry} className="px-3 py-1.5 rounded-lg hover:bg-red-500/20 text-xs font-medium transition-colors">Retry</button>
           </div>
         </div>
       )}
@@ -1849,7 +1849,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           isDashboardMode
             ? "w-full md:grid-cols-2"
             : shouldShowPreviewPanel
-              ? "w-full grid-cols-1 xl:grid-cols-[minmax(380px,480px)_minmax(0,1fr)]"
+              ? "w-full grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
               : "w-full grid-cols-1",
         )}
       >
@@ -1857,18 +1857,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           className={cn(
             "relative flex h-screen w-full flex-col",
             isDashboardMode
-              ? "col-span-2 mx-auto max-w-none p-4"
-              : "min-w-0 border-r border-white/10 bg-[#111211]",
+              ? "col-span-2 mx-auto max-w-none p-2 md:p-4"
+              : "min-w-0 bg-[#111211]",
             isDashboardMode && (fragment || isPreviewPanelOpen ? 'col-span-1' : 'col-span-2'),
           )}
         >
           {!isDashboardMode && (
-            <div className="flex h-[76px] shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+            <div className="flex h-[64px] md:h-[76px] shrink-0 items-center justify-between gap-2 md:gap-3 border-b border-white/10 px-3 md:px-4 py-2 md:py-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-white">
                   {projectHeaderTitle}
                 </div>
-                <div className="mt-0.5 truncate text-xs text-white/55">
+                <div className="mt-0.5 truncate text-xs text-white/55 hidden sm:block">
                   {projectHeaderSubtitle}
                 </div>
               </div>
@@ -1960,7 +1960,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   </div>
                 </div>
 
-                <div className="mx-auto mt-8 w-[calc(100%-2rem)] max-w-7xl border-t border-white/10 bg-[#111315]/80 p-4 backdrop-blur-md sm:w-[calc(100%-3rem)] sm:p-5">
+                <div className="mx-auto mt-6 md:mt-8 w-[calc(100%-1rem)] max-w-7xl border-t border-white/10 bg-[#111315]/80 p-3 backdrop-blur-md sm:w-[calc(100%-2rem)] md:p-4 lg:p-5">
                   <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex flex-wrap gap-1 text-xs text-white/60">
                       <button
@@ -2147,7 +2147,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             </div>
           ) : (
             <>
-              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 md:px-3 md:py-4">
                 {isLoadingProject ? (
                   <div className="flex h-full items-center justify-center">
                     <div className="text-sm text-white/55">Loading project...</div>
@@ -2166,9 +2166,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 )}
               </div>
 
-              <div className="shrink-0 space-y-3 border-t border-white/10 bg-[#111211] p-3">
-                {statusNotices}
-                {promptInput}
+              <div className="shrink-0 p-3 pb-4 md:p-4">
+                <div className="rounded-2xl border border-white/10 bg-[#111211]/80 p-3 backdrop-blur-md md:p-4">
+                  {statusNotices}
+                  {promptInput}
+                </div>
               </div>
             </>
             )}
