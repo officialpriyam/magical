@@ -101,14 +101,6 @@ export function Preview({
 
   return (
     <div className="absolute left-0 top-0 z-10 h-full w-full overflow-hidden border border-white/10 bg-[#151615] shadow-2xl md:relative md:m-3 md:ml-0 md:h-[calc(100vh-1.5rem)] md:rounded-2xl">
-      {/* Mobile close button */}
-      <button
-        type="button"
-        onClick={onClose}
-        className="md:hidden fixed top-2 right-2 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white/70 backdrop-blur-sm hover:bg-black/80 hover:text-white"
-      >
-        <ChevronsRight className="h-5 w-5 rotate-180" />
-      </button>
       <Tabs
         value={selectedTab}
         onValueChange={(value) => {
@@ -125,7 +117,7 @@ export function Preview({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground"
+                  className="relative z-30 text-muted-foreground hover:text-white"
                   onClick={onClose}
                 >
                   <ChevronsRight className="h-5 w-5" />

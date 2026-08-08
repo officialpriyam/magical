@@ -287,6 +287,9 @@ export async function POST(req: Request) {
           env: supabaseRuntimeEnv,
         })
 
+        // Wait for server to start before getting tunnel URL
+        await new Promise(resolve => setTimeout(resolve, 5000))
+
         const files = await listModalSandboxFiles(modalSandbox)
         const url = await getModalSandboxUrl(modalSandbox, fragment.port || 3000)
 
