@@ -75,12 +75,10 @@
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-family: var(--font-sans, sans-serif);
-    background-image: radial-gradient(
-      ellipse 56% 38% at 50% -12%,
-      var(--torch-core) 0%,
-      var(--torch-warm) 42%,
-      var(--torch-fade) 78%
-    );
+    background-image: url('/background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     background-repeat: no-repeat;
     background-attachment: fixed;
   }

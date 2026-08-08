@@ -321,10 +321,9 @@ function GenerationStatusCard({
           <button
             type="button"
             onClick={onStop}
-            className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 text-xs text-red-200 transition hover:bg-red-500/20"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-red-500/30 bg-red-500/10 text-red-200 transition hover:bg-red-500/20"
           >
             <Square className="h-3 w-3 fill-current" />
-            Stop
           </button>
         )}
       </div>

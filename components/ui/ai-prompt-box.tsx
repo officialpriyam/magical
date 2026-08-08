@@ -1018,15 +1018,15 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
           >
             <Button
               variant="default"
-              size={isLoading || hasContent ? "default" : "icon"}
+              size="icon"
               className={cn(
-                "h-8 rounded-full transition-all duration-200",
+                "h-8 w-8 rounded-full transition-all duration-200",
                 isLoading
-                  ? "gap-1.5 bg-red-500/15 px-3 text-red-200 hover:bg-red-500/25"
+                  ? "bg-red-500/15 text-red-200 hover:bg-red-500/25"
                   : isRecording
                   ? "bg-red-500/15 text-red-300 hover:bg-red-500/25"
                   : hasContent
-                  ? "gap-1.5 bg-white text-black hover:bg-white/90 px-3"
+                  ? "bg-white text-black hover:bg-white/90"
                   : "bg-white/[0.08] text-white/80 hover:bg-white/[0.14] hover:text-white"
               )}
               onClick={() => {
@@ -1038,17 +1038,11 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
               disabled={false}
             >
               {isLoading ? (
-                <>
-                  <Square className="h-3.5 w-3.5 fill-current animate-pulse" />
-                  <span className="text-xs font-semibold">Stop</span>
-                </>
+                <Square className="h-3.5 w-3.5 fill-current animate-pulse" />
               ) : isRecording ? (
                 <StopCircle className="h-5 w-5 text-red-500" />
               ) : hasContent ? (
-                <>
-                  <ArrowUp className="h-4 w-4" />
-                  <span className="text-xs font-semibold">Send</span>
-                </>
+                <ArrowUp className="h-4 w-4" />
               ) : (
                 <Mic className="h-5 w-5 text-current transition-colors" />
               )}

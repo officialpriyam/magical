@@ -189,6 +189,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false)
   const [projectShelfView, setProjectShelfView] = useState<ProjectShelfView>('recent')
+  const [showAllProjects, setShowAllProjects] = useState(false)
+
+  const setProjectShelfViewAndReset = useCallback((view: ProjectShelfView) => {
+    setProjectShelfView(view)
+    setShowAllProjects(false)
+  }, [])
   const setAuthDialogCallback = useCallback((isOpen: boolean) => {
     setAuthDialog(isOpen)
   }, [setAuthDialog])
@@ -1546,47 +1552,49 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     if (!session) return
 
     try {
-      // Check if this is a sandbox file (when result.sbxId exists)
-      if (result?.sbxId) {
-        // Save to sandbox
-        const response = await fetch(`/api/sandbox/${result.sbxId}/files/content`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            path,
-            content,
-            projectID: currentProject?.id,
-          }),
-        })
-
-        if (response.ok) {
-          setErrorMessage('')
-          scheduleGitHubFileSync(path, content)
-        } else {
-          console.error('Failed to save sandbox file:', response.statusText)
-        }
-      } else {
-        // Save to IDE workspace
-        const response = await fetch('/api/files/content', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            path,
-            content
-          }),
-        })
-
-        if (response.ok) {
-          setErrorMessage('')
-          scheduleGitHubFileSync(path, content)
-        } else {
-          console.error('Failed to save file:', response.statusText)
+      // 1. Save to sandbox-storage directly (always works, no live sandbox needed)
+      if (currentProject?.id) {
+        try {
+          await fetch(`/api/projects/${currentProject.id}/sandbox-storage-files`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path, content }),
+          })
+        } catch {
+          // Storage save is best-effort, don't block the rest
         }
       }
+
+      // 2. Try to save to the live sandbox (optional, may fail if sandbox is dead)
+      if (result?.sbxId) {
+        try {
+          const response = await fetch(`/api/sandbox/${result.sbxId}/files/content`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path, content, projectID: currentProject?.id }),
+          })
+          if (!response.ok) {
+            console.warn('Live sandbox save failed (file saved to storage):', response.statusText)
+          }
+        } catch {
+          // Sandbox save is best-effort, file is already in storage
+        }
+      } else {
+        // Non-sandbox mode: save to IDE workspace
+        try {
+          await fetch('/api/files/content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path, content }),
+          })
+        } catch {
+          // Workspace save is best-effort
+        }
+      }
+
+      // 3. Always trigger GitHub sync (file is in storage, sync works even if sandbox is dead)
+      setErrorMessage('')
+      scheduleGitHubFileSync(path, content)
     } catch (error) {
       console.error('Error saving file:', error)
     }
@@ -1792,7 +1800,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       {autoFixMessage && (
         <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-600 dark:text-amber-400 text-sm">
           <span>{autoFixMessage}</span>
-          <button onClick={handleStopGeneration} className="ml-4 p-1 rounded-md hover:bg-amber-500/20">Stop</button>
+          {autoFixMessage.includes('Automatic fix') && (
+            <button onClick={handleStopGeneration} className="ml-4 p-1 rounded-md hover:bg-amber-500/20">Stop</button>
+          )}
         </div>
       )}
       {(error || errorMessage) && (
@@ -1805,7 +1815,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   )
 
   return (
-    <main className="flex h-dvh min-h-dvh overflow-hidden bg-[#080809]">
+    <main className="flex h-dvh min-h-dvh overflow-hidden">
       {supabase && (
         <AuthDialog
           open={isAuthDialogOpen}
@@ -1969,7 +1979,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     <div className="flex flex-wrap gap-1 text-xs text-white/60">
                       <button
                         type="button"
-                        onClick={() => setProjectShelfView('all')}
+                        onClick={() => setProjectShelfViewAndReset('all')}
                         className={cn(
                           'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'all'
@@ -1982,7 +1992,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setProjectShelfView('recent')}
+                        onClick={() => setProjectShelfViewAndReset('recent')}
                         className={cn(
                           'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'recent'
@@ -1995,7 +2005,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setProjectShelfView('github')}
+                        onClick={() => setProjectShelfViewAndReset('github')}
                         className={cn(
                           'inline-flex h-8 items-center justify-center gap-2 rounded-full border px-3 font-medium transition',
                           projectShelfView === 'github'
@@ -2013,8 +2023,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       <span>{githubProjectCount} connected to GitHub</span>
                     </div>
                   </div>
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {dashboardProjects.length > 0 ? dashboardProjects.slice(0, 6).map((project) => {
+                  <div className="max-h-[480px] overflow-y-auto overscroll-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {dashboardProjects.length > 0 ? dashboardProjects.slice(0, showAllProjects ? undefined : 6).map((project) => {
                       const workspace = getProjectGitHubWorkspace(project)
                       const r2Workspace = getProjectR2Workspace(project)
                       const preview = getProjectPreviewCard(project, projectPreviews[project.id])
@@ -2119,7 +2130,30 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                           : 'Your Magical AI projects will appear here after your first chat.'}
                       </div>
                     )}
+                    </div>
                   </div>
+                  {dashboardProjects.length > 6 && !showAllProjects && (
+                    <div className="mt-3 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllProjects(true)}
+                        className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-xs font-medium text-white/60 transition hover:bg-white/[0.08] hover:text-white"
+                      >
+                        Browse all {dashboardProjects.length} projects
+                      </button>
+                    </div>
+                  )}
+                  {showAllProjects && dashboardProjects.length > 6 && (
+                    <div className="mt-3 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllProjects(false)}
+                        className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-xs font-medium text-white/60 transition hover:bg-white/[0.08] hover:text-white"
+                      >
+                        Show less
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

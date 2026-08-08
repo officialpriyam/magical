@@ -5,6 +5,7 @@ import {
   getProjectFileTreeFromSandboxStorage,
   getSandboxStorageMetadata,
   hasSandboxStorageConfig,
+  saveProjectFileToSandboxStorage,
 } from '@/lib/sandbox-storage'
 import type { FileSystemNode } from '@/components/file-tree'
 
@@ -145,4 +146,63 @@ function raceWithTimeout<T>(promise: Promise<T>, timeoutMs: number, reason: stri
       setTimeout(() => reject(new Error(reason)), timeoutMs),
     ),
   ])
+}
+
+/**
+ * POST /api/projects/[projectId]/sandbox-storage-files
+ * Save a file directly to sandbox-storage (no live sandbox required)
+ */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> },
+) {
+  const { projectId } = await params
+
+  if (!projectId) {
+    return NextResponse.json({ error: 'Missing project ID' }, { status: 400 })
+  }
+
+  const supabase = await createServerClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
+  try {
+    const { path: filePath, content } = await req.json()
+
+    if (!filePath || typeof content !== 'string') {
+      return NextResponse.json({ error: 'Missing file path or content' }, { status: 400 })
+    }
+
+    const result = await raceWithTimeout(
+      saveProjectFileToSandboxStorage({
+        userId: user.id,
+        projectId,
+        path: filePath,
+        content,
+      }),
+      7000,
+      'sandbox_storage_write_timeout',
+    )
+
+    return NextResponse.json({ saved: result.saved, path: filePath })
+  } catch (error: any) {
+    const isTimeout = /timeout/i.test(String(error?.message || ''))
+    console.error('Failed to save file to sandbox-storage:', error)
+
+    return NextResponse.json(
+      {
+        error: isTimeout
+          ? 'Sandbox storage write timed out.'
+          : `Failed to save file (${error?.message || 'unknown error'})`,
+        saved: false,
+      },
+      { status: isTimeout ? 504 : 500 },
+    )
+  }
 }
