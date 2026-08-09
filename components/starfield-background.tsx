@@ -95,7 +95,7 @@ export function StarfieldBackground() {
   }, [])
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-0">
+    <div className="pointer-events-none fixed inset-0 z-[-1]">
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{

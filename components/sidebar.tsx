@@ -219,7 +219,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar panel - single element, width swaps between full and compact rail */}
       <div
         className={`
-          bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col
+          bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col relative z-10
           overflow-hidden h-dvh md:h-screen shrink-0
           ${isMobile
             ? `fixed inset-y-0 left-0 z-50 transition-[width,transform] duration-300 ease-in-out ${isOpen ? 'w-[min(82vw,18rem)] translate-x-0' : 'w-0 -translate-x-full'}`
