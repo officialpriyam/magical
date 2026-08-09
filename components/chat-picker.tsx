@@ -15,6 +15,8 @@ import { Sparkles, Zap, Wand2 } from 'lucide-react'
 import Image from 'next/image'
 import { useMemo, useRef } from 'react'
 
+const ETC_PROVIDER_IDS = new Set(['orcarouter', 'requesty', 'llm_gateway', 'novita', 'poolside'])
+
 export function ChatPicker({
   templates,
   selectedTemplate,
@@ -168,12 +170,18 @@ export function ChatPicker({
                   (model) =>
                     model.providerId === 'openrouter'
                       ? 'openrouter'
-                      : model.provider,
+                      : ETC_PROVIDER_IDS.has(model.providerId)
+                        ? 'etc'
+                        : model.provider,
                 ),
               ).map(([groupKey, groupModels]) => (
                 <SelectGroup key={groupKey}>
                   <SelectLabel>
-                    {groupKey === 'openrouter' ? 'OpenRouter' : groupKey}
+                    {groupKey === 'openrouter'
+                      ? 'OpenRouter'
+                      : groupKey === 'etc'
+                        ? 'etc'
+                        : groupKey}
                   </SelectLabel>
                   {groupModels?.map((model) => (
                     <SelectItem key={model.id} value={model.id}>

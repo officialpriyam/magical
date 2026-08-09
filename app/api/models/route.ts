@@ -66,9 +66,7 @@ export async function GET() {
   }
 
   for (const model of [...MAGIC_FREE_MODELS, ...MAGIC_PLUS_MODELS]) {
-    if (hasProviderEnvironmentCredentials(model.providerId)) {
-      models.set(model.id, model)
-    }
+    models.set(model.id, model)
   }
 
   const [googleModels, nvidiaModels, openRouterModels] = await Promise.all([

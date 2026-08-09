@@ -9,10 +9,18 @@ import {
 import { applyPatch } from '@/lib/morph'
 import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { FragmentSchema, morphEditSchema, MorphEditSchema } from '@/lib/schema'
-import { streamObject, type LanguageModel, type ModelMessage } from 'ai'
+import { streamObject, streamText, type LanguageModel, type ModelMessage } from 'ai'
 import { sanitizeJsonTextStream } from '@/lib/json-stream'
 
 export const maxDuration = 300
+
+const STREAM_TEXT_PROVIDER_IDS = new Set([
+  'orcarouter',
+  'requesty',
+  'llm_gateway',
+  'deepseek',
+  'nvidia',
+])
 
 
 export async function POST(req: Request) {
@@ -86,35 +94,67 @@ ${currentFragment.code}
   for (const candidate of fallbackChain) {
     try {
       const modelClient = getModelClient(candidate, config)
-
-      const result = streamObject({
-        model: modelClient as LanguageModel,
-        system: contextualSystemPrompt,
-        messages,
-        schema: morphEditSchema,
-        maxRetries: 0,
-        ...modelParams,
-      })
-
-      let accumulated = ''
-      const reader = result.textStream.pipeThrough(sanitizeJsonTextStream()).getReader()
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          accumulated += value
-        }
-      } finally {
-        reader.releaseLock()
-      }
+      const useFallback = STREAM_TEXT_PROVIDER_IDS.has(candidate.providerId)
 
       let editInstructions: MorphEditSchema
-      try {
-        const cleaned = accumulated.replace(/^data:\s*/gm, '').trim()
-        const jsonStr = cleaned.split('\n').filter(l => l.trim()).pop() || cleaned
-        editInstructions = JSON.parse(jsonStr)
-      } catch {
-        editInstructions = JSON.parse(accumulated)
+
+      if (useFallback) {
+        const result = streamText({
+          model: modelClient as any,
+          system: contextualSystemPrompt + '\n\nYou MUST respond with ONLY a valid JSON object matching the schema above. No markdown, no explanation.',
+          messages,
+          maxRetries: 0,
+          ...modelParams,
+        })
+
+        let accumulated = ''
+        const reader = result.textStream.getReader()
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            accumulated += value
+          }
+        } finally {
+          reader.releaseLock()
+        }
+
+        try {
+          const cleaned = accumulated.replace(/^data:\s*/gm, '').trim()
+          const jsonStr = cleaned.split('\n').filter(l => l.trim()).pop() || cleaned
+          editInstructions = JSON.parse(jsonStr)
+        } catch {
+          editInstructions = JSON.parse(accumulated)
+        }
+      } else {
+        const result = streamObject({
+          model: modelClient as LanguageModel,
+          system: contextualSystemPrompt,
+          messages,
+          schema: morphEditSchema,
+          maxRetries: 0,
+          ...modelParams,
+        })
+
+        let accumulated = ''
+        const reader = result.textStream.pipeThrough(sanitizeJsonTextStream()).getReader()
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            accumulated += value
+          }
+        } finally {
+          reader.releaseLock()
+        }
+
+        try {
+          const cleaned = accumulated.replace(/^data:\s*/gm, '').trim()
+          const jsonStr = cleaned.split('\n').filter(l => l.trim()).pop() || cleaned
+          editInstructions = JSON.parse(jsonStr)
+        } catch {
+          editInstructions = JSON.parse(accumulated)
+        }
       }
 
       const morphResult = await applyPatch({
