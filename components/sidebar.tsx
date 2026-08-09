@@ -220,10 +220,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div
         className={`
           bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col
-          transition-all duration-300 ease-in-out overflow-hidden
-          h-dvh md:h-screen shrink-0
+          overflow-hidden h-dvh md:h-screen shrink-0
           ${isMobile
-            ? `fixed inset-y-0 left-0 z-50 ${isOpen ? 'w-[min(82vw,18rem)]' : 'w-0'}`
+            ? `fixed inset-y-0 left-0 z-50 transition-[width,transform] duration-300 ease-in-out ${isOpen ? 'w-[min(82vw,18rem)] translate-x-0' : 'w-0 -translate-x-full'}`
             : `${isOpen ? 'w-64' : 'w-16'}`
           }
         `}
