@@ -7,7 +7,7 @@ async function checkAdmin() {
   if (error || !user) return null
 
   const { data } = await supabase
-    .from('user_profiles')
+    .from('profiles')
     .select('role')
     .eq('user_id', user.id)
     .single()
@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   const supabase = await createServerClient(true)
 
   let query = supabase
-    .from('user_profiles')
+    .from('profiles')
     .select('*', { count: 'exact' })
 
   if (search) {
@@ -66,7 +66,7 @@ export async function PATCH(req: Request) {
   switch (action) {
     case 'ban':
       const { error: banError } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .update({ banned: true })
         .eq('user_id', userId)
       if (banError) return NextResponse.json({ error: banError.message }, { status: 500 })
@@ -74,7 +74,7 @@ export async function PATCH(req: Request) {
 
     case 'unban':
       const { error: unbanError } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .update({ banned: false })
         .eq('user_id', userId)
       if (unbanError) return NextResponse.json({ error: unbanError.message }, { status: 500 })
@@ -86,7 +86,7 @@ export async function PATCH(req: Request) {
       }
 
       const { data: currentUser } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .select('credits')
         .eq('user_id', userId)
         .single()
@@ -100,7 +100,7 @@ export async function PATCH(req: Request) {
         : Math.max(0, (currentUser.credits || 0) - amount)
 
       const { error: creditError } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .update({ credits: newCredits })
         .eq('user_id', userId)
 

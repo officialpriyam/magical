@@ -84,13 +84,13 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   if (!userId) return null
 
   return safeOperation(
-    'user_profiles',
+    'profiles',
     async () => {
       const supabase = getSupabase()
       if (!supabase) throw new Error('Supabase not available')
 
       const { data, error } = await supabase
-        .from('user_profiles')
+        .from('profiles')
         .select('*')
         .eq('user_id', userId) // Uses idx_profiles_user_id index
         .single()
@@ -129,10 +129,10 @@ export async function createUserProfile(userId: string, profile?: Partial<UserPr
   if (!userId) return null
 
   return safeOperation(
-    'user_profiles',
+    'profiles',
     async () => {
       const { data, error } = await getSupabase()!
-        .from('user_profiles')
+        .from('profiles')
         .insert({
           user_id: userId, // Uses idx_profiles_user_id index
           full_name: profile?.full_name || '',
@@ -158,10 +158,10 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
   if (!userId) return false
 
   return safeOperation(
-    'user_profiles',
+    'profiles',
     async () => {
       const { error } = await getSupabase()!
-        .from('user_profiles')
+        .from('profiles')
         .update(updates)
         .eq('user_id', userId) // Uses idx_profiles_user_id index
 
