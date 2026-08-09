@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase-server'
 export async function isAdmin(userId: string): Promise<boolean> {
   const supabase = await createServerClient(true)
   const { data, error } = await supabase
-    .from('profiles')
+    .from('user_profiles')
     .select('role')
     .eq('user_id', userId)
     .single()
@@ -27,7 +27,7 @@ export async function getAllUsers(page = 1, pageSize = 20, search = '') {
   const supabase = await createServerClient(true)
 
   let query = supabase
-    .from('profiles')
+    .from('user_profiles')
     .select('*', { count: 'exact' })
 
   if (search) {
@@ -46,7 +46,7 @@ export async function getUserDetails(userId: string) {
   const supabase = await createServerClient(true)
 
   const [profileResult, projectsResult, teamsResult] = await Promise.all([
-    supabase.from('profiles').select('*').eq('user_id', userId).single(),
+    supabase.from('user_profiles').select('*').eq('user_id', userId).single(),
     supabase.from('projects').select('id, title, created_at, updated_at', { count: 'exact' }).eq('user_id', userId).is('deleted_at', null),
     supabase.from('users_teams').select('team_id, teams(name)', { count: 'exact' }).eq('user_id', userId),
   ])
@@ -63,7 +63,7 @@ export async function getUserDetails(userId: string) {
 export async function banUser(userId: string) {
   const supabase = await createServerClient(true)
   const { error } = await supabase
-    .from('profiles')
+    .from('user_profiles')
     .update({ banned: true })
     .eq('user_id', userId)
 
@@ -73,7 +73,7 @@ export async function banUser(userId: string) {
 export async function unbanUser(userId: string) {
   const supabase = await createServerClient(true)
   const { error } = await supabase
-    .from('profiles')
+    .from('user_profiles')
     .update({ banned: false })
     .eq('user_id', userId)
 

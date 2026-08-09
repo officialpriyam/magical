@@ -7,7 +7,7 @@ async function checkAdmin() {
   if (error || !user) return null
 
   const { data } = await supabase
-    .from('profiles')
+    .from('user_profiles')
     .select('role')
     .eq('user_id', user.id)
     .single()
@@ -29,7 +29,7 @@ export async function GET(
   const supabase = await createServerClient(true)
 
   const [profileResult, projectsResult, teamsResult] = await Promise.all([
-    supabase.from('profiles').select('*').eq('user_id', userId).single(),
+    supabase.from('user_profiles').select('*').eq('user_id', userId).single(),
     supabase.from('projects').select('id, title, created_at, updated_at', { count: 'exact' }).eq('user_id', userId).is('deleted_at', null),
     supabase.from('users_teams').select('team_id, teams(name)', { count: 'exact' }).eq('user_id', userId),
   ])

@@ -1,12 +1,12 @@
 -- Admin tables migration
 -- Run this in your Supabase SQL editor
 
--- 1. Add admin columns to profiles table
+-- 1. Add admin columns to user_profiles table
 DO $$ BEGIN
-  ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role text DEFAULT 'user';
-  ALTER TABLE profiles ADD COLUMN IF NOT EXISTS banned boolean DEFAULT false;
-  ALTER TABLE profiles ADD COLUMN IF NOT EXISTS credits integer DEFAULT 0;
-  ALTER TABLE profiles ADD COLUMN IF NOT EXISTS tokens_used integer DEFAULT 0;
+  ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS role text DEFAULT 'user';
+  ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS banned boolean DEFAULT false;
+  ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS credits integer DEFAULT 0;
+  ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS tokens_used integer DEFAULT 0;
 EXCEPTION WHEN duplicate_column THEN NULL;
 END $$;
 
@@ -38,7 +38,7 @@ CREATE POLICY "Anyone can view site settings" ON site_settings
 
 CREATE POLICY "Admins can update site settings" ON site_settings
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM user_profiles WHERE user_id = auth.uid() AND role = 'admin')
   );
 
 -- Token usage: users can view own, admins can view all
@@ -47,7 +47,7 @@ CREATE POLICY "Users can view own token usage" ON token_usage
 
 CREATE POLICY "Admins can view all token usage" ON token_usage
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM user_profiles WHERE user_id = auth.uid() AND role = 'admin')
   );
 
 CREATE POLICY "System can insert token usage" ON token_usage
@@ -57,13 +57,13 @@ CREATE POLICY "System can insert token usage" ON token_usage
 CREATE OR REPLACE FUNCTION add_credits(p_user_id uuid, p_amount integer)
 RETURNS void AS $$
 BEGIN
-  UPDATE profiles SET credits = COALESCE(credits, 0) + p_amount WHERE user_id = p_user_id;
+  UPDATE user_profiles SET credits = COALESCE(credits, 0) + p_amount WHERE user_id = p_user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION deduct_credits(p_user_id uuid, p_amount integer)
 RETURNS void AS $$
 BEGIN
-  UPDATE profiles SET credits = GREATEST(0, COALESCE(credits, 0) - p_amount) WHERE user_id = p_user_id;
+  UPDATE user_profiles SET credits = GREATEST(0, COALESCE(credits, 0) - p_amount) WHERE user_id = p_user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

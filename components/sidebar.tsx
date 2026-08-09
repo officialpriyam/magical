@@ -206,8 +206,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [refreshKey]);
 
-  const SIDEBAR_WIDTH = 'w-64';
-
   return (
     <div className="flex h-dvh shrink-0 md:h-screen">
       {/* Mobile overlay */}
@@ -225,8 +223,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           transition-all duration-300 ease-in-out
           h-dvh md:h-screen shrink-0
           ${isMobile
-            ? `fixed inset-y-0 left-0 z-50 ${isOpen ? 'w-[min(82vw,18rem)] translate-x-0' : 'w-0 -translate-x-full'}`
-            : `${SIDEBAR_WIDTH} relative ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
+            ? `fixed inset-y-0 left-0 z-50 ${isOpen ? 'w-[min(82vw,18rem)] translate-x-0' : 'w-0 -translate-x-full overflow-hidden'}`
+            : `${isOpen ? 'w-64' : 'w-0'} overflow-hidden relative`
           }
         `}
       >
