@@ -1,20 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
-
-async function checkAdmin() {
-  const supabase = await createServerClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return null
-
-  const { data } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!data || data.role !== 'admin') return null
-  return user
-}
+import { checkAdmin } from '@/lib/admin'
 
 export async function GET() {
   const admin = await checkAdmin()

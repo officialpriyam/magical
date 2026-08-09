@@ -12,15 +12,27 @@ export async function isAdmin(userId: string): Promise<boolean> {
   return data.role === 'admin'
 }
 
-export async function getAdminUser() {
+import type { User as SupabaseUser } from '@supabase/supabase-js'
+
+export type AdminCheckResult =
+  | { admin: true; user: SupabaseUser }
+  | { admin: false; reason: 'unauthenticated' | 'forbidden' }
+
+export async function getAdminStatus(): Promise<AdminCheckResult> {
   const supabase = await createServerClient()
   const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return null
+  if (error || !user) return { admin: false, reason: 'unauthenticated' }
 
   const admin = await isAdmin(user.id)
-  if (!admin) return null
+  if (!admin) return { admin: false, reason: 'forbidden' }
 
-  return user
+  return { admin: true, user }
+}
+
+export async function checkAdmin() {
+  const result = await getAdminStatus()
+  if (!result.admin) return null
+  return result.user
 }
 
 export async function getAllUsers(page = 1, pageSize = 20, search = '') {
