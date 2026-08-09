@@ -48,12 +48,51 @@ export function resolveGenerationModel(model: LLMModel, config: LLMModelConfig):
       (candidate) => candidate.id === fallbackId,
     )
 
-    if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, {})) {
+    if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, config)) {
       return fallbackModel
     }
   }
 
   return model
+}
+
+export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMModel[] {
+  const chain: LLMModel[] = []
+
+  if (hasProviderCredentials(model.providerId, config)) {
+    chain.push(model)
+  }
+
+  const fallbackIds = [
+    'models/gemini-2.0-flash',
+    'qwen/qwen3-coder',
+    'anthropic/claude-haiku-4.5',
+    'claude-3-5-haiku-latest',
+    'gpt-4o-mini',
+    'openrouter/auto',
+  ]
+
+  const seenProviders = new Set<string>(chain.map((m) => m.providerId))
+
+  for (const fallbackId of fallbackIds) {
+    const fallbackModel = (bundledModels.models as LLMModel[]).find(
+      (candidate) => candidate.id === fallbackId,
+    )
+
+    if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, config) && !seenProviders.has(fallbackModel.providerId)) {
+      chain.push(fallbackModel)
+      seenProviders.add(fallbackModel.providerId)
+    }
+  }
+
+  if (chain.length === 0) {
+    const anyModel = (bundledModels.models as LLMModel[]).find((candidate) =>
+      hasProviderCredentials(candidate.providerId, config),
+    )
+    if (anyModel) chain.push(anyModel)
+  }
+
+  return chain
 }
 
 export function hasProviderEnvironmentCredentials(providerId: string) {

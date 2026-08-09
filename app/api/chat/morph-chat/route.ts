@@ -1,10 +1,10 @@
 import { handleAPIError, createRateLimitResponse } from '@/lib/api-errors'
 import {
+  getFallbackChain,
   getModelClient,
   hasProviderCredentials,
   LLMModel,
   LLMModelConfig,
-  resolveGenerationModel,
 } from '@/lib/models'
 import { applyPatch } from '@/lib/morph'
 import { applyChatRateLimit } from '@/lib/chat-rate-limit'
@@ -41,32 +41,29 @@ export async function POST(req: Request) {
     return createRateLimitResponse(limit)
   }
 
-  try {
-    const resolvedModel = resolveGenerationModel(model, config)
+  const morphApiKey = config.apiKey || process.env.MORPH_API_KEY
+  if (!morphApiKey) {
+    return new Response(
+      'Morph API key is not configured. Disable "Use Morph" in settings or add MORPH_API_KEY environment variable.',
+      { status: 400 },
+    )
+  }
 
-    if (!hasProviderCredentials(resolvedModel.providerId, config)) {
-      return new Response(
-        `No API key is configured for ${resolvedModel.provider}. Add the provider key in Vercel environment variables or enter your own API key in chat settings.`,
-        { status: 400 },
-      )
-    }
+  const fallbackChain = getFallbackChain(model, config)
 
-    const modelParams = { ...config }
-    delete modelParams.model
-    delete modelParams.apiKey
-    delete modelParams.baseURL
-    const modelClient = getModelClient(resolvedModel, config)
+  if (fallbackChain.length === 0) {
+    return new Response(
+      'No AI providers are configured. Add an API key in Vercel environment variables or in chat settings.',
+      { status: 400 },
+    )
+  }
 
-    // Check if Morph API key is configured
-    const morphApiKey = config.apiKey || process.env.MORPH_API_KEY
-    if (!morphApiKey) {
-      return new Response(
-        'Morph API key is not configured. Disable "Use Morph" in settings or add MORPH_API_KEY environment variable.',
-        { status: 400 },
-      )
-    }
+  const modelParams = { ...config }
+  delete modelParams.model
+  delete modelParams.apiKey
+  delete modelParams.baseURL
 
-    const contextualSystemPrompt = `You are a code editor. Generate a JSON response with exactly these fields:
+  const contextualSystemPrompt = `You are a code editor. Generate a JSON response with exactly these fields:
 
 {
   "commentary": "Explain what changes you are making",
@@ -83,48 +80,56 @@ ${currentFragment.code}
 
 `
 
-    const result = await generateObject({
-      model: modelClient as LanguageModel,
-      system: contextualSystemPrompt,
-      messages,
-      schema: morphEditSchema,
-      maxRetries: 0,
-      ...modelParams,
-    })
+  let lastError: any = null
 
-    const editInstructions = result.object
+  for (const candidate of fallbackChain) {
+    try {
+      const modelClient = getModelClient(candidate, config)
 
-    // Apply edits using Morph
-    const morphResult = await applyPatch({
-      targetFile: currentFragment.file_path,
-      instructions: editInstructions.instruction,
-      initialCode: currentFragment.code,
-      codeEdit: editInstructions.edit,
-    })
+      const result = await generateObject({
+        model: modelClient as LanguageModel,
+        system: contextualSystemPrompt,
+        messages,
+        schema: morphEditSchema,
+        maxRetries: 0,
+        ...modelParams,
+      })
 
-    // Return updated fragment in standard format
-    const updatedFragment: FragmentSchema = {
-      ...currentFragment,
-      code: morphResult.code,
-      commentary: editInstructions.commentary,
+      const editInstructions = result.object
+
+      const morphResult = await applyPatch({
+        targetFile: currentFragment.file_path,
+        instructions: editInstructions.instruction,
+        initialCode: currentFragment.code,
+        codeEdit: editInstructions.edit,
+      })
+
+      const updatedFragment: FragmentSchema = {
+        ...currentFragment,
+        code: morphResult.code,
+        commentary: editInstructions.commentary,
+      }
+
+      const encoder = new TextEncoder()
+      const stream = new ReadableStream({
+        start(controller) {
+          const json = JSON.stringify(updatedFragment)
+          controller.enqueue(encoder.encode(json))
+          controller.close()
+        },
+      })
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+        },
+      })
+    } catch (error: any) {
+      lastError = error
+      console.error(`Morph model ${candidate.id} (${candidate.providerId}) failed:`, error?.message || error)
+      continue
     }
-
-    // Create a streaming response that matches the AI SDK format
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      start(controller) {
-        const json = JSON.stringify(updatedFragment)
-        controller.enqueue(encoder.encode(json))
-        controller.close()
-      },
-    })
-
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-      },
-    })
-  } catch (error: any) {
-    return handleAPIError(error, { hasOwnApiKey: !!config.apiKey })
   }
+
+  return handleAPIError(lastError, { hasOwnApiKey: !!config.apiKey })
 }

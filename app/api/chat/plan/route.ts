@@ -1,11 +1,11 @@
 import { handleAPIError, createRateLimitResponse } from '@/lib/api-errors'
 import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import {
+  getFallbackChain,
   getModelClient,
   hasProviderCredentials,
   LLMModel,
   LLMModelConfig,
-  resolveGenerationModel,
 } from '@/lib/models'
 import { AI_GENERATION_GUIDE } from '@/lib/ai-generation-guide'
 import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
@@ -101,49 +101,58 @@ export async function POST(req: Request) {
     return createRateLimitResponse(limit)
   }
 
-  try {
-    const resolvedModel = resolveGenerationModel(model, config)
+  const fallbackChain = getFallbackChain(model, config)
 
-    if (!hasProviderCredentials(resolvedModel.providerId, config)) {
-      return new Response(
-        `No API key is configured for ${resolvedModel.provider}. Add the provider key in Vercel environment variables or enter your own API key in chat settings.`,
-        { status: 400 },
-      )
-    }
-
-    const modelParams = { ...config }
-    delete modelParams.model
-    delete modelParams.apiKey
-    delete modelParams.baseURL
-    const modelClient = getModelClient(resolvedModel, config)
-    const supabaseStatus = await getSupabaseConnectionStatus(userID, projectID)
-    const supabaseInstruction = supabaseStatus.connected
-      ? supabaseStatus.projectsMode === 'per_project'
-        ? 'Supabase is connected by OAuth. If schema changes are needed, mention the migration files/SQL; Magical will create or reuse one Supabase project for this Magical project.'
-        : `Supabase is connected for project ref ${supabaseStatus.projectRef || 'unknown'} via ${supabaseStatus.source === 'environment' ? 'server environment variables' : 'the user integration'}. If schema changes are needed, mention the migration files/SQL the build step should generate.`
-      : 'Supabase is not connected. If the request needs auth, persistence, relational data, or migrations, ask whether the user wants to connect Supabase or proceed with mock/local data.'
-
-    const result = await generateText({
-      model: modelClient as LanguageModel,
-      system: [
-        'You are Magical AI in Plan mode.',
-        'Use the existing chat history as project memory.',
-        'Return JSON only with keys: plan, question, options, allowCustomInput.',
-        'The plan must be a concise implementation plan, not code.',
-        'Mention important files, UI states, data/storage changes, and verification steps when relevant.',
-        'Set question only when the work cannot proceed safely without one blocking answer.',
-        'When question is set, include 2 to 4 short option strings when likely answers exist.',
-        'Set allowCustomInput to true unless the listed options are exhaustive.',
-        AI_GENERATION_GUIDE,
-        supabaseInstruction,
-      ].join(' '),
-      messages,
-      maxRetries: 0,
-      ...modelParams,
-    })
-
-    return Response.json(parsePlanPayload(result.text))
-  } catch (error: any) {
-    return handleAPIError(error, { hasOwnApiKey: !!config.apiKey })
+  if (fallbackChain.length === 0) {
+    return new Response(
+      'No AI providers are configured. Add an API key in Vercel environment variables or in chat settings.',
+      { status: 400 },
+    )
   }
+
+  const modelParams = { ...config }
+  delete modelParams.model
+  delete modelParams.apiKey
+  delete modelParams.baseURL
+  const supabaseStatus = await getSupabaseConnectionStatus(userID, projectID)
+  const supabaseInstruction = supabaseStatus.connected
+    ? supabaseStatus.projectsMode === 'per_project'
+      ? 'Supabase is connected by OAuth. If schema changes are needed, mention the migration files/SQL; Magical will create or reuse one Supabase project for this Magical project.'
+      : `Supabase is connected for project ref ${supabaseStatus.projectRef || 'unknown'} via ${supabaseStatus.source === 'environment' ? 'server environment variables' : 'the user integration'}. If schema changes are needed, mention the migration files/SQL the build step should generate.`
+    : 'Supabase is not connected. If the request needs auth, persistence, relational data, or migrations, ask whether the user wants to connect Supabase or proceed with mock/local data.'
+
+  let lastError: any = null
+
+  for (const candidate of fallbackChain) {
+    try {
+      const modelClient = getModelClient(candidate, config)
+
+      const result = await generateText({
+        model: modelClient as LanguageModel,
+        system: [
+          'You are Magical AI in Plan mode.',
+          'Use the existing chat history as project memory.',
+          'Return JSON only with keys: plan, question, options, allowCustomInput.',
+          'The plan must be a concise implementation plan, not code.',
+          'Mention important files, UI states, data/storage changes, and verification steps when relevant.',
+          'Set question only when the work cannot proceed safely without one blocking answer.',
+          'When question is set, include 2 to 4 short option strings when likely answers exist.',
+          'Set allowCustomInput to true unless the listed options are exhaustive.',
+          AI_GENERATION_GUIDE,
+          supabaseInstruction,
+        ].join(' '),
+        messages,
+        maxRetries: 0,
+        ...modelParams,
+      })
+
+      return Response.json(parsePlanPayload(result.text))
+    } catch (error: any) {
+      lastError = error
+      console.error(`Plan model ${candidate.id} (${candidate.providerId}) failed:`, error?.message || error)
+      continue
+    }
+  }
+
+  return handleAPIError(lastError, { hasOwnApiKey: !!config.apiKey })
 }

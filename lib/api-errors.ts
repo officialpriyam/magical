@@ -42,7 +42,13 @@ export function handleAPIError(
   context?: { hasOwnApiKey?: boolean },
 ): Response {
   // Log the error for debugging
-  console.error('API Error:', error)
+  console.error('API Error:', error?.message || error)
+  if (error?.cause) {
+    console.error('API Error cause:', error.cause?.message || error.cause)
+  }
+  if (error?.statusCode) {
+    console.error('API Error status:', error.statusCode)
+  }
 
   if (isRateLimitError(error)) {
     const message = context?.hasOwnApiKey
@@ -54,14 +60,14 @@ export function handleAPIError(
 
   if (isOverloadedError(error)) {
     return new Response(
-      'The provider is currently unavailable. Please try again later.',
+      'The provider is currently overloaded. Please try again in a moment.',
       { status: 529 },
     )
   }
 
   if (isAccessDeniedError(error)) {
     return new Response(
-      'Access denied. Please make sure your API key is valid.',
+      'Access denied. Please check your API key is valid and has credits remaining.',
       { status: 403 },
     )
   }
@@ -73,9 +79,31 @@ export function handleAPIError(
     )
   }
 
-  // Generic error handling
+  // Surface the actual error message when available
+  const msg = error?.message || ''
+  if (msg.includes('fetch') || msg.includes('network') || msg.includes('ECONNREFUSED')) {
+    return new Response(
+      'Network error. Could not reach the AI provider. Please check your connection and try again.',
+      { status: 502 },
+    )
+  }
+  if (msg.includes('timeout') || msg.includes('TIMEOUT')) {
+    return new Response(
+      'The request timed out. The model may be too busy. Please try again or choose a different model.',
+      { status: 504 },
+    )
+  }
+  if (msg.includes('invalid') || msg.includes('not found') || msg.includes('does not exist')) {
+    return new Response(
+      `Model error: ${msg}`,
+      { status: 422 },
+    )
+  }
+
+  // Generic error handling — include a useful snippet of the real error
+  const detail = error?.cause?.message || error?.message || 'Unknown error'
   return new Response(
-    'An unexpected error has occurred. Please try again later.',
+    `An unexpected error has occurred: ${detail.slice(0, 200)}. Please try again or choose a different model.`,
     { status: 500 },
   )
 }

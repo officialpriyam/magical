@@ -1,10 +1,10 @@
 import { handleAPIError, createRateLimitResponse } from '@/lib/api-errors'
 import {
+  getFallbackChain,
   getModelClient,
   hasProviderCredentials,
   LLMModel,
   LLMModelConfig,
-  resolveGenerationModel,
 } from '@/lib/models'
 import { toPrompt } from '@/lib/prompt'
 import { applyChatRateLimit } from '@/lib/chat-rate-limit'
@@ -44,45 +44,54 @@ export async function POST(req: Request) {
     return createRateLimitResponse(limit)
   }
 
-  try {
-    const resolvedModel = resolveGenerationModel(model, config)
+  const fallbackChain = getFallbackChain(model, config)
 
-    if (!hasProviderCredentials(resolvedModel.providerId, config)) {
-      return new Response(
-        `No API key is configured for ${resolvedModel.provider}. Add the provider key in Vercel environment variables or enter your own API key in chat settings.`,
-        { status: 400 },
-      )
-    }
-
-    const modelParams = { ...config }
-    delete modelParams.model
-    delete modelParams.apiKey
-    delete modelParams.baseURL
-    const modelClient = getModelClient(resolvedModel, config)
-    const supabaseStatus = await getSupabaseConnectionStatus(userID, projectID)
-
-    const result = await generateObject({
-      model: modelClient as LanguageModel,
-      schema,
-      system: toPrompt(template, {
-        supabase: {
-          connected: supabaseStatus.connected,
-          projectRef: supabaseStatus.projectRef,
-          source: supabaseStatus.source,
-          projectsMode: supabaseStatus.projectsMode,
-        },
-      }),
-      messages,
-      maxRetries: 0, // do not retry on errors
-      ...modelParams,
-    })
-
-    return new Response(JSON.stringify(result.object), {
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-      },
-    })
-  } catch (error: any) {
-    return handleAPIError(error, { hasOwnApiKey: !!config.apiKey })
+  if (fallbackChain.length === 0) {
+    return new Response(
+      'No AI providers are configured. Add an API key in Vercel environment variables or in chat settings.',
+      { status: 400 },
+    )
   }
+
+  const modelParams = { ...config }
+  delete modelParams.model
+  delete modelParams.apiKey
+  delete modelParams.baseURL
+  const supabaseStatus = await getSupabaseConnectionStatus(userID, projectID)
+
+  let lastError: any = null
+
+  for (const candidate of fallbackChain) {
+    try {
+      const modelClient = getModelClient(candidate, config)
+
+      const result = await generateObject({
+        model: modelClient as LanguageModel,
+        schema,
+        system: toPrompt(template, {
+          supabase: {
+            connected: supabaseStatus.connected,
+            projectRef: supabaseStatus.projectRef,
+            source: supabaseStatus.source,
+            projectsMode: supabaseStatus.projectsMode,
+          },
+        }),
+        messages,
+        maxRetries: 0,
+        ...modelParams,
+      })
+
+      return new Response(JSON.stringify(result.object), {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+      })
+    } catch (error: any) {
+      lastError = error
+      console.error(`Model ${candidate.id} (${candidate.providerId}) failed:`, error?.message || error)
+      continue
+    }
+  }
+
+  return handleAPIError(lastError, { hasOwnApiKey: !!config.apiKey })
 }
