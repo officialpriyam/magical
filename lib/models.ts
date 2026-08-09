@@ -145,6 +145,10 @@ export function hasProviderEnvironmentCredentials(providerId: string) {
       return Boolean(process.env.ORCAROUTER_API_KEY)
     case 'requesty':
       return Boolean(process.env.REQUESTY_API_KEY)
+    case 'magicx_coder':
+      return true // Local server, always available
+    case 'magicx':
+      return true // Local server, always available
     default:
       return false
   }
@@ -257,6 +261,16 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       createOpenAI({
         apiKey: apiKey || process.env.REQUESTY_API_KEY,
         baseURL: baseURL || 'https://router.requesty.ai/v1',
+      })(modelNameString),
+    magicx_coder: () =>
+      createOpenAI({
+        apiKey: apiKey || 'no-key',
+        baseURL: baseURL || 'http://185.172.175.223:1234/v1',
+      })(modelNameString),
+    magicx: () =>
+      createOpenAI({
+        apiKey: apiKey || 'no-key',
+        baseURL: baseURL || 'http://localhost:1234/api/v1',
       })(modelNameString),
   }
 

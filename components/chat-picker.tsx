@@ -15,7 +15,7 @@ import { Sparkles, Zap, Wand2 } from 'lucide-react'
 import Image from 'next/image'
 import { useMemo, useRef } from 'react'
 
-const ETC_PROVIDER_IDS = new Set(['orcarouter', 'requesty', 'llm_gateway', 'novita', 'poolside'])
+const ETC_PROVIDER_IDS = new Set(['orcarouter', 'requesty', 'llm_gateway', 'novita', 'poolside', 'magicx_coder', 'magicx'])
 
 export function ChatPicker({
   templates,

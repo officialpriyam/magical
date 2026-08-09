@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <rect width="100" height="100" rx="20" fill="#1a1a2e"/>
+  <path d="M25 35 L50 20 L75 35 L75 65 L50 80 L25 65Z" stroke="#ff6b6b" stroke-width="3" fill="none"/>
+  <path d="M35 45 L50 35 L65 45 L65 55 L50 65 L35 55Z" fill="#ff6b6b"/>
+  <text x="50" y="95" text-anchor="middle" fill="#ff6b6b" font-size="12" font-family="monospace">MAGICX</text>
+</svg>

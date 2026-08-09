@@ -18,6 +18,8 @@ export const MAGIC_FREE_MODELS: LLMModel[] = [
   { id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B', provider: 'Google', providerId: 'requesty' },
   { id: 'novita/inclusionai/ling-3.0-tiny', name: 'Ling 3.0 Tiny', provider: 'Novita', providerId: 'requesty' },
   { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', name: 'Nemotron Nano Omni', provider: 'NVIDIA', providerId: 'requesty' },
+  { id: 'qwen2.5-coder-1.5b-instruct', name: 'MagicX Coder (Qwen2.5 1.5B)', provider: 'MagicX Coder', providerId: 'magicx_coder' },
+  { id: 'google/gemma-3-1b', name: 'MagicX (Gemma 3 1B)', provider: 'MagicX', providerId: 'magicx' },
 ]
 
 export const MAGIC_PLUS_MODELS: LLMModel[] = [

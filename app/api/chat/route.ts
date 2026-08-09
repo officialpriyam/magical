@@ -21,6 +21,8 @@ const STREAM_TEXT_PROVIDER_IDS = new Set([
   'llm_gateway',
   'deepseek',
   'nvidia',
+  'magicx_coder',
+  'magicx',
 ])
 
 const JSON_SCHEMA_PROMPT = `You MUST respond with ONLY a valid JSON object matching this exact schema. No markdown, no explanation, no text before or after the JSON. Start your response with { and end with }.
