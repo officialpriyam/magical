@@ -7,9 +7,9 @@ async function checkAdmin() {
   if (error || !user) return null
 
   const { data } = await supabase
-    .from('users')
+    .from('profiles')
     .select('role')
-    .eq('id', user.id)
+    .eq('user_id', user.id)
     .single()
 
   if (!data || data.role !== 'admin') return null
