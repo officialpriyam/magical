@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, Gift, HelpCircle, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch, Home } from 'lucide-react';
+import { MessageCircle, Search, Gift, HelpCircle, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch, Home, PanelLeftClose, PanelLeft } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -45,7 +45,7 @@ interface SidebarProps {
 interface ChatHistoryItem {
   id: string;
   title: string;
-  date: string; // e.g., "Yesterday", "Last 7 days", "Last 30 days"
+  date: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -73,14 +73,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [deleteConfirmation, setDeleteConfirmation] = React.useState('');
   const [deleteError, setDeleteError] = React.useState('');
   const [isDeletingChat, setIsDeletingChat] = React.useState(false);
-  const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  const leaveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const isMobile = useIsMobile();
 
-  // Use external search query if provided, otherwise use internal state
   const activeSearchQuery = externalSearchQuery || searchQuery;
 
-  // Filter chat history based on search query
   const filteredChatHistory = React.useMemo(() => {
     if (!activeSearchQuery.trim()) {
       return chatHistory;
@@ -104,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleHomeClick = () => {
     onHomeClick();
     if (isMobile) {
-      handleCloseSidebar();
+      setIsOpen(false);
     }
   };
 
@@ -160,65 +156,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
     deleteConfirmation.trim() === deleteTarget?.title &&
     !isDeletingChat;
 
-  const handleOpenSidebar = () => {
-    if (leaveTimeoutRef.current) {
-      clearTimeout(leaveTimeoutRef.current);
-      leaveTimeoutRef.current = null;
-    }
-    setIsOpen(true);
-  };
-
-  const handleCloseSidebar = () => {
-    setIsOpen(false);
-    onClose();
-  };
-
-  const handleMouseEnter = () => {
-    if (isMobile) return;
-
-    if (leaveTimeoutRef.current) {
-      clearTimeout(leaveTimeoutRef.current);
-      leaveTimeoutRef.current = null;
-    }
-    
-    if (!isOpen) {
-      hoverTimeoutRef.current = setTimeout(() => {
-        setIsOpen(true);
-      }, 300);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (isMobile) return;
-
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    
-    if (isOpen) {
-      leaveTimeoutRef.current = setTimeout(() => {
-        setIsOpen(false);
-      }, 500);
-    }
-  };
-
   React.useEffect(() => {
     if (isMobile) {
       setIsOpen(false);
-    } else {
-      setIsOpen(initialIsOpen);
     }
-  }, [initialIsOpen, isMobile]);
+  }, [isMobile]);
+
+  React.useEffect(() => {
+    setIsOpen(initialIsOpen);
+  }, [initialIsOpen]);
 
   React.useEffect(() => {
     const supabase = createSupabaseBrowserClient();
-    
-    // Skip authentication setup if Supabase is not available (development mode)
+
     if (!supabase) {
       return;
     }
-    
+
     const fetchChatHistory = async () => {
       const projects = await getProjects(supabase);
       const history = projects.map((project: Project) => ({
@@ -248,250 +202,256 @@ export const Sidebar: React.FC<SidebarProps> = ({
     });
 
     return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-      if (leaveTimeoutRef.current) {
-        clearTimeout(leaveTimeoutRef.current);
-      }
       authListener?.subscription.unsubscribe();
     };
   }, [refreshKey]);
 
+  const SIDEBAR_WIDTH = 'w-64';
+
   return (
     <div className="flex h-dvh shrink-0 md:h-screen">
-      {/* Always visible icons - hidden on mobile */}
-      <div 
-        className={`bg-[#0b0b0c] border-r border-white/[0.06] flex-col items-center py-4 transition-all duration-300 ease-in-out ${
-          isOpen ? 'w-0 opacity-0 overflow-hidden' : 'w-16 opacity-100'
-        } hidden md:flex`}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        style={{ borderRadius: '0 16px 16px 0' }}
-      >
-        {/* Top section with menu and new icons */}
-        <div className="flex flex-col items-center space-y-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleOpenSidebar}
-            className="h-8 w-8 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-            aria-label="Open sidebar"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onStartNewChat}
-            className="h-8 w-8 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-            aria-label="Start new chat"
-          >
-            <Plus className="h-5 w-5" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              handleOpenSidebar()
-              // Focus search input after opening sidebar
-              setTimeout(() => {
-                const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement
-                if (searchInput) {
-                  searchInput.focus()
-                }
-              }, 100)
-            }}
-            className="h-8 w-8 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-            aria-label="Search"
-          >
-            <Search className="h-5 w-5" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            asChild
-            className="h-8 w-8 text-muted-foreground hover:text-primary dark:hover:text-foreground transition-colors"
-            aria-label="Tasks"
-          >
-            <Link href="/tasks">
-              <ListTodo className="h-5 w-5" />
-            </Link>
-          </Button>
-        </div>
-
-        {/* Spacer to push bottom icons down */}
-        <div className="flex-1" />
-
-        {/* Bottom section with utility icons */}
-        <div className="flex flex-col items-center space-y-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onGetFreeTokens}
-            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950 transition-colors"
-            aria-label="Get free tokens"
-          >
-            <Gift className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
-
+      {/* Mobile overlay */}
       {isMobile && isOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 bg-black/55"
-          aria-label="Close sidebar"
-          onClick={handleCloseSidebar}
+        <div
+          className="fixed inset-0 z-40 bg-black/55 transition-opacity"
+          onClick={() => setIsOpen(false)}
         />
       )}
 
-      {/* Collapsible Sidebar Content */}
+      {/* Sidebar panel */}
       <div
-        className={`h-dvh bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col transition-all duration-300 ease-in-out md:h-screen ${
-          isOpen
-            ? 'fixed inset-y-0 left-0 z-50 w-[min(82vw,18rem)] opacity-100 translate-x-0 shadow-2xl md:relative md:z-auto md:w-64 md:shadow-none'
-            : 'w-0 opacity-0 overflow-hidden md:-translate-x-full'
-        }`}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        style={{ borderRadius: isOpen ? '0 16px 16px 0' : undefined }}
+        className={`
+          bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col
+          transition-all duration-300 ease-in-out
+          h-dvh md:h-screen shrink-0
+          ${isMobile
+            ? `fixed inset-y-0 left-0 z-50 ${isOpen ? 'w-[min(82vw,18rem)] translate-x-0' : 'w-0 -translate-x-full'}`
+            : `${SIDEBAR_WIDTH} relative ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
+          }
+        `}
       >
-        {/* Header Section */}
-        <div className="p-3 border-b border-white/10">
-          <WorkspaceDropdown onSignOut={onSignOut} onOpenPricing={() => setIsPricingModalOpen(true)} />
-        </div>
-
-        <div className="p-3 space-y-1">
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-3 bg-white/10 text-white hover:bg-white/15"
-            onClick={handleHomeClick}
-          >
-            <Home className="h-4 w-4" />
-            Home
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
-            onClick={() => {
-              setTimeout(() => {
-                const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement
-                searchInput?.focus()
-              }, 100)
-            }}
-          >
-            <Search className="h-4 w-4" />
-            Search
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
-          >
-            <HelpCircle className="h-4 w-4" />
-            Resources
-          </Button>
-          <Button
-            variant="ghost"
-            asChild
-            className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
-          >
-            <Link href="/settings/git">
-              <GitBranch className="h-4 w-4" />
-              Git
-            </Link>
-          </Button>
-        </div>
-
-        {/* Chat Controls */}
-        <div className="px-4 pb-4 space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search"
-              value={activeSearchQuery}
-              onChange={handleSearchChange}
-              className="pl-10 bg-white/5 border-white/10 text-white transition-colors placeholder:text-white/45"
-            />
+        <div className={`flex flex-col h-full ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-200`}>
+          {/* Header */}
+          <div className="p-3 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <WorkspaceDropdown onSignOut={onSignOut} onOpenPricing={() => setIsPricingModalOpen(true)} />
+              {!isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOpen(false)}
+                  className="h-7 w-7 text-muted-foreground hover:text-white"
+                  aria-label="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Chat History */}
-        <div className="flex-1 overflow-y-auto px-4 pb-4">
-          <h3 className="text-sm font-medium text-white/70 mb-2">Projects</h3>
-          {Object.keys(groupedChats).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No previous conversations</p>
-          ) : (
-            <div className="space-y-4">
-              {Object.entries(groupedChats).map(([date, chats]) => (
-                <div key={date}>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">{date}</h4>
-                  <div className="space-y-1">
-                    {chats.map((chat) => (
-                      <div key={chat.id} className="group flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          onClick={() => onChatSelected(chat.id)}
-                          className="min-w-0 flex-1 justify-start gap-2 text-white/75 hover:text-white hover:bg-white/10 transition-colors"
-                        >
-                          <MessageCircle className="h-4 w-4 flex-shrink-0" />
-                          <span className="truncate">{chat.title}</span>
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+          <div className="p-3 space-y-1">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 bg-white/10 text-white hover:bg-white/15"
+              onClick={handleHomeClick}
+            >
+              <Home className="h-4 w-4" />
+              Home
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+              onClick={() => {
+                setTimeout(() => {
+                  const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement
+                  searchInput?.focus()
+                }, 100)
+              }}
+            >
+              <Search className="h-4 w-4" />
+              Search
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Resources
+            </Button>
+            <Button
+              variant="ghost"
+              asChild
+              className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+            >
+              <Link href="/settings/git">
+                <GitBranch className="h-4 w-4" />
+                Git
+              </Link>
+            </Button>
+          </div>
+
+          {/* Search */}
+          <div className="px-4 pb-4 space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search"
+                value={activeSearchQuery}
+                onChange={handleSearchChange}
+                className="pl-10 bg-white/5 border-white/10 text-white transition-colors placeholder:text-white/45"
+              />
+            </div>
+          </div>
+
+          {/* Chat History */}
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <h3 className="text-sm font-medium text-white/70 mb-2">Projects</h3>
+            {Object.keys(groupedChats).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No previous conversations</p>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(groupedChats).map(([date, chats]) => (
+                  <div key={date}>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">{date}</h4>
+                    <div className="space-y-1">
+                      {chats.map((chat) => (
+                        <div key={chat.id} className="group flex items-center gap-1">
                           <Button
                             variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0 text-white/45 opacity-0 transition-opacity hover:bg-white/10 hover:text-white group-hover:opacity-100"
-                            aria-label={`More actions for ${chat.title}`}
+                            onClick={() => onChatSelected(chat.id)}
+                            className="min-w-0 flex-1 justify-start gap-2 text-white/75 hover:text-white hover:bg-white/10 transition-colors"
                           >
-                            <MoreHorizontal className="h-4 w-4" />
+                            <MessageCircle className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{chat.title}</span>
                           </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent side="right" align="start">
-                            <DropdownMenuItem onClick={() => onChatSelected(chat.id)}>
-                              <CornerUpLeft className="mr-2 h-4 w-4" />
-                              <span>Re-enter</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleRequestDeleteChat(chat)} className="text-red-500">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              <span>Delete</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    ))}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-white/45 opacity-0 transition-opacity hover:bg-white/10 hover:text-white group-hover:opacity-100"
+                              aria-label={`More actions for ${chat.title}`}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent side="right" align="start">
+                              <DropdownMenuItem onClick={() => onChatSelected(chat.id)}>
+                                <CornerUpLeft className="mr-2 h-4 w-4" />
+                                <span>Re-enter</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleRequestDeleteChat(chat)} className="text-red-500">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-        {/* User Information */}
-        <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.user_metadata?.name ?? 'User'} />
-              <AvatarFallback className="bg-muted text-muted-foreground">
-                {user?.user_metadata?.name?.charAt(0).toUpperCase() ?? 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
-                {user?.user_metadata?.name ?? 'Anonymous'}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {userPlan}
-              </p>
+          {/* User Info */}
+          <div className="p-4 border-t border-white/10">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.user_metadata?.name ?? 'User'} />
+                <AvatarFallback className="bg-muted text-muted-foreground">
+                  {user?.user_metadata?.name?.charAt(0).toUpperCase() ?? 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {user?.user_metadata?.name ?? 'Anonymous'}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {userPlan}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Collapsed icon rail - desktop only */}
+      {!isMobile && !isOpen && (
+        <div
+          className="bg-[#0b0b0c] border-r border-white/[0.06] flex-col items-center py-4 w-16 shrink-0 h-dvh md:h-screen"
+        >
+          <div className="flex flex-col items-center space-y-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsOpen(true)}
+              className="h-8 w-8 text-muted-foreground hover:text-white transition-colors"
+              aria-label="Open sidebar"
+            >
+              <PanelLeft className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onStartNewChat}
+              className="h-8 w-8 text-muted-foreground hover:text-white transition-colors"
+              aria-label="Start new chat"
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setIsOpen(true)
+                setTimeout(() => {
+                  const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement
+                  if (searchInput) {
+                    searchInput.focus()
+                  }
+                }, 100)
+              }}
+              className="h-8 w-8 text-muted-foreground hover:text-white transition-colors"
+              aria-label="Search"
+            >
+              <Search className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className="h-8 w-8 text-muted-foreground hover:text-white transition-colors"
+              aria-label="Tasks"
+            >
+              <Link href="/tasks">
+                <ListTodo className="h-5 w-5" />
+              </Link>
+            </Button>
+          </div>
+
+          <div className="flex-1" />
+
+          <div className="flex flex-col items-center space-y-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onGetFreeTokens}
+              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950 transition-colors"
+              aria-label="Get free tokens"
+            >
+              <Gift className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Dialog */}
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => {
         if (!open) resetDeleteDialog();
       }}>
