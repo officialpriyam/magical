@@ -7,9 +7,9 @@ async function checkAdmin() {
   if (error || !user) return null
 
   const { data } = await supabase
-    .from('users')
+    .from('profiles')
     .select('role')
-    .eq('id', user.id)
+    .eq('user_id', user.id)
     .single()
 
   if (!data || data.role !== 'admin') return null
@@ -18,28 +18,28 @@ async function checkAdmin() {
 
 export async function GET(
   req: Request,
-  { params }: { params: { userId: string } }
+  context: { params: Promise<{ userId: string }> }
 ) {
   const admin = await checkAdmin()
   if (!admin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { userId } = params
+  const { userId } = await context.params
   const supabase = await createServerClient(true)
 
-  const [userResult, projectsResult, teamsResult] = await Promise.all([
-    supabase.from('users').select('*').eq('id', userId).single(),
+  const [profileResult, projectsResult, teamsResult] = await Promise.all([
+    supabase.from('profiles').select('*').eq('user_id', userId).single(),
     supabase.from('projects').select('id, title, created_at, updated_at', { count: 'exact' }).eq('user_id', userId).is('deleted_at', null),
-    supabase.from('team_members').select('team_id, teams(name)', { count: 'exact' }).eq('user_id', userId),
+    supabase.from('users_teams').select('team_id, teams(name)', { count: 'exact' }).eq('user_id', userId),
   ])
 
-  if (userResult.error || !userResult.data) {
+  if (profileResult.error || !profileResult.data) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
   return NextResponse.json({
-    user: userResult.data,
+    profile: profileResult.data,
     projects: projectsResult.data || [],
     projectCount: projectsResult.count || 0,
     teams: teamsResult.data || [],

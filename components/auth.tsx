@@ -99,6 +99,15 @@ const ProviderIcons: {
       dangerouslySetInnerHTML={{ __html: SimpleIcons.siGoogle.svg }}
     />
   ),
+  discord: ({ className }) => (
+    <svg
+      role="img"
+      viewBox="0 0 24 24"
+      className={className}
+      fill="currentColor"
+      dangerouslySetInnerHTML={{ __html: SimpleIcons.siDiscord.svg }}
+    />
+  ),
 }
 
 function useAuthForm(): UseAuthFormReturn {

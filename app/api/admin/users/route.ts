@@ -7,9 +7,9 @@ async function checkAdmin() {
   if (error || !user) return null
 
   const { data } = await supabase
-    .from('users')
+    .from('profiles')
     .select('role')
-    .eq('id', user.id)
+    .eq('user_id', user.id)
     .single()
 
   if (!data || data.role !== 'admin') return null
@@ -30,11 +30,11 @@ export async function GET(req: Request) {
   const supabase = await createServerClient(true)
 
   let query = supabase
-    .from('users')
+    .from('profiles')
     .select('*', { count: 'exact' })
 
   if (search) {
-    query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
+    query = query.or(`full_name.ilike.%${search}%,display_name.ilike.%${search}%`)
   }
 
   const { data, error, count } = await query
@@ -55,7 +55,7 @@ export async function PATCH(req: Request) {
   }
 
   const body = await req.json()
-  const { userId, action, role, creditAction, amount } = body
+  const { userId, action, creditAction, amount } = body
 
   if (!userId || !action) {
     return NextResponse.json({ error: 'Missing userId or action' }, { status: 400 })
@@ -66,29 +66,18 @@ export async function PATCH(req: Request) {
   switch (action) {
     case 'ban':
       const { error: banError } = await supabase
-        .from('users')
+        .from('profiles')
         .update({ banned: true })
-        .eq('id', userId)
+        .eq('user_id', userId)
       if (banError) return NextResponse.json({ error: banError.message }, { status: 500 })
       break
 
     case 'unban':
       const { error: unbanError } = await supabase
-        .from('users')
+        .from('profiles')
         .update({ banned: false })
-        .eq('id', userId)
+        .eq('user_id', userId)
       if (unbanError) return NextResponse.json({ error: unbanError.message }, { status: 500 })
-      break
-
-    case 'role':
-      if (!role || !['user', 'admin'].includes(role)) {
-        return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
-      }
-      const { error: roleError } = await supabase
-        .from('users')
-        .update({ role })
-        .eq('id', userId)
-      if (roleError) return NextResponse.json({ error: roleError.message }, { status: 500 })
       break
 
     case 'credits':
@@ -97,9 +86,9 @@ export async function PATCH(req: Request) {
       }
 
       const { data: currentUser } = await supabase
-        .from('users')
+        .from('profiles')
         .select('credits')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .single()
 
       if (!currentUser) {
@@ -111,9 +100,9 @@ export async function PATCH(req: Request) {
         : Math.max(0, (currentUser.credits || 0) - amount)
 
       const { error: creditError } = await supabase
-        .from('users')
+        .from('profiles')
         .update({ credits: newCredits })
-        .eq('id', userId)
+        .eq('user_id', userId)
 
       if (creditError) return NextResponse.json({ error: creditError.message }, { status: 500 })
       break

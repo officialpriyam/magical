@@ -3,9 +3,9 @@ import { createServerClient } from '@/lib/supabase-server'
 export async function isAdmin(userId: string): Promise<boolean> {
   const supabase = await createServerClient(true)
   const { data, error } = await supabase
-    .from('users')
+    .from('profiles')
     .select('role')
-    .eq('id', userId)
+    .eq('user_id', userId)
     .single()
 
   if (error || !data) return false
@@ -27,11 +27,11 @@ export async function getAllUsers(page = 1, pageSize = 20, search = '') {
   const supabase = await createServerClient(true)
 
   let query = supabase
-    .from('users')
+    .from('profiles')
     .select('*', { count: 'exact' })
 
   if (search) {
-    query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
+    query = query.or(`full_name.ilike.%${search}%,display_name.ilike.%${search}%`)
   }
 
   const { data, error, count } = await query
@@ -45,14 +45,14 @@ export async function getAllUsers(page = 1, pageSize = 20, search = '') {
 export async function getUserDetails(userId: string) {
   const supabase = await createServerClient(true)
 
-  const [userResult, projectsResult, teamsResult] = await Promise.all([
-    supabase.from('users').select('*').eq('id', userId).single(),
+  const [profileResult, projectsResult, teamsResult] = await Promise.all([
+    supabase.from('profiles').select('*').eq('user_id', userId).single(),
     supabase.from('projects').select('id, title, created_at, updated_at', { count: 'exact' }).eq('user_id', userId).is('deleted_at', null),
-    supabase.from('team_members').select('team_id, teams(name)', { count: 'exact' }).eq('user_id', userId),
+    supabase.from('users_teams').select('team_id, teams(name)', { count: 'exact' }).eq('user_id', userId),
   ])
 
   return {
-    user: userResult.data,
+    profile: profileResult.data,
     projects: projectsResult.data || [],
     projectCount: projectsResult.count || 0,
     teams: teamsResult.data || [],
@@ -60,22 +60,12 @@ export async function getUserDetails(userId: string) {
   }
 }
 
-export async function updateUserRole(userId: string, role: string) {
-  const supabase = await createServerClient(true)
-  const { error } = await supabase
-    .from('users')
-    .update({ role })
-    .eq('id', userId)
-
-  if (error) throw error
-}
-
 export async function banUser(userId: string) {
   const supabase = await createServerClient(true)
   const { error } = await supabase
-    .from('users')
+    .from('profiles')
     .update({ banned: true })
-    .eq('id', userId)
+    .eq('user_id', userId)
 
   if (error) throw error
 }
@@ -83,9 +73,9 @@ export async function banUser(userId: string) {
 export async function unbanUser(userId: string) {
   const supabase = await createServerClient(true)
   const { error } = await supabase
-    .from('users')
+    .from('profiles')
     .update({ banned: false })
-    .eq('id', userId)
+    .eq('user_id', userId)
 
   if (error) throw error
 }

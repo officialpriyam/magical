@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 
 interface UserDetails {
-  user: any
+  profile: any
   projects: any[]
   projectCount: number
   teams: any[]
@@ -68,21 +68,7 @@ export default function AdminUserDetailPage() {
       await fetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, action: details?.user?.banned ? 'unban' : 'ban' }),
-      })
-      fetchDetails()
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleRole = async () => {
-    setActionLoading(true)
-    try {
-      await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, action: 'role', role: details?.user?.role === 'admin' ? 'user' : 'admin' }),
+        body: JSON.stringify({ userId, action: details?.profile?.banned ? 'unban' : 'ban' }),
       })
       fetchDetails()
     } finally {
@@ -94,11 +80,11 @@ export default function AdminUserDetailPage() {
     return <div className="text-white/40 text-center py-12">Loading...</div>
   }
 
-  if (!details?.user) {
+  if (!details?.profile) {
     return <div className="text-white/40 text-center py-12">User not found</div>
   }
 
-  const { user, projects, projectCount, teams, teamCount } = details
+  const { profile, projects, projectCount, teams, teamCount } = details
 
   return (
     <div className="space-y-6">
@@ -112,34 +98,31 @@ export default function AdminUserDetailPage() {
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-white/10 flex items-center justify-center">
             <span className="text-2xl font-bold text-white/60">
-              {(user.full_name || user.email)?.charAt(0)?.toUpperCase() || '?'}
+              {(profile.full_name || profile.display_name || '?')?.charAt(0)?.toUpperCase()}
             </span>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">{user.full_name || 'Unnamed User'}</h1>
-            <p className="text-sm text-white/50">{user.email}</p>
+            <h1 className="text-xl font-bold text-white">{profile.full_name || profile.display_name || 'Unnamed User'}</h1>
+            <p className="text-sm text-white/50">{profile.user_id}</p>
             <div className="flex items-center gap-2 mt-1">
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                user.role === 'admin' ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-white/60'
+                profile.role === 'admin' ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-white/60'
               }`}>
-                {user.role === 'admin' && <Shield className="h-3 w-3" />}
-                {user.role}
+                {profile.role === 'admin' && <Shield className="h-3 w-3" />}
+                {profile.role}
               </span>
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                user.banned ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'
+                profile.banned ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'
               }`}>
-                {user.banned ? <Ban className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
-                {user.banned ? 'Banned' : 'Active'}
+                {profile.banned ? <Ban className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
+                {profile.banned ? 'Banned' : 'Active'}
               </span>
             </div>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRole} disabled={actionLoading} className="border-white/10 text-white/70 hover:bg-white/10">
-            {user.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleBan} disabled={actionLoading} className={user.banned ? 'border-green-500/30 text-green-400 hover:bg-green-500/10' : 'border-red-500/30 text-red-400 hover:bg-red-500/10'}>
-            {user.banned ? 'Unban' : 'Ban'}
+          <Button variant="outline" size="sm" onClick={handleBan} disabled={actionLoading} className={profile.banned ? 'border-green-500/30 text-green-400 hover:bg-green-500/10' : 'border-red-500/30 text-red-400 hover:bg-red-500/10'}>
+            {profile.banned ? 'Unban' : 'Ban'}
           </Button>
         </div>
       </div>
@@ -151,14 +134,14 @@ export default function AdminUserDetailPage() {
             <CreditCard className="h-4 w-4" />
             Credits
           </div>
-          <div className="text-2xl font-bold text-white">{user.credits ?? 0}</div>
+          <div className="text-2xl font-bold text-white">{profile.credits ?? 0}</div>
         </div>
         <div className="p-4 rounded-xl border border-white/10 bg-white/[0.03]">
           <div className="flex items-center gap-2 text-white/50 text-sm mb-1">
             <Zap className="h-4 w-4" />
             Tokens Used
           </div>
-          <div className="text-2xl font-bold text-white">{user.tokens_used ?? 0}</div>
+          <div className="text-2xl font-bold text-white">{profile.tokens_used ?? 0}</div>
         </div>
         <div className="p-4 rounded-xl border border-white/10 bg-white/[0.03]">
           <div className="flex items-center gap-2 text-white/50 text-sm mb-1">

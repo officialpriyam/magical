@@ -14,9 +14,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 interface UserRow {
-  id: string
-  email: string
+  user_id: string
   full_name: string | null
+  display_name: string | null
   role: string
   banned: boolean
   credits: number
@@ -71,20 +71,6 @@ export default function AdminUsersPage() {
     }
   }
 
-  const handleRoleChange = async (userId: string, role: string) => {
-    setActionLoading(userId)
-    try {
-      await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, action: 'role', role }),
-      })
-      fetchUsers()
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
   const totalPages = Math.ceil(total / pageSize)
 
   return (
@@ -92,6 +78,10 @@ export default function AdminUsersPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Users</h1>
         <span className="text-sm text-white/50">{total} total users</span>
+      </div>
+
+      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
+        Admin roles must be assigned directly in Supabase (set <code className="bg-black/20 px-1 rounded">role = 'admin'</code> in the users table).
       </div>
 
       <div className="relative max-w-md">
@@ -128,15 +118,15 @@ export default function AdminUsersPage() {
               </tr>
             ) : (
               users.map((user) => (
-                <tr key={user.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                <tr key={user.user_id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center">
                         <User className="h-4 w-4 text-white/60" />
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-white">{user.full_name || 'Unnamed'}</div>
-                        <div className="text-xs text-white/40">{user.email}</div>
+                        <div className="text-sm font-medium text-white">{user.full_name || user.display_name || 'Unnamed'}</div>
+                        <div className="text-xs text-white/40">{user.user_id?.slice(0, 8)}...</div>
                       </div>
                     </div>
                   </td>
@@ -168,18 +158,15 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={actionLoading === user.id}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={actionLoading === user.user_id}>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => router.push(`/admin/users/${user.id}`)}>
+                        <DropdownMenuItem onClick={() => router.push(`/admin/users/${user.user_id}`)}>
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleRoleChange(user.id, user.role === 'admin' ? 'user' : 'admin')}>
-                          {user.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleBan(user.id, user.banned)} className={user.banned ? 'text-green-400' : 'text-red-400'}>
+                        <DropdownMenuItem onClick={() => handleBan(user.user_id, user.banned)} className={user.banned ? 'text-green-400' : 'text-red-400'}>
                           {user.banned ? 'Unban User' : 'Ban User'}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
