@@ -100,6 +100,7 @@ export function StarfieldBackground() {
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: 'url(/nebula.jpg)',
+          backgroundColor: '#0a0008',
           filter: 'brightness(0.35) saturate(1.2)',
         }}
       />
