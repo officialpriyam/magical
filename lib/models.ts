@@ -146,9 +146,9 @@ export function hasProviderEnvironmentCredentials(providerId: string) {
     case 'requesty':
       return Boolean(process.env.REQUESTY_API_KEY)
     case 'magicx_coder':
-      return true // Local server, always available
+      return Boolean(process.env.LM_API_TOKEN)
     case 'magicx':
-      return true // Local server, always available
+      return Boolean(process.env.LM_API_TOKEN)
     default:
       return false
   }
@@ -264,14 +264,14 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       })(modelNameString),
     magicx_coder: () =>
       createOpenAI({
-        apiKey: apiKey || 'no-key',
-        baseURL: baseURL || 'http://185.172.175.223:1234/v1',
-      })(modelNameString),
+        apiKey: apiKey || process.env.LM_API_TOKEN,
+        baseURL: baseURL || process.env.MAGICX_CODER_BASE_URL || 'http://185.172.175.223:1234/v1',
+      })(process.env.MAGICX_CODER_MODEL || modelNameString),
     magicx: () =>
       createOpenAI({
-        apiKey: apiKey || 'no-key',
-        baseURL: baseURL || 'http://localhost:1234/api/v1',
-      })(modelNameString),
+        apiKey: apiKey || process.env.LM_API_TOKEN,
+        baseURL: baseURL || process.env.MAGICX_BASE_URL || 'http://localhost:1234/api/v1',
+      })(process.env.MAGICX_MODEL || modelNameString),
   }
 
   const createClient =

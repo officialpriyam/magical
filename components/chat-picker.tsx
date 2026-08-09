@@ -15,7 +15,8 @@ import { Sparkles, Zap, Wand2 } from 'lucide-react'
 import Image from 'next/image'
 import { useMemo, useRef } from 'react'
 
-const ETC_PROVIDER_IDS = new Set(['orcarouter', 'requesty', 'llm_gateway', 'novita', 'poolside', 'magicx_coder', 'magicx'])
+const ETC_PROVIDER_IDS = new Set(['orcarouter', 'requesty', 'llm_gateway', 'novita', 'poolside'])
+const MAGICAL_AI_PROVIDER_IDS = new Set(['magicx_coder', 'magicx'])
 
 export function ChatPicker({
   templates,
@@ -163,10 +164,24 @@ export function ChatPicker({
               ))}
             </SelectGroup>
             <SelectGroup>
+              <SelectLabel>Magical AI</SelectLabel>
+              {models
+                .filter((m) => MAGICAL_AI_PROVIDER_IDS.has(m.providerId))
+                .map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <div className="flex items-center space-x-2">
+                      <Wand2 className="h-3.5 w-3.5 text-purple-400" />
+                      <span>{model.name}</span>
+                      <span className="text-[10px] text-purple-400">Local</span>
+                    </div>
+                  </SelectItem>
+                ))}
+            </SelectGroup>
+            <SelectGroup>
               <SelectLabel>Other models</SelectLabel>
               {Object.entries(
                 Object.groupBy(
-                  models.filter((m) => !MAGIC_FREE_MODELS.some((f) => f.id === m.id)),
+                  models.filter((m) => !MAGIC_FREE_MODELS.some((f) => f.id === m.id) && !MAGICAL_AI_PROVIDER_IDS.has(m.providerId)),
                   (model) =>
                     model.providerId === 'openrouter'
                       ? 'openrouter'
