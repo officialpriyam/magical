@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { MessageCircle, Search, Gift, HelpCircle, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch, Home, PanelLeftClose, PanelLeft } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -379,8 +380,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Collapsed icon rail - desktop only */}
+      <AnimatePresence>
       {!isMobile && !isOpen && (
-        <div
+        <motion.div
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -8 }}
+          transition={{ duration: 0.15 }}
           className="bg-[#0b0b0c] border-r border-white/[0.06] flex-col items-center py-4 w-16 shrink-0 h-dvh md:h-screen"
         >
           <div className="flex flex-col items-center space-y-2">
@@ -448,8 +454,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Gift className="h-5 w-5" />
             </Button>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Delete Dialog */}
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => {

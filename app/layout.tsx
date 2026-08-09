@@ -9,6 +9,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import { AppStabilityGuard } from '@/components/app-stability-guard'
 import { CookieConsent } from '@/components/cookie-consent'
 import { StarfieldBackground } from '@/components/starfield-background'
+import { PageTransition } from '@/components/page-transition'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://magical-ai.vercel.app'),
@@ -73,7 +74,9 @@ export default function RootLayout({
         >
           <PostHogProvider>
             <AuthProvider>
-              <AppStabilityGuard>{children}</AppStabilityGuard>
+              <AppStabilityGuard>
+                <PageTransition>{children}</PageTransition>
+              </AppStabilityGuard>
             </AuthProvider>
           </PostHogProvider>
           <Toaster />

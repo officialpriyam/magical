@@ -22,6 +22,7 @@ import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { useRouter } from 'next/navigation';
 import { usePostHog } from 'posthog-js/react';
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
 import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
@@ -1813,8 +1814,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           )}
         </div>
       )}
+      <AnimatePresence>
       {(error || errorMessage) && (
-        <div className="flex items-center justify-between gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ duration: 0.2 }}
+          className="flex items-center justify-between gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm"
+        >
           <span className="min-w-0 flex-1 truncate">{errorMessage || error?.message || 'AI generation failed.'}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             {fragment && (
@@ -1833,8 +1841,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             )}
             <button onClick={retry} className="px-3 py-1.5 rounded-lg hover:bg-red-500/20 text-xs font-medium transition-colors">Retry</button>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </>
   )
 
@@ -2209,11 +2218,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             </>
             )}
         </div>
+          <AnimatePresence>
           {shouldShowPreviewPanel && (
-            <div className={cn(
-              "flex-1 overflow-hidden",
-              "fixed inset-0 z-40 bg-[#111211] md:relative md:z-auto"
-            )}>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className={cn(
+                "flex-1 overflow-hidden",
+                "fixed inset-0 z-40 bg-[#111211] md:relative md:z-auto"
+              )}
+            >
               <Preview
                 teamID={userTeam?.id}
                 accessToken={session?.access_token}
@@ -2241,8 +2257,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 onRedeploy={handleRedeploy}
                 executeCode={handleExecuteCode}
               />
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
       </div>
     </main>
   )

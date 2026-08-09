@@ -5,6 +5,7 @@ import { getFragmentFiles } from '@/lib/fragment-files'
 import { DeepPartial } from 'ai'
 import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 
 export function Chat({
   messages,
@@ -48,7 +49,10 @@ export function Chat({
       )}
 
       {messages.map((message: Message, index: number) => (
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.3) }}
           className={`flex flex-col whitespace-pre-wrap text-sm leading-5 ${
             message.role === 'user'
               ? 'self-end max-w-[85%] rounded-2xl bg-white/[0.07] px-3 py-1.5 text-white shadow-sm sm:px-4 md:px-4'
@@ -126,7 +130,7 @@ export function Chat({
               setCurrentPreview={setCurrentPreview}
             />
           )}
-        </div>
+        </motion.div>
       ))}
       {(isLoading || isPreviewLoading || autoFixMessage) && (
         <GenerationStatusCard

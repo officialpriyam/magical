@@ -132,6 +132,7 @@ export async function POST(
           files = await getProjectFilesFromSandboxStorage({
             userId: user.id,
             projectId,
+            project,
           })
           restoredFrom = 'sandbox-storage'
 
@@ -277,9 +278,9 @@ export async function POST(
           : {}),
       })
 
-      for (const file of files) {
-        await (sbx as SandboxInstance).files.write(file.path, file.content)
-      }
+      await Promise.all(
+        files.map((file) => (sbx as SandboxInstance).files.write(file.path, file.content))
+      )
     }
 
     const installCommand = cleanCommand(fragment.install_dependencies_command)

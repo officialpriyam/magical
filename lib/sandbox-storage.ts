@@ -34,7 +34,7 @@ type SandboxStorageResult =
 
 const MAX_SANDBOX_STORAGE_FILES = 1000
 const MAX_SANDBOX_STORAGE_FILE_BYTES = 1024 * 1024
-const FILES_TTL_SECONDS = 30
+const FILES_TTL_SECONDS = 300
 const MAX_CACHE_BYTES = 3 * 1024 * 1024
 const STORAGE_REQUEST_TIMEOUT_MS = 3000
 
@@ -247,9 +247,11 @@ export async function renameProjectFileInSandboxStorage({
 export async function getProjectFilesFromSandboxStorage({
   userId,
   projectId,
+  project,
 }: {
   userId: string
   projectId: string
+  project?: { id: string; metadata: any } | null
 }) {
   if (!hasSandboxStorageConfig()) {
     return []
@@ -262,13 +264,13 @@ export async function getProjectFilesFromSandboxStorage({
     return cached
   }
 
-  const project = await getOwnedProject(userId, projectId)
+  const projectRow = project || await getOwnedProject(userId, projectId)
 
-  if (!project) {
+  if (!projectRow) {
     return []
   }
 
-  const metadata = getSandboxStorageMetadata(project.metadata)
+  const metadata = getSandboxStorageMetadata(projectRow.metadata)
   const storageId = metadata?.storageId
 
   if (!storageId) {
@@ -333,7 +335,9 @@ export async function getProjectFileTreeFromSandboxStorage({
   const files = await getProjectFilesFromSandboxStorage({ userId, projectId })
 
   if (files.length > 0) {
-    await kvCacheSet(cacheKey, buildFileTree(files), FILES_TTL_SECONDS)
+    const tree = buildFileTree(files)
+    await kvCacheSet(cacheKey, tree, FILES_TTL_SECONDS)
+    return tree
   }
 
   return buildFileTree(files)
