@@ -154,7 +154,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   )
   const [useMorphApply, setUseMorphApply] = useLocalStorage(
     'useMorphApply',
-    true,
+    false,
   )
   const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'build')
   const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
@@ -2204,33 +2204,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   <div className="flex-1 min-w-0">
                     {promptInput}
                   </div>
-                  {fragment && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (shouldShowPreviewPanel) {
-                          setCurrentPreview({ fragment: undefined, result: undefined })
-                          setIsPreviewPanelOpen(false)
-                        } else {
-                          setIsPreviewPanelOpen(true)
-                          setCurrentTab('ide')
-                        }
-                      }}
-                      className={cn(
-                        "hidden md:flex shrink-0 h-10 w-10 items-center justify-center rounded-xl border transition-all",
-                        shouldShowPreviewPanel
-                          ? "border-white/20 bg-white/10 text-white"
-                          : "border-white/10 bg-white/[0.04] text-white/50 hover:bg-white/[0.08] hover:text-white"
-                      )}
-                      title={shouldShowPreviewPanel ? 'Close IDE' : 'Open IDE'}
-                    >
-                      {shouldShowPreviewPanel ? (
-                        <PanelRightClose className="h-5 w-5" />
-                      ) : (
-                        <PanelRightOpen className="h-5 w-5" />
-                      )}
-                    </button>
-                  )}
                 </div>
               </div>
             </>

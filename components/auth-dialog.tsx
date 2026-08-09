@@ -8,7 +8,8 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
-import { SupabaseClient } from '@supabase/supabase-js'
+import { Provider, SupabaseClient } from '@supabase/supabase-js'
+import { useEffect, useState } from 'react'
 
 export function AuthDialog({
   open,
@@ -21,6 +22,23 @@ export function AuthDialog({
   supabase: SupabaseClient
   view: ViewType
 }) {
+  const [providers, setProviders] = useState<Provider[]>([])
+
+  useEffect(() => {
+    if (!open) return
+
+    fetch('/api/auth/providers')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.providers)) {
+          setProviders(data.providers as Provider[])
+        }
+      })
+      .catch(() => {
+        setProviders([])
+      })
+  }, [open])
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
@@ -38,7 +56,7 @@ export function AuthDialog({
             <Auth
               supabaseClient={supabase}
               view={view}
-              providers={['github', 'google']}
+              providers={providers}
               socialLayout="horizontal"
               onSignUpValidate={validateEmail}
               metadata={{

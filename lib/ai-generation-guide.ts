@@ -6,11 +6,17 @@ Generation contract:
 - Use commentary to explain the concrete files being created and the order of work.
 - Use title and description for the user-facing artifact card, not as implementation notes.
 
-CRITICAL - Do NOT generate boilerplate:
-- NEVER generate the default Next.js starter template ("Get started by editing pages/index.tsx", "Deploy now", etc.)
-- NEVER output placeholder text like "Learn", "Examples", "Go to nextjs.org"
-- The pages/index.tsx file MUST contain the actual application code the user requested
-- Generate a COMPLETE, FUNCTIONAL application - not a placeholder or starter template
+CRITICAL - NEVER generate default/placeholder content:
+- NEVER include "Get started by editing pages/index.tsx" or "Deploy now" text
+- NEVER include "Learn", "Examples", "Go to nextjs.org" links
+- NEVER include placeholder images like vercel.svg or next.svg
+- NEVER generate a basic "Hello World" or minimal starter template
+- The code must be a REAL, COMPLETE application - not a demo or example
+- pages/index.tsx MUST contain the actual UI and functionality the user requested
+- Generate meaningful content with proper styling, layout, and interactivity
+- For landing pages: full hero section, feature sections, CTA buttons, footer
+- For dashboards: sidebar, charts, tables, data cards with realistic content
+- For e-commerce: product grids, cart, checkout UI, product details
 
 Multi-file expectations:
 - Next.js apps should usually include pages/index.tsx plus relevant components, data helpers, and styles when the UI has multiple sections or meaningful interactions.

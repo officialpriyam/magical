@@ -57,6 +57,15 @@ export async function POST(req: Request) {
     delete modelParams.baseURL
     const modelClient = getModelClient(resolvedModel, config)
 
+    // Check if Morph API key is configured
+    const morphApiKey = config.apiKey || process.env.MORPH_API_KEY
+    if (!morphApiKey) {
+      return new Response(
+        'Morph API key is not configured. Disable "Use Morph" in settings or add MORPH_API_KEY environment variable.',
+        { status: 400 },
+      )
+    }
+
     const contextualSystemPrompt = `You are a code editor. Generate a JSON response with exactly these fields:
 
 {
