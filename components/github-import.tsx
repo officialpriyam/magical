@@ -60,8 +60,10 @@ interface GitHubImportProps {
   onClose?: () => void
 }
 
+const noop = () => {}
+
 export function GitHubImport({ onImport, onClose }: GitHubImportProps) {
-  const { session } = useAuth(() => {}, () => {})
+  const { session } = useAuth(noop, noop)
   const { toast } = useToast()  
   const [repositories, setRepositories] = useState<GitHubRepo[]>([])
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null)

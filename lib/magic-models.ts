@@ -17,6 +17,7 @@ export const MAGIC_FREE_MODELS: LLMModel[] = [
   { id: 'mistral/leanstral-1-5', name: 'Leanstral 1.5', provider: 'Mistral', providerId: 'requesty' },
   { id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B', provider: 'Google', providerId: 'requesty' },
   { id: 'novita/inclusionai/ling-3.0-tiny', name: 'Ling 3.0 Tiny', provider: 'Novita', providerId: 'requesty' },
+  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', name: 'Nemotron Nano Omni', provider: 'NVIDIA', providerId: 'requesty' },
 ]
 
 export const MAGIC_PLUS_MODELS: LLMModel[] = [
@@ -39,6 +40,7 @@ export const MAGIC_PLUS_MODELS: LLMModel[] = [
   { id: 'poolside/laguna-m.1', name: 'Poolside Laguna M', provider: 'Poolside', providerId: 'requesty' },
   { id: 'poolside/laguna-xs.2', name: 'Poolside Laguna XS', provider: 'Poolside', providerId: 'requesty' },
   { id: 'nvidia/nemotron-3-nano-30b-a3b', name: 'Nemotron 3 Nano 30B', provider: 'NVIDIA', providerId: 'requesty' },
+  { id: 'nvidia/nemotron-3.5-content-safety', name: 'Nemotron 3.5 Content Safety', provider: 'NVIDIA', providerId: 'requesty' },
   { id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B', provider: 'Google', providerId: 'requesty' },
 ]
 

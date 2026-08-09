@@ -18,6 +18,8 @@ interface GitProvider {
   loading: boolean
 }
 
+const noop = () => {}
+
 const statusMessages: Record<string, { title: string; description: string; type: 'success' | 'error' }> = {
   connected: { title: 'Connected successfully', description: 'Your account is now linked.', type: 'success' },
   disconnected: { title: 'Disconnected', description: 'Account has been unlinked.', type: 'success' },
@@ -41,7 +43,7 @@ export default function GitPage() {
 }
 
 function GitPageContent() {
-  const { session } = useAuth(() => {}, () => {})
+  const { session } = useAuth(noop, noop)
   const searchParams = useSearchParams()
   const [providers, setProviders] = useState<GitProvider[]>([
     { id: 'github', name: 'GitHub', icon: <GitHubIcon />, description: 'Two-way sync with your GitHub account or organization', connected: false, loading: true },

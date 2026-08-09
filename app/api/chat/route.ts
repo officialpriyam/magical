@@ -12,6 +12,7 @@ import { fragmentSchema as schema } from '@/lib/schema'
 import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
 import { Templates } from '@/lib/templates'
 import { streamObject, type LanguageModel, type ModelMessage } from 'ai'
+import { sanitizeJsonTextStream } from '@/lib/json-stream'
 
 export const maxDuration = 300
 
@@ -84,8 +85,15 @@ export async function POST(req: Request) {
       const encoder = new TextEncoder()
       const stream = new ReadableStream({
         async start(controller) {
-          for await (const chunk of result.textStream) {
-            controller.enqueue(encoder.encode(chunk))
+          const reader = result.textStream.pipeThrough(sanitizeJsonTextStream()).getReader()
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              controller.enqueue(encoder.encode(value))
+            }
+          } finally {
+            reader.releaseLock()
           }
           controller.close()
         },

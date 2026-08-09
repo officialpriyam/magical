@@ -10,6 +10,7 @@ import { applyPatch } from '@/lib/morph'
 import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { FragmentSchema, morphEditSchema, MorphEditSchema } from '@/lib/schema'
 import { streamObject, type LanguageModel, type ModelMessage } from 'ai'
+import { sanitizeJsonTextStream } from '@/lib/json-stream'
 
 export const maxDuration = 300
 
@@ -96,8 +97,15 @@ ${currentFragment.code}
       })
 
       let accumulated = ''
-      for await (const chunk of result.textStream) {
-        accumulated += chunk
+      const reader = result.textStream.pipeThrough(sanitizeJsonTextStream()).getReader()
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          accumulated += value
+        }
+      } finally {
+        reader.releaseLock()
       }
 
       let editInstructions: MorphEditSchema

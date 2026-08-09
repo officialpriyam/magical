@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import staticModels from '@/lib/models.json'
 import { hasProviderEnvironmentCredentials, type LLMModel } from '@/lib/models'
+import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS } from '@/lib/magic-models'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,6 +61,12 @@ export async function GET() {
 
   for (const model of staticModels.models as LLMModel[]) {
     if (model.providerId !== 'nvidia' && hasProviderEnvironmentCredentials(model.providerId)) {
+      models.set(model.id, model)
+    }
+  }
+
+  for (const model of [...MAGIC_FREE_MODELS, ...MAGIC_PLUS_MODELS]) {
+    if (hasProviderEnvironmentCredentials(model.providerId)) {
       models.set(model.id, model)
     }
   }
