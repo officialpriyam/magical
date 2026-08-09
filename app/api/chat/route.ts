@@ -170,37 +170,25 @@ export async function POST(req: Request) {
           ...modelParams,
         })
 
-        let accumulated = ''
-        const reader = result.textStream.getReader()
-        try {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            accumulated += value
-          }
-        } finally {
-          reader.releaseLock()
-        }
-
-        let parsed: any
-        try {
-          const cleaned = accumulated.replace(/^data:\s*/gm, '').trim()
-          const jsonStr = cleaned.split('\n').filter(l => l.trim()).pop() || cleaned
-          parsed = JSON.parse(jsonStr)
-        } catch {
-          parsed = JSON.parse(accumulated)
-        }
-
         const encoder = new TextEncoder()
-        const jsonStream = new ReadableStream({
-          start(controller) {
-            controller.enqueue(encoder.encode(JSON.stringify(parsed)))
+        const stream = new ReadableStream({
+          async start(controller) {
+            const reader = result.textStream.getReader()
+            try {
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                controller.enqueue(encoder.encode(value))
+              }
+            } finally {
+              reader.releaseLock()
+            }
             controller.close()
           },
         })
 
-        return new Response(jsonStream, {
-          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        return new Response(stream, {
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
         })
       }
 
