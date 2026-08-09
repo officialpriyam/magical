@@ -8,41 +8,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { LLMModel, LLMModelConfig } from '@/lib/models'
+import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS, getRandomModel } from '@/lib/magic-models'
 import type { TemplateId, Templates } from '@/lib/templates'
 import 'core-js/actual/object/group-by'
 import { Sparkles, Zap, Wand2 } from 'lucide-react'
 import Image from 'next/image'
 import { useMemo, useRef } from 'react'
-
-export const MAGIC_FREE_MODELS: LLMModel[] = [
-  { id: 'openai/gpt-oss-20b:free', name: 'GPT-OSS 20B', provider: 'OpenAI', providerId: 'openrouter' },
-  { id: 'qwen/qwen3-4b:free', name: 'Qwen3 4B', provider: 'Qwen', providerId: 'openrouter' },
-  { id: 'qwen/qwen3-8b:free', name: 'Qwen3 8B', provider: 'Qwen', providerId: 'openrouter' },
-  { id: 'qwen/qwen3-14b:free', name: 'Qwen3 14B', provider: 'Qwen', providerId: 'openrouter' },
-  { id: 'qwen/qwen3-30b-a3b:free', name: 'Qwen3 30B', provider: 'Qwen', providerId: 'openrouter' },
-  { id: 'google/gemma-3n-e2b-it:free', name: 'Gemma 3n E2B', provider: 'Google', providerId: 'openrouter' },
-  { id: 'google/gemma-3n-e4b-it:free', name: 'Gemma 3n E4B', provider: 'Google', providerId: 'openrouter' },
-  { id: 'meta-llama/llama-3.2-3b-instruct:free', name: 'Llama 3.2 3B', provider: 'Meta', providerId: 'openrouter' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', provider: 'Meta', providerId: 'openrouter' },
-  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', provider: 'Mistral', providerId: 'openrouter' },
-]
-
-export const MAGIC_PLUS_MODELS: LLMModel[] = [
-  { id: 'qwen/qwen3-235b-a22b:free', name: 'Qwen3 235B', provider: 'Qwen', providerId: 'openrouter' },
-  { id: 'meta-llama/llama-4-maverick:free', name: 'Llama 4 Maverick', provider: 'Meta', providerId: 'openrouter' },
-  { id: 'meta-llama/llama-4-scout:free', name: 'Llama 4 Scout', provider: 'Meta', providerId: 'openrouter' },
-  { id: 'qwen/qwen3-coder:free', name: 'Qwen3 Coder', provider: 'Qwen', providerId: 'openrouter' },
-  { id: 'qwen/qwen3-30b-a3b:free', name: 'Qwen3 30B', provider: 'Qwen', providerId: 'openrouter' },
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', provider: 'Meta', providerId: 'openrouter' },
-  { id: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', provider: 'Mistral', providerId: 'openrouter' },
-  { id: 'qwen/qwen3-14b:free', name: 'Qwen3 14B', provider: 'Qwen', providerId: 'openrouter' },
-  { id: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B', provider: 'Google', providerId: 'openrouter' },
-  { id: 'google/gemma-3-12b-it:free', name: 'Gemma 3 12B', provider: 'Google', providerId: 'openrouter' },
-]
-
-function getRandomModel(models: LLMModel[]): LLMModel {
-  return models[Math.floor(Math.random() * models.length)]
-}
 
 export function ChatPicker({
   templates,

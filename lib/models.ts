@@ -7,6 +7,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createOllama } from 'ollama-ai-provider'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import bundledModels from '@/lib/models.json'
+import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS } from '@/lib/magic-models'
 
 export type LLMModel = {
   id: string
@@ -63,6 +64,19 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
     chain.push(model)
   }
 
+  const isMagicFree = MAGIC_FREE_MODELS.some((m) => m.id === model.id)
+  const isMagicPlus = MAGIC_PLUS_MODELS.some((m) => m.id === model.id)
+
+  if (isMagicFree || isMagicPlus) {
+    const siblings = (isMagicFree ? MAGIC_FREE_MODELS : MAGIC_PLUS_MODELS).filter(
+      (m) => m.id !== model.id && hasProviderCredentials(m.providerId, config),
+    )
+    for (const sibling of siblings) {
+      if (chain.length >= 6) break
+      chain.push(sibling)
+    }
+  }
+
   const fallbackIds = [
     'models/gemini-2.0-flash',
     'qwen/qwen3-coder',
@@ -70,11 +84,15 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
     'claude-3-5-haiku-latest',
     'gpt-4o-mini',
     'openrouter/auto',
+    'anthropic/claude-haiku-4-5-free',
+    'mistral/leanstral-1-5',
+    'google/gemma-4-31b-it',
   ]
 
   const seenProviders = new Set<string>(chain.map((m) => m.providerId))
 
   for (const fallbackId of fallbackIds) {
+    if (chain.length >= 8) break
     const fallbackModel = (bundledModels.models as LLMModel[]).find(
       (candidate) => candidate.id === fallbackId,
     )
@@ -121,6 +139,12 @@ export function hasProviderEnvironmentCredentials(providerId: string) {
       return Boolean(process.env.OPENROUTER_API_KEY)
     case 'nvidia':
       return Boolean(process.env.NVIDIA_API_KEY)
+    case 'llm_gateway':
+      return Boolean(process.env.LLM_GATEWAY_API_KEY)
+    case 'orcarouter':
+      return Boolean(process.env.ORCAROUTER_API_KEY)
+    case 'requesty':
+      return Boolean(process.env.REQUESTY_API_KEY)
     default:
       return false
   }
@@ -218,6 +242,21 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       createOpenAI({
         apiKey: apiKey || process.env.NVIDIA_API_KEY,
         baseURL: baseURL || process.env.NVIDIA_BASE_URL || NVIDIA_BASE_URL,
+      })(modelNameString),
+    llm_gateway: () =>
+      createOpenAI({
+        apiKey: apiKey || process.env.LLM_GATEWAY_API_KEY,
+        baseURL: baseURL || 'https://api.llmgateway.ai/v1',
+      })(modelNameString),
+    orcarouter: () =>
+      createOpenAI({
+        apiKey: apiKey || process.env.ORCAROUTER_API_KEY,
+        baseURL: baseURL || 'https://api.orcarouter.ai/v1',
+      })(modelNameString),
+    requesty: () =>
+      createOpenAI({
+        apiKey: apiKey || process.env.REQUESTY_API_KEY,
+        baseURL: baseURL || 'https://router.requesty.ai/v1',
       })(modelNameString),
   }
 

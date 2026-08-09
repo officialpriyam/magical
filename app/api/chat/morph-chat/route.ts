@@ -9,7 +9,7 @@ import {
 import { applyPatch } from '@/lib/morph'
 import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { FragmentSchema, morphEditSchema, MorphEditSchema } from '@/lib/schema'
-import { generateObject, type LanguageModel, type ModelMessage } from 'ai'
+import { streamObject, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
 
@@ -86,7 +86,7 @@ ${currentFragment.code}
     try {
       const modelClient = getModelClient(candidate, config)
 
-      const result = await generateObject({
+      const result = streamObject({
         model: modelClient as LanguageModel,
         system: contextualSystemPrompt,
         messages,
@@ -95,7 +95,19 @@ ${currentFragment.code}
         ...modelParams,
       })
 
-      const editInstructions = result.object
+      let accumulated = ''
+      for await (const chunk of result.textStream) {
+        accumulated += chunk
+      }
+
+      let editInstructions: MorphEditSchema
+      try {
+        const cleaned = accumulated.replace(/^data:\s*/gm, '').trim()
+        const jsonStr = cleaned.split('\n').filter(l => l.trim()).pop() || cleaned
+        editInstructions = JSON.parse(jsonStr)
+      } catch {
+        editInstructions = JSON.parse(accumulated)
+      }
 
       const morphResult = await applyPatch({
         targetFile: currentFragment.file_path,

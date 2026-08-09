@@ -3,7 +3,7 @@ import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
 import { getFragmentFiles } from '@/lib/fragment-files'
 import { DeepPartial } from 'ai'
-import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square } from 'lucide-react'
+import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 
@@ -121,6 +121,16 @@ export function Chat({
                   disabled={isLoading || isPreviewLoading}
                   onAcceptPlan={onAcceptPlan}
                 />
+              )
+            }
+            if (content.type === 'file_op') {
+              return (
+                <FileOperationCard key={id} operation={content.operation} files={content.files} />
+              )
+            }
+            if (content.type === 'web_search') {
+              return (
+                <WebSearchCard key={id} query={content.query} results={content.results} />
               )
             }
           })}
@@ -317,6 +327,123 @@ function PlanActionCard({
           <Check className="h-4 w-4" />
           {hasQuestion ? 'Continue with answer' : 'Accept and continue'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+function FileOperationCard({
+  operation,
+  files,
+}: {
+  operation: 'reading' | 'created' | 'editing'
+  files: string[]
+}) {
+  const config = {
+    reading: {
+      label: 'Reading',
+      icon: Eye,
+      borderColor: 'border-blue-500/20',
+      bgColor: 'bg-blue-500/5',
+      iconColor: 'text-blue-400',
+      labelColor: 'text-blue-300',
+    },
+    created: {
+      label: 'Created',
+      icon: Plus,
+      borderColor: 'border-emerald-500/20',
+      bgColor: 'bg-emerald-500/5',
+      iconColor: 'text-emerald-400',
+      labelColor: 'text-emerald-300',
+    },
+    editing: {
+      label: 'Editing',
+      icon: Pencil,
+      borderColor: 'border-amber-500/20',
+      bgColor: 'bg-amber-500/5',
+      iconColor: 'text-amber-400',
+      labelColor: 'text-amber-300',
+    },
+  }
+
+  const { label, icon: Icon, borderColor, bgColor, iconColor, labelColor } = config[operation]
+
+  return (
+    <div className={`w-full max-w-[36rem] rounded-xl border ${borderColor} ${bgColor} p-3`}>
+      <div className={`mb-2 flex items-center gap-1.5 text-xs font-semibold ${labelColor}`}>
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {files.map((file) => {
+          const fileName = file.split('/').pop() || file
+          const icon = fileName.endsWith('.yml') || fileName.endsWith('.yaml')
+            ? '⚙'
+            : fileName.endsWith('.java')
+              ? '☕'
+              : fileName.endsWith('.gradle')
+                ? '🐘'
+                : fileName.endsWith('.kt') || fileName.endsWith('.kod')
+                  ? '🟣'
+                  : '📄'
+          return (
+            <span
+              key={file}
+              className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-white/70"
+            >
+              <span>{icon}</span>
+              <span className="truncate max-w-[140px]">{fileName}</span>
+            </span>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function WebSearchCard({
+  query,
+  results,
+}: {
+  query: string
+  results: { title: string; url: string; favicon?: string }[]
+}) {
+  return (
+    <div className="w-full max-w-[36rem] rounded-xl border border-[#1EAEDB]/20 bg-[#1EAEDB]/5 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-[#1EAEDB]">
+          <Globe className="h-3.5 w-3.5" />
+          {query}
+        </div>
+        <span className="text-[11px] text-white/40">{results.length} results</span>
+      </div>
+      <div className="space-y-1">
+        {results.map((result) => {
+          let domain = ''
+          try {
+            domain = new URL(result.url).hostname.replace('www.', '')
+          } catch {
+            domain = result.url
+          }
+          return (
+            <a
+              key={result.url}
+              href={result.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-lg border border-white/5 bg-black/10 px-2.5 py-1.5 text-xs text-white/70 transition hover:bg-white/[0.06] hover:text-white"
+            >
+              {result.favicon ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={result.favicon} alt="" className="h-4 w-4 rounded-sm object-contain" />
+              ) : (
+                <Globe className="h-3.5 w-3.5 shrink-0 text-white/30" />
+              )}
+              <span className="truncate flex-1">{result.title}</span>
+              <span className="shrink-0 text-[10px] text-white/35">{domain}</span>
+            </a>
+          )
+        })}
       </div>
     </div>
   )

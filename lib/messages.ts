@@ -25,7 +25,23 @@ export type MessagePlan = {
   allowCustomInput?: boolean
 }
 
-export type MessageContent = MessageText | MessageCode | MessageImage | MessagePlan
+export type MessageFileOp = {
+  type: 'file_op'
+  operation: 'reading' | 'created' | 'editing'
+  files: string[]
+}
+
+export type MessageWebSearch = {
+  type: 'web_search'
+  query: string
+  results: {
+    title: string
+    url: string
+    favicon?: string
+  }[]
+}
+
+export type MessageContent = MessageText | MessageCode | MessageImage | MessagePlan | MessageFileOp | MessageWebSearch
 
 export type Message = {
   role: 'assistant' | 'user'
@@ -63,6 +79,20 @@ export function toAISDKMessages(messages: Message[]) {
         return {
           type: 'text',
           text: formatPlanForModel(content),
+        }
+      }
+
+      if (content.type === 'file_op') {
+        return {
+          type: 'text',
+          text: `[${content.operation === 'reading' ? 'Reading' : content.operation === 'created' ? 'Created' : 'Editing'}: ${content.files.join(', ')}]`,
+        }
+      }
+
+      if (content.type === 'web_search') {
+        return {
+          type: 'text',
+          text: `[Search: ${content.query} — ${content.results.map((r) => r.title).join(', ')}]`,
         }
       }
 

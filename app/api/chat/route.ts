@@ -11,7 +11,7 @@ import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { fragmentSchema as schema } from '@/lib/schema'
 import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
 import { Templates } from '@/lib/templates'
-import { generateObject, type LanguageModel, type ModelMessage } from 'ai'
+import { streamObject, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
 
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     try {
       const modelClient = getModelClient(candidate, config)
 
-      const result = await generateObject({
+      const result = streamObject({
         model: modelClient as LanguageModel,
         schema,
         system: toPrompt(template, {
@@ -81,10 +81,18 @@ export async function POST(req: Request) {
         ...modelParams,
       })
 
-      return new Response(JSON.stringify(result.object), {
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
+      const encoder = new TextEncoder()
+      const stream = new ReadableStream({
+        async start(controller) {
+          for await (const chunk of result.textStream) {
+            controller.enqueue(encoder.encode(chunk))
+          }
+          controller.close()
         },
+      })
+
+      return new Response(stream, {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       })
     } catch (error: any) {
       lastError = error

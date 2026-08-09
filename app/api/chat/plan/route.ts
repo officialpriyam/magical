@@ -9,7 +9,7 @@ import {
 } from '@/lib/models'
 import { AI_GENERATION_GUIDE } from '@/lib/ai-generation-guide'
 import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
-import { generateText, type LanguageModel, type ModelMessage } from 'ai'
+import { streamText, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
 
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
     try {
       const modelClient = getModelClient(candidate, config)
 
-      const result = await generateText({
+      const result = streamText({
         model: modelClient as LanguageModel,
         system: [
           'You are Magical AI in Plan mode.',
@@ -146,7 +146,17 @@ export async function POST(req: Request) {
         ...modelParams,
       })
 
-      return Response.json(parsePlanPayload(result.text))
+      const textStream = result.textStream
+      const reader = textStream.getReader()
+      let accumulated = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        accumulated += value
+      }
+
+      return Response.json(parsePlanPayload(accumulated))
     } catch (error: any) {
       lastError = error
       console.error(`Plan model ${candidate.id} (${candidate.providerId}) failed:`, error?.message || error)

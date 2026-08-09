@@ -10,7 +10,7 @@ It uses Next.js 16, shadcn/ui, Tailwind CSS, the Vercel AI SDK, Supabase, and E2
 - Secure code execution with selectable E2B or Vercel sandboxes.
 - Support for npm and pip package installation inside generated projects.
 - Built-in templates for Python data analysis, Next.js, Vue.js, Streamlit, and Gradio.
-- Multiple AI providers, including OpenAI, Anthropic, Google, Groq, Fireworks, Together AI, OpenRouter, Mistral, xAI, DeepSeek, NVIDIA, and Ollama.
+- Multiple AI providers, including OpenAI, Anthropic, Google, Groq, Fireworks, Together AI, OpenRouter, Mistral, xAI, DeepSeek, NVIDIA, Ollama, LLM Gateway, OrcaRouter, and Requesty.
 - Optional Supabase authentication, GitHub sync, and private Cloudflare R2 workspace backup.
 
 ## Setup
@@ -49,6 +49,7 @@ The prompt box lets users choose `Let AI choose`, `Vercel`, or `E2B`. If the use
 At least one hosted AI provider key is recommended:
 
 ```sh
+# Direct providers
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
 GOOGLE_AI_API_KEY=
@@ -56,10 +57,15 @@ MISTRAL_API_KEY=
 GROQ_API_KEY=
 FIREWORKS_API_KEY=
 TOGETHER_API_KEY=
-OPENROUTER_API_KEY=
 XAI_API_KEY=
 DEEPSEEK_API_KEY=
 NVIDIA_API_KEY=
+
+# Aggregators / gateways
+OPENROUTER_API_KEY=       # 200+ models from multiple providers
+LLM_GATEWAY_API_KEY=      # Free Claude Haiku 4.5
+ORCAROUTER_API_KEY=       # Free DeepSeek V4 Flash/Pro
+REQUESTY_API_KEY=         # NVIDIA, Poolside, Mistral, Google models
 ```
 
 Supabase is needed for auth and saved workspace data:
@@ -158,7 +164,7 @@ Use these project settings on Vercel:
 - Build command: `pnpm build`
 - Output directory: `.next`
 
-Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set one sandbox provider (`E2B_API_KEY` or Vercel Sandbox OIDC/access-token envs), one AI provider key, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL=https://magicalai.iampriyam.me`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. For non-GitHub workspace recovery, optionally set the `CLOUDFLARE_R2_*` variables.
+Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set one sandbox provider (`E2B_API_KEY` or Vercel Sandbox OIDC/access-token envs), one AI provider key (e.g. `OPENROUTER_API_KEY`, `GOOGLE_AI_API_KEY`, or `ANTHROPIC_API_KEY`), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL=https://magicalai.iampriyam.me`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. For non-GitHub workspace recovery, optionally set the `CLOUDFLARE_R2_*` variables.
 
 Use this GitHub OAuth callback URL:
 
@@ -170,10 +176,10 @@ https://magicalai.iampriyam.me/api/github/callback
 
 The generated `.env.local` contains placeholders for all runtime keys referenced by the app:
 
-- AI providers and E2B
-- Supabase
-- Vercel KV rate limiting and short URLs
-- GitHub OAuth connection settings
+- AI providers (OpenAI, Anthropic, Google, Mistral, Groq, Fireworks, Together, xAI, DeepSeek, NVIDIA, OpenRouter, LLM Gateway, OrcaRouter, Requesty)
+- Sandbox providers (E2B, Modal, Vercel)
+- Supabase auth and database
+- GitHub / GitLab OAuth connection settings
 - Cloudflare R2 private workspace backup
 - Morph apply mode
 - PostHog analytics toggle

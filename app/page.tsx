@@ -3,7 +3,7 @@
 import { ViewType } from '@/components/auth';
 import { AuthDialog } from '@/components/auth-dialog';
 import { Chat } from '@/components/chat';
-import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS } from '@/components/chat-picker';
+import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS } from '@/lib/magic-models';
 import { PromptInputBox } from '@/components/ui/ai-prompt-box';
 import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import type { SandboxProviderMode } from '@/lib/sandbox-provider';
 import { DeepPartial } from 'ai';
 import { experimental_useObject as useObject } from '@ai-sdk/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { usePostHog } from 'posthog-js/react';
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -145,6 +145,9 @@ type HomeProps = {
 
 export default function Home({ initialProjectId }: HomeProps = {}) {
   const router = useRouter()
+  const urlParams = useParams()
+  const projectIdFromUrl = urlParams?.projectId as string | undefined
+  const activeProjectId = projectIdFromUrl || initialProjectId
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
   const [selectedTemplate, setSelectedTemplate] = useState<'auto' | TemplateId>('auto')
   const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
@@ -398,7 +401,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const apiEndpoint = shouldUseMorph ? '/api/chat/morph-chat' : '/api/chat'
 
   useEffect(() => {
-    const projectId = initialProjectId
+    const projectId = activeProjectId
 
     if (!projectId) {
       setIsLoadingProject(false)
@@ -451,7 +454,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       isMounted = false
     }
-  }, [authLoading, initialProjectId, session?.user?.id, supabase])
+  }, [authLoading, activeProjectId, session?.user?.id, supabase])
 
   useEffect(() => {
     let isMounted = true
@@ -1712,15 +1715,36 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }
 
   async function handleRedeploy() {
-    if (!fragment?.code) return
+    if (!fragment?.template || !currentProjectRef.current?.id) return
+    setIsPreviewLoading(true)
+    setAutoFixMessage('Redeploying sandbox...')
     try {
-      const newResult = await handleExecuteCode(fragment.code)
-      if (newResult) {
-        setResult(newResult)
-        setCurrentPreview({ fragment, result: newResult })
+      const response = await fetch(`/api/projects/${currentProjectRef.current.id}/restore-sandbox`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fragment,
+          teamID: userTeam?.id,
+          accessToken: session?.access_token,
+          sandboxProvider,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || 'Redeploy failed')
       }
+      const newResult = data as ExecutionResult
+      setResult(newResult)
+      setWarmSandboxResult(newResult)
+      setCurrentPreview({ fragment, result: newResult })
+      setIsPreviewPanelOpen(true)
+      setAutoFixMessage('')
     } catch (err) {
       console.error('Redeploy failed:', err)
+      setErrorMessage(err instanceof Error ? err.message : 'Redeploy failed')
+      setAutoFixMessage('')
+    } finally {
+      setIsPreviewLoading(false)
     }
   }
 
