@@ -184,6 +184,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const skipNextProjectMessagesLoadRef = useRef('')
   const isHydratingProjectMessagesRef = useRef(false)
   const pendingNavigateRef = useRef<string | null>(null)
+  const isLandingPagePromptRef = useRef(false)
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
   const [availableModels, setAvailableModels] = useState<LLMModel[]>([])
   const [currentTab, setCurrentTab] = useState<PreviewTab>('code');
@@ -967,6 +968,22 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setCurrentTab('code')
       setIsLoadingProject(false)
 
+      if (isLandingPagePromptRef.current) {
+        isLandingPagePromptRef.current = false
+        const lastMsg = projectMessages[projectMessages.length - 1]
+        if (lastMsg && lastMsg.role === 'user') {
+          submit({
+            userID: session?.user?.id,
+            teamID: userTeam?.id,
+            projectID: currentProjectId,
+            messages: toAISDKMessages(projectMessages),
+            template: getTemplateForSubmission(),
+            model: currentModel,
+            config: languageModel,
+          })
+        }
+      }
+
       if (skipNextWorkspaceRestoreRef.current === currentProject?.id) {
         skipNextWorkspaceRestoreRef.current = ''
       } else if (currentProject && latestPreviewMessage?.object && hasRestorableWorkspace(currentProject)) {
@@ -1255,6 +1272,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
     if (!hadProjectBeforePrompt) {
       pendingNavigateRef.current = projectForPrompt.id
+      isLandingPagePromptRef.current = true
       if (supabase) {
         void saveMessage(supabase, projectForPrompt.id, newMessage, 0)
       }

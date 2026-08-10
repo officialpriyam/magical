@@ -67,37 +67,32 @@ export function formatPlanForModel(plan: MessagePlan) {
 export function toAISDKMessages(messages: Message[]) {
   return messages.map((message) => ({
     role: message.role,
-    content: message.content.map((content) => {
-      if (content.type === 'code') {
-        return {
-          type: 'text',
-          text: content.text,
+    content: message.content
+      .filter((content) => content.type !== 'code')
+      .map((content) => {
+        if (content.type === 'plan') {
+          return {
+            type: 'text',
+            text: formatPlanForModel(content),
+          }
         }
-      }
 
-      if (content.type === 'plan') {
-        return {
-          type: 'text',
-          text: formatPlanForModel(content),
+        if (content.type === 'file_op') {
+          return {
+            type: 'text',
+            text: `[${content.operation === 'reading' ? 'Reading' : content.operation === 'created' ? 'Created' : 'Editing'}: ${content.files.join(', ')}]`,
+          }
         }
-      }
 
-      if (content.type === 'file_op') {
-        return {
-          type: 'text',
-          text: `[${content.operation === 'reading' ? 'Reading' : content.operation === 'created' ? 'Created' : 'Editing'}: ${content.files.join(', ')}]`,
+        if (content.type === 'web_search') {
+          return {
+            type: 'text',
+            text: `[Search: ${content.query} — ${content.results.map((r) => r.title).join(', ')}]`,
+          }
         }
-      }
 
-      if (content.type === 'web_search') {
-        return {
-          type: 'text',
-          text: `[Search: ${content.query} — ${content.results.map((r) => r.title).join(', ')}]`,
-        }
-      }
-
-      return content
-    }),
+        return content
+      }),
   }))
 }
 
