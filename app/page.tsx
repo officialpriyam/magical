@@ -183,6 +183,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const lastSavedMessageSignatureRef = useRef('')
   const skipNextProjectMessagesLoadRef = useRef('')
   const isHydratingProjectMessagesRef = useRef(false)
+  const pendingNavigateRef = useRef<string | null>(null)
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
   const [availableModels, setAvailableModels] = useState<LLMModel[]>([])
   const [currentTab, setCurrentTab] = useState<PreviewTab>('code');
@@ -544,12 +545,27 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setAutoFixMessage('')
       setIsRateLimited(isRateLimit);
       setErrorMessage(displayMessage);
+
+      const pendingId = pendingNavigateRef.current
+      if (pendingId) {
+        pendingNavigateRef.current = null
+        router.replace(`/chat/${pendingId}`)
+      }
     },
     onFinish: async ({ object: fragment, error }: { object: DeepPartial<FragmentSchema> | undefined, error: any }) => {
       if (error) {
         setAutoFixMessage('')
         setIsPreviewLoading(false)
         setErrorMessage(error instanceof Error ? error.message : 'AI generation failed.')
+        const pendingId = pendingNavigateRef.current
+        if (pendingId && supabase && currentProjectRef.current) {
+          pendingNavigateRef.current = null
+          const last = messagesRef.current[messagesRef.current.length - 1]
+          if (last) {
+            void saveMessage(supabase, currentProjectRef.current.id, last, messagesRef.current.length - 1)
+          }
+          router.replace(`/chat/${pendingId}`)
+        }
         return
       }
 
@@ -658,6 +674,16 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         setAutoFixMessage('')
         setCurrentTab('fragment');
         setIsPreviewLoading(false);
+
+        const pendingId = pendingNavigateRef.current
+        if (pendingId && supabase && currentProjectRef.current) {
+          pendingNavigateRef.current = null
+          const last = messagesRef.current[messagesRef.current.length - 1]
+          if (last) {
+            await saveMessage(supabase, currentProjectRef.current.id, last, messagesRef.current.length - 1)
+          }
+          router.replace(`/chat/${pendingId}`)
+        }
     },
   })
   const isPromptLoading = isLoading || isPlanLoading
@@ -1228,7 +1254,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setMessages(updatedMessages)
 
     if (!hadProjectBeforePrompt) {
-      window.history.replaceState(null, '', `/chat/${projectForPrompt.id}`)
+      pendingNavigateRef.current = projectForPrompt.id
+      if (supabase) {
+        void saveMessage(supabase, projectForPrompt.id, newMessage, 0)
+      }
+      router.push(`/chat/${projectForPrompt.id}`)
     }
 
     if (shouldRenameProject) {

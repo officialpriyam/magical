@@ -65,7 +65,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   refreshKey = 0,
 }) => {
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [isOpen, setIsOpen] = React.useState(initialIsOpen);
+  const [isOpen, setIsOpen] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sidebar-is-open')
+      return stored !== null ? stored === 'true' : initialIsOpen
+    }
+    return initialIsOpen
+  });
   const [isPricingModalOpen, setIsPricingModalOpen] = React.useState(false);
   const [user, setUser] = React.useState<SupabaseUser | null>(null);
   const [chatHistory, setChatHistory] = React.useState<ChatHistoryItem[]>([]);
@@ -74,6 +80,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [deleteError, setDeleteError] = React.useState('');
   const [isDeletingChat, setIsDeletingChat] = React.useState(false);
   const isMobile = useIsMobile();
+
+  React.useEffect(() => {
+    localStorage.setItem('sidebar-is-open', String(isOpen))
+  }, [isOpen]);
 
   const activeSearchQuery = externalSearchQuery || searchQuery;
 
@@ -163,10 +173,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [isMobile]);
 
   React.useEffect(() => {
-    setIsOpen(initialIsOpen);
-  }, [initialIsOpen]);
-
-  React.useEffect(() => {
     const supabase = createSupabaseBrowserClient();
 
     if (!supabase) {
@@ -252,6 +258,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-3 bg-white/10 text-white hover:bg-white/15"
+                onClick={onStartNewChat}
+              >
+                <Plus className="h-4 w-4" />
+                New chat
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
                 onClick={handleHomeClick}
               >
                 <Home className="h-4 w-4" />
@@ -269,13 +283,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <Search className="h-4 w-4" />
                 Search
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
-              >
-                <HelpCircle className="h-4 w-4" />
-                Resources
               </Button>
               <Button
                 variant="ghost"
