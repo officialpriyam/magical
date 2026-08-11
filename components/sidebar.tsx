@@ -516,7 +516,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </Button>
 
                 <Link href="/" className="shrink-0">
-                  <img src="/logo-icon.png" alt="Logo" className="h-7 w-7 object-contain" />
+                  <img src="/icon.png" alt="Logo" className="h-7 w-7 object-contain" />
                 </Link>
 
                 <div className="w-6 h-px bg-white/10 my-1" />
