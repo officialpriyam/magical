@@ -21,7 +21,7 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b]">
+    <div className="bg-[#0a0a0b]">
       {/* Header */}
       <div className="border-b border-white/[0.06] px-6 py-5">
         <h1 className="text-2xl font-bold text-white">Templates</h1>

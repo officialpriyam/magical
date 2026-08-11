@@ -491,8 +491,7 @@ interface PromptInputBoxProps {
   placeholder?: string;
   className?: string;
   defaultValue?: string;
-  autoSend?: boolean;
-  onAutoSendComplete?: () => void;
+  onDefaultValueUsed?: () => void;
   templates: Templates
   selectedTemplate: 'auto' | TemplateId
   onSelectedTemplateChange: (template: 'auto' | TemplateId) => void
@@ -519,7 +518,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       document.head.removeChild(styleSheet);
     };
   }, []);
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, defaultValue, autoSend = false, onAutoSendComplete, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, defaultValue, onDefaultValueUsed, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
   const [input, setInput] = React.useState(defaultValue || "");
   const [files, setFiles] = React.useState<File[]>([]);
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
@@ -533,27 +532,14 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const [showSlashCommands, setShowSlashCommands] = React.useState(false);
   const [matchingCommands, setMatchingCommands] = React.useState<SlashCommand[]>([]);
   const [selectedCommandIndex, setSelectedCommandIndex] = React.useState(0);
-  const autoSendAttemptedRef = React.useRef(false);
 
   // Update input when defaultValue changes
   React.useEffect(() => {
     if (defaultValue) {
       setInput(defaultValue);
+      onDefaultValueUsed?.();
     }
   }, [defaultValue]);
-
-  // Auto-send when autoSend is true and defaultValue is set
-  React.useEffect(() => {
-    if (autoSend && defaultValue && !autoSendAttemptedRef.current && !isLoading) {
-      autoSendAttemptedRef.current = true;
-      // Small delay to ensure state is updated
-      const timer = setTimeout(() => {
-        onSend(defaultValue, [], chatMode);
-        onAutoSendComplete?.();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [autoSend, defaultValue, isLoading, onSend, onAutoSendComplete, chatMode]);
 
   const handleToggleChange = (value: string) => {
     if (value === "search") {
