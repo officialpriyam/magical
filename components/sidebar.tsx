@@ -275,9 +275,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <p className="text-xs text-white/50">Free Plan · 1 member</p>
                       </div>
                     </div>
-                    <DropdownMenuItem className="w-full mt-4 h-9 text-sm border border-white/10 bg-transparent text-white hover:bg-white/5 justify-center">
+                    <Button
+                      variant="outline"
+                      className="w-full mt-4 h-9 text-sm border-white/10 bg-transparent text-white hover:bg-white/5"
+                    >
                       Invite members
-                    </DropdownMenuItem>
+                    </Button>
                   </div>
 
                   {/* Credits */}
@@ -298,7 +301,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {/* Workspaces List */}
                   <div className="px-4 py-3">
                     <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Workspaces</p>
-                    <DropdownMenuItem className="flex items-center gap-3 px-3 py-2 rounded-md bg-white/5">
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-white/5">
                       <Avatar className="h-6 w-6">
                         <AvatarFallback className="bg-white/10 text-white/60 text-[10px]">
                           {workspaceInitial}
@@ -309,34 +312,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={onStartNewChat} className="flex items-center gap-3 px-3 py-2 text-sm text-white/50 hover:text-white/70">
+                    </div>
+                    <button
+                      onClick={onStartNewChat}
+                      className="flex items-center gap-3 px-3 py-2 mt-1 text-sm text-white/50 hover:text-white/70 transition-colors w-full"
+                    >
                       <Plus className="h-4 w-4" />
                       <span>New workspace</span>
-                    </DropdownMenuItem>
+                    </button>
                   </div>
 
                   <DropdownMenuSeparator className="bg-white/10" />
 
                   {/* Menu Items */}
                   <div className="py-2">
-                    <DropdownMenuItem onSelect={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                    <button
+                      onClick={() => setIsPricingModalOpen(true)}
+                      className="flex items-center w-full px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                    >
                       <Settings className="mr-3 h-4 w-4" />
                       <span>Settings</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                    </button>
+                    <button className="flex items-center w-full px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors">
                       <HelpCircle className="mr-3 h-4 w-4" />
                       <span>Help Center</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                    </button>
+                    <button
+                      onClick={() => setIsPricingModalOpen(true)}
+                      className="flex items-center w-full px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                    >
                       <CreditCard className="mr-3 h-4 w-4" />
                       <span>My Subscription</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-white/10 my-1" />
-                    <DropdownMenuItem onSelect={onSignOut} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                    </button>
+                    <div className="my-1 h-px bg-white/10" />
+                    <button
+                      onClick={onSignOut}
+                      className="flex items-center w-full px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+                    >
                       <LogOut className="mr-3 h-4 w-4" />
                       <span>Sign Out</span>
-                    </DropdownMenuItem>
+                    </button>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
