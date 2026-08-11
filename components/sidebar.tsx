@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, Home, LayoutGrid, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut, ChevronDown, CreditCard, HelpCircle, Plus, Link as LinkIcon, FolderOpen, GitBranch, Sparkles } from 'lucide-react';
+import { MessageCircle, Search, Home, LayoutGrid, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut, ChevronDown, CreditCard, HelpCircle, Plus, Link as LinkIcon, FolderOpen, GitBranch } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -310,7 +310,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="flex items-center gap-3 px-3 py-2 text-sm text-white/50 hover:text-white/70">
+                    <DropdownMenuItem onSelect={onStartNewChat} className="flex items-center gap-3 px-3 py-2 text-sm text-white/50 hover:text-white/70">
                       <Plus className="h-4 w-4" />
                       <span>New workspace</span>
                     </DropdownMenuItem>
@@ -320,7 +320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                   {/* Menu Items */}
                   <div className="py-2">
-                    <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                    <DropdownMenuItem onSelect={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
                       <Settings className="mr-3 h-4 w-4" />
                       <span>Settings</span>
                     </DropdownMenuItem>
@@ -328,12 +328,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <HelpCircle className="mr-3 h-4 w-4" />
                       <span>Help Center</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                    <DropdownMenuItem onSelect={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
                       <CreditCard className="mr-3 h-4 w-4" />
                       <span>My Subscription</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/10 my-1" />
-                    <DropdownMenuItem onClick={onSignOut} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                    <DropdownMenuItem onSelect={onSignOut} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
                       <LogOut className="mr-3 h-4 w-4" />
                       <span>Sign Out</span>
                     </DropdownMenuItem>
@@ -501,9 +501,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </Button>
 
                 <Link href="/" className="shrink-0">
-                  <div className="h-6 w-6 flex items-center justify-center rounded-md bg-gradient-to-br from-purple-500 to-blue-500">
-                    <Sparkles className="h-3.5 w-3.5 text-white" />
-                  </div>
+                  <img src="/logo-icon.png" alt="Logo" className="h-7 w-7 object-contain" />
                 </Link>
 
                 <div className="w-6 h-px bg-white/10 my-1" />
