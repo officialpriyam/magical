@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, Gift, HelpCircle, MoreHorizontal, Menu, Plus, Trash2, CornerUpLeft, ListTodo, GitBranch, Home, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { MessageCircle, Search, Home, Grid3X3, Star, User, Users, Settings, Gift, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, Plus, LogOut } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -8,8 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { WorkspaceDropdown } from '@/components/workspace-dropdown';
-import { PricingModal } from '@/components/pricing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -26,6 +24,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { PricingModal } from '@/components/pricing';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { MotionSitesGallery } from '@/components/motionsites-gallery';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -73,6 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return initialIsOpen
   });
   const [isPricingModalOpen, setIsPricingModalOpen] = React.useState(false);
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = React.useState(false);
   const [user, setUser] = React.useState<SupabaseUser | null>(null);
   const [chatHistory, setChatHistory] = React.useState<ChatHistoryItem[]>([]);
   const [deleteTarget, setDeleteTarget] = React.useState<ChatHistoryItem | null>(null);
@@ -100,6 +102,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     (acc[chat.date] = acc[chat.date] || []).push(chat);
     return acc;
   }, {} as Record<string, ChatHistoryItem[]>);
+
+  const recentChats = chatHistory.slice(0, 3);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -214,7 +218,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="flex h-dvh shrink-0 md:h-screen">
-      {/* Mobile overlay */}
       {isMobile && isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/55 transition-opacity"
@@ -222,58 +225,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      {/* Sidebar panel - single element, width swaps between full and compact rail */}
       <div
         className={`
-          bg-[#0b0b0c] border-r border-white/[0.06] flex flex-col relative z-10
+          bg-[#0a0a0b] border-r border-white/[0.06] flex flex-col relative z-10
           h-dvh md:h-screen shrink-0
           ${isMobile ? 'overflow-hidden ' : ''}
           ${isMobile
             ? `fixed inset-y-0 left-0 z-50 transition-[width,transform] duration-300 ease-in-out ${isOpen ? 'w-[min(82vw,18rem)] translate-x-0' : 'w-0 -translate-x-full'}`
-            : `${isOpen ? 'w-64' : 'w-16'}`
+            : `${isOpen ? 'w-60' : 'w-14'}`
           }
         `}
       >
         {isOpen ? (
           <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="p-3 border-b border-white/10">
-              <div className="flex items-center justify-between">
-                <WorkspaceDropdown onSignOut={onSignOut} onOpenPricing={() => setIsPricingModalOpen(true)} />
-                {!isMobile && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsOpen(false)}
-                    className="h-7 w-7 text-muted-foreground hover:text-white"
-                    aria-label="Collapse sidebar"
-                  >
-                    <PanelLeftClose className="h-4 w-4" />
-                  </Button>
-                )}
+            {/* Header - Logo & Brand */}
+            <div className="px-3 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-400 via-pink-500 to-purple-500 flex items-center justify-center shrink-0">
+                  <span className="text-white text-sm font-bold">M</span>
+                </div>
+                <span className="text-sm font-semibold text-white truncate">Magical AI</span>
               </div>
+              {!isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOpen(false)}
+                  className="h-7 w-7 text-white/40 hover:text-white hover:bg-white/10"
+                  aria-label="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+              )}
             </div>
 
-            <div className="p-3 space-y-1">
+            {/* Navigation */}
+            <div className="px-2 py-1 space-y-0.5">
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 bg-white/10 text-white hover:bg-white/15"
-                onClick={onStartNewChat}
-              >
-                <Plus className="h-4 w-4" />
-                New chat
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+                className="w-full justify-start gap-3 h-9 text-white/70 hover:bg-white/[0.08] hover:text-white"
                 onClick={handleHomeClick}
               >
-                <Home className="h-4 w-4" />
-                Home
+                <Home className="h-4 w-4 shrink-0" />
+                <span className="text-sm">Dashboard</span>
               </Button>
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+                className="w-full justify-start gap-3 h-9 text-white/70 hover:bg-white/[0.08] hover:text-white"
                 onClick={() => {
                   setTimeout(() => {
                     const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement
@@ -281,130 +279,199 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }, 100)
                 }}
               >
-                <Search className="h-4 w-4" />
-                Search
+                <Search className="h-4 w-4 shrink-0" />
+                <span className="text-sm flex-1 text-left">Search</span>
+                <kbd className="text-[10px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded font-mono">Ctrl K</kbd>
               </Button>
               <Button
                 variant="ghost"
-                asChild
-                className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+                className="w-full justify-start gap-3 h-9 text-white bg-white/[0.08] hover:bg-white/[0.12] hover:text-white"
+                onClick={() => setIsTemplatesModalOpen(true)}
               >
-                <Link href="/settings/git">
-                  <GitBranch className="h-4 w-4" />
-                  Git
-                </Link>
+                <div className="h-4 w-4 shrink-0 rounded-full border-2 border-current" />
+                <span className="text-sm">Templates</span>
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-9 text-white/70 hover:bg-white/[0.08] hover:text-white"
+                onClick={onStartNewChat}
+              >
+                <Grid3X3 className="h-4 w-4 shrink-0" />
+                <span className="text-sm">Connectors</span>
               </Button>
             </div>
 
-            {/* Search */}
-            <div className="px-4 pb-4 space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search"
-                  value={activeSearchQuery}
-                  onChange={handleSearchChange}
-                  className="pl-10 bg-white/5 border-white/10 text-white transition-colors placeholder:text-white/45"
-                />
+            {/* Projects Section */}
+            <div className="px-2 py-2">
+              <h3 className="px-3 text-xs font-medium text-white/40 uppercase tracking-wider mb-1">Projects</h3>
+              <div className="space-y-0.5">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
+                  onClick={() => {
+                    const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement
+                    searchInput?.focus()
+                  }}
+                >
+                  <Grid3X3 className="h-3.5 w-3.5 shrink-0" />
+                  <span className="text-sm">All projects</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
+                >
+                  <Star className="h-3.5 w-3.5 shrink-0" />
+                  <span className="text-sm">Starred</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
+                >
+                  <User className="h-3.5 w-3.5 shrink-0" />
+                  <span className="text-sm">Owned by me</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
+                >
+                  <Users className="h-3.5 w-3.5 shrink-0" />
+                  <span className="text-sm">Shared with me</span>
+                </Button>
               </div>
             </div>
 
-            {/* Chat History */}
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
-              <h3 className="text-sm font-medium text-white/70 mb-2">Projects</h3>
-              {Object.keys(groupedChats).length === 0 ? (
-                <p className="text-sm text-muted-foreground">No previous conversations</p>
+            {/* Recents Section */}
+            <div className="flex-1 overflow-y-auto px-2 py-2">
+              <h3 className="px-3 text-xs font-medium text-white/40 uppercase tracking-wider mb-1">Recents</h3>
+              {recentChats.length === 0 ? (
+                <p className="px-3 text-xs text-white/30">No recent projects</p>
               ) : (
-                <div className="space-y-4">
-                  {Object.entries(groupedChats).map(([date, chats]) => (
-                    <div key={date}>
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">{date}</h4>
-                      <div className="space-y-1">
-                        {chats.map((chat) => (
-                          <div key={chat.id} className="group flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              onClick={() => onChatSelected(chat.id)}
-                              className="min-w-0 flex-1 justify-start gap-2 text-white/75 hover:text-white hover:bg-white/10 transition-colors"
-                            >
-                              <MessageCircle className="h-4 w-4 flex-shrink-0" />
-                              <span className="truncate">{chat.title}</span>
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 shrink-0 text-white/45 opacity-0 transition-opacity hover:bg-white/10 hover:text-white group-hover:opacity-100"
-                                aria-label={`More actions for ${chat.title}`}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent side="right" align="start">
-                                <DropdownMenuItem onClick={() => onChatSelected(chat.id)}>
-                                  <CornerUpLeft className="mr-2 h-4 w-4" />
-                                  <span>Re-enter</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleRequestDeleteChat(chat)} className="text-red-500">
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  <span>Delete</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        ))}
-                      </div>
+                <div className="space-y-0.5">
+                  {recentChats.map((chat) => (
+                    <div key={chat.id} className="group flex items-center">
+                      <Button
+                        variant="ghost"
+                        onClick={() => onChatSelected(chat.id)}
+                        className="min-w-0 flex-1 justify-start gap-3 h-8 text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate text-sm">{chat.title}</span>
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 text-white/30 opacity-0 transition-opacity hover:bg-white/[0.08] hover:text-white group-hover:opacity-100"
+                            aria-label={`More actions for ${chat.title}`}
+                          >
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="right" align="start">
+                          <DropdownMenuItem onClick={() => onChatSelected(chat.id)}>
+                            <CornerUpLeft className="mr-2 h-4 w-4" />
+                            <span>Re-enter</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleRequestDeleteChat(chat)} className="text-red-500">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Delete</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
+            {/* Referral Banner */}
+            <div className="px-3 py-2">
+              <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] p-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shrink-0">
+                    <Gift className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-white">Share Magical AI</p>
+                    <p className="text-[10px] text-white/40">100 credits per paid referral</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* User Info */}
-            <div className="p-4 border-t border-white/10">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.user_metadata?.name ?? 'User'} />
-                  <AvatarFallback className="bg-muted text-muted-foreground">
-                    {user?.user_metadata?.name?.charAt(0).toUpperCase() ?? 'U'}
-                  </AvatarFallback>
-                </Avatar>
+            <div className="px-3 py-3 border-t border-white/[0.06]">
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.user_metadata?.name ?? 'User'} />
+                    <AvatarFallback className="bg-white/10 text-white/60 text-xs">
+                      {user?.user_metadata?.name?.charAt(0).toUpperCase() ?? 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 border-2 border-[#0a0a0b]" />
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
+                  <p className="text-xs font-medium text-white truncate">
                     {user?.user_metadata?.name ?? 'Anonymous'}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="text-[10px] text-white/40 truncate">
                     {userPlan}
                   </p>
                 </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-white/40 hover:text-white hover:bg-white/10"
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="top" align="start">
+                    <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)}>
+                      <span>Pricing</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sign out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
         ) : (
-          /* Compact icon rail (desktop only) */
+          /* Compact icon rail */
           !isMobile && (
-            <div className="flex flex-col items-center py-4 h-full">
-              <div className="flex flex-col items-center space-y-2">
+            <div className="flex flex-col items-center py-3 h-full">
+              <div className="flex flex-col items-center space-y-1">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsOpen(true)}
-                  className="h-8 w-8 text-muted-foreground hover:text-white transition-colors"
+                  className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
                   aria-label="Open sidebar"
                 >
-                  <PanelLeft className="h-5 w-5" />
+                  <PanelLeft className="h-4 w-4" />
                 </Button>
+
+                <div className="h-6 w-6 rounded-md bg-gradient-to-br from-orange-400 via-pink-500 to-purple-500 flex items-center justify-center">
+                  <span className="text-white text-[10px] font-bold">M</span>
+                </div>
+
+                <div className="w-6 h-px bg-white/10 my-1" />
 
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={onStartNewChat}
-                  className="h-8 w-8 text-muted-foreground hover:text-white transition-colors"
-                  aria-label="Start new chat"
+                  onClick={handleHomeClick}
+                  className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/[0.08]"
+                  aria-label="Dashboard"
                 >
-                  <Plus className="h-5 w-5" />
+                  <Home className="h-4 w-4" />
                 </Button>
 
                 <Button
@@ -414,41 +481,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     setIsOpen(true)
                     setTimeout(() => {
                       const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement
-                      if (searchInput) {
-                        searchInput.focus()
-                      }
+                      searchInput?.focus()
                     }, 100)
                   }}
-                  className="h-8 w-8 text-muted-foreground hover:text-white transition-colors"
+                  className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/[0.08]"
                   aria-label="Search"
                 >
-                  <Search className="h-5 w-5" />
+                  <Search className="h-4 w-4" />
                 </Button>
 
                 <Button
                   variant="ghost"
                   size="icon"
-                  asChild
-                  className="h-8 w-8 text-muted-foreground hover:text-white transition-colors"
-                  aria-label="Tasks"
+                  className="h-9 w-9 text-white bg-white/[0.08] hover:bg-white/[0.12]"
+                  aria-label="Templates"
                 >
-                  <Link href="/tasks">
-                    <ListTodo className="h-5 w-5" />
-                  </Link>
+                  <div className="h-4 w-4 rounded-full border-2 border-current" />
                 </Button>
-              </div>
 
-              <div className="flex-1" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onStartNewChat}
+                  className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/[0.08]"
+                  aria-label="Connectors"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
 
-              <div className="flex flex-col items-center space-y-2">
+                <div className="flex-1" />
+
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={onGetFreeTokens}
-                  className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950 transition-colors"
+                  className="h-9 w-9 text-green-500 hover:text-green-400 hover:bg-green-500/10"
                   aria-label="Get free tokens"
                 >
-                  <Gift className="h-5 w-5" />
+                  <Gift className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -516,6 +586,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </AlertDialogContent>
       </AlertDialog>
       <PricingModal isOpen={isPricingModalOpen} onClose={() => setIsPricingModalOpen(false)} />
+      <Dialog open={isTemplatesModalOpen} onOpenChange={setIsTemplatesModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Website Templates</DialogTitle>
+          </DialogHeader>
+          <MotionSitesGallery />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
