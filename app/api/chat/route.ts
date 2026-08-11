@@ -11,7 +11,6 @@ import { fragmentSchema as schema } from '@/lib/schema'
 import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
 import { Templates } from '@/lib/templates'
 import { streamObject, streamText, type LanguageModel, type ModelMessage } from 'ai'
-import { sanitizeJsonTextStream } from '@/lib/json-stream'
 
 export const maxDuration = 300
 
@@ -76,6 +75,82 @@ function extractSearchQuery(messages: ModelMessage[]): string | null {
     break
   }
   return null
+}
+
+async function readStreamToText(stream: ReadableStream<string>): Promise<string> {
+  const reader = stream.getReader()
+  let text = ''
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      text += value
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  return text
+}
+
+function extractJson(text: string): string {
+  const start = text.indexOf('{')
+  if (start === -1) {
+    throwObjectGenerationError('NoObjectGeneratedError', 'The model returned an empty response.')
+  }
+
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (let i = start; i < text.length; i++) {
+    const char = text[i]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (char === '\\') {
+        escaped = true
+      } else if (char === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (char === '"') {
+      inString = true
+    } else if (char === '{') {
+      depth++
+    } else if (char === '}') {
+      depth--
+      if (depth === 0) {
+        return text.slice(start, i + 1)
+      }
+    }
+  }
+
+  throwObjectGenerationError('NoObjectGeneratedError', 'The model returned incomplete JSON.')
+}
+
+function throwObjectGenerationError(name: string, message: string): never {
+  const error = new Error(message) as Error & { cause?: unknown }
+  error.name = name
+  throw error
+}
+
+function parseAndValidateFragment(text: string) {
+  const json = extractJson(text)
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(json)
+  } catch (cause) {
+    throwObjectGenerationError('JSONParseError', 'The model returned invalid JSON.')
+  }
+
+  const result = schema.safeParse(parsed)
+  if (!result.success) {
+    throwObjectGenerationError('TypeValidationError', 'The model response failed schema validation.')
+  }
+
+  return result.data
 }
 
 export async function POST(req: Request) {
@@ -160,6 +235,7 @@ export async function POST(req: Request) {
     try {
       const modelClient = getModelClient(candidate, config)
       const useFallback = STREAM_TEXT_PROVIDER_IDS.has(candidate.providerId)
+      let text: string
 
       if (useFallback) {
         const result = streamText({
@@ -170,55 +246,23 @@ export async function POST(req: Request) {
           ...modelParams,
         })
 
-        const encoder = new TextEncoder()
-        const stream = new ReadableStream({
-          async start(controller) {
-            const reader = result.textStream.getReader()
-            try {
-              while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-                controller.enqueue(encoder.encode(value))
-              }
-            } finally {
-              reader.releaseLock()
-            }
-            controller.close()
-          },
+        text = await readStreamToText(result.textStream)
+      } else {
+        const result = streamObject({
+          model: modelClient as LanguageModel,
+          schema,
+          system: finalSystemPrompt,
+          messages,
+          maxRetries: 0,
+          ...modelParams,
         })
 
-        return new Response(stream, {
-          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-        })
+        text = await readStreamToText(result.textStream)
       }
 
-      const result = streamObject({
-        model: modelClient as LanguageModel,
-        schema,
-        system: finalSystemPrompt,
-        messages,
-        maxRetries: 0,
-        ...modelParams,
-      })
+      const fragment = parseAndValidateFragment(text)
 
-      const encoder = new TextEncoder()
-      const stream = new ReadableStream({
-        async start(controller) {
-          const reader = result.textStream.pipeThrough(sanitizeJsonTextStream()).getReader()
-          try {
-            while (true) {
-              const { done, value } = await reader.read()
-              if (done) break
-              controller.enqueue(encoder.encode(value))
-            }
-          } finally {
-            reader.releaseLock()
-          }
-          controller.close()
-        },
-      })
-
-      return new Response(stream, {
+      return new Response(JSON.stringify(fragment), {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       })
     } catch (error: any) {

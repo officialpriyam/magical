@@ -10,6 +10,7 @@ import {
   chooseSandboxProvider,
   decodeSandboxId,
   encodeSandboxId,
+  getResolvedSandboxPort,
   normalizeSandboxProviderMode,
   type SandboxProvider,
   type SandboxProviderMode,
@@ -144,6 +145,7 @@ export async function POST(req: Request) {
 
     let sbx: Sandbox | VercelSandboxInstance | ModalSandbox | null = null
     let createdSandbox = false
+    const resolvedPort = getResolvedSandboxPort(fragment.template, fragment.port)
     try {
       sbx = await connectReusableSandbox(existingSandboxId, selectedProvider)
 
@@ -155,7 +157,7 @@ export async function POST(req: Request) {
             userId: userID,
             teamId: teamID,
             projectId: projectID,
-            port: fragment.port,
+            port: resolvedPort,
             env: supabaseRuntimeEnv,
             timeoutMs: sandboxTimeout,
           })
@@ -165,7 +167,7 @@ export async function POST(req: Request) {
             userId: userID,
             teamId: teamID,
             projectId: projectID,
-            port: fragment.port,
+            port: resolvedPort,
             env: supabaseRuntimeEnv,
             timeoutMs: sandboxTimeout,
           })
@@ -271,7 +273,7 @@ export async function POST(req: Request) {
             sbxId: encodeSandboxId('vercel', vercelSandbox.name),
             sandboxProvider: selectedProvider,
             template: fragment.template,
-            url: getVercelSandboxUrl(vercelSandbox, fragment.port || 3000),
+            url: getVercelSandboxUrl(vercelSandbox, resolvedPort),
             files,
           } as ExecutionResultWeb),
           { headers: { 'Content-Type': 'application/json' } }
@@ -291,7 +293,7 @@ export async function POST(req: Request) {
         await new Promise(resolve => setTimeout(resolve, 3000))
 
         const files = await listModalSandboxFiles(modalSandbox)
-        const url = await getModalSandboxUrl(modalSandbox, fragment.port || 3000)
+        const url = await getModalSandboxUrl(modalSandbox, resolvedPort)
 
         return new Response(
           JSON.stringify({

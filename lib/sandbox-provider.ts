@@ -78,3 +78,17 @@ export function chooseSandboxProvider({
 
   return available[Math.floor(Math.random() * available.length)]
 }
+
+export function getResolvedSandboxPort(
+  template: string | undefined,
+  port?: number | null,
+): number {
+  if (typeof port === 'number' && port > 0) {
+    return port
+  }
+
+  if (template === 'streamlit-developer') return 8501
+  if (template === 'gradio-developer') return 7860
+
+  return 3000
+}
