@@ -43,6 +43,20 @@ type VercelSandboxInstance =
   | Awaited<ReturnType<typeof createVercelSandbox>>
   | Awaited<ReturnType<typeof getVercelSandbox>>
 
+async function waitForSandboxReady(url: string, maxRetries = 15, delayMs = 1000): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const res = await fetch(url, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(3000),
+        redirect: 'follow',
+      })
+      if (res.ok || res.status < 500) return
+    } catch {}
+    await new Promise((r) => setTimeout(r, delayMs))
+  }
+}
+
 async function fetchSandboxFiles(sbx: Sandbox): Promise<FileSystemNode[]> {
   try {
     // Use E2B SDK's files.list() method for robust file listing
@@ -266,6 +280,11 @@ export async function POST(req: Request) {
           env: supabaseRuntimeEnv,
         })
 
+        const vercelUrl = getVercelSandboxUrl(vercelSandbox, resolvedPort)
+        if (vercelUrl) {
+          await waitForSandboxReady(vercelUrl)
+        }
+
         const files = await listVercelSandboxFiles(vercelSandbox)
 
         return new Response(
@@ -273,7 +292,7 @@ export async function POST(req: Request) {
             sbxId: encodeSandboxId('vercel', vercelSandbox.name),
             sandboxProvider: selectedProvider,
             template: fragment.template,
-            url: getVercelSandboxUrl(vercelSandbox, resolvedPort),
+            url: vercelUrl,
             files,
           } as ExecutionResultWeb),
           { headers: { 'Content-Type': 'application/json' } }
@@ -289,18 +308,19 @@ export async function POST(req: Request) {
           env: supabaseRuntimeEnv,
         })
 
-        // Wait for server to start before getting tunnel URL
-        await new Promise(resolve => setTimeout(resolve, 3000))
-
         const files = await listModalSandboxFiles(modalSandbox)
-        const url = await getModalSandboxUrl(modalSandbox, resolvedPort)
+        const modalUrl = await getModalSandboxUrl(modalSandbox, resolvedPort)
+
+        if (modalUrl) {
+          await waitForSandboxReady(modalUrl)
+        }
 
         return new Response(
           JSON.stringify({
             sbxId: encodeSandboxId('modal', modalSandbox.sandboxId),
             sandboxProvider: selectedProvider,
             template: fragment.template,
-            url,
+            url: modalUrl,
             files,
           } as ExecutionResultWeb),
           { headers: { 'Content-Type': 'application/json' } }

@@ -7,7 +7,6 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createOllama } from 'ollama-ai-provider'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import bundledModels from '@/lib/models.json'
-import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS } from '@/lib/magic-models'
 
 export type LLMModel = {
   id: string
@@ -31,83 +30,61 @@ export type LLMModelConfig = {
 
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
 
-export function resolveGenerationModel(model: LLMModel, config: LLMModelConfig): LLMModel {
-  if (hasProviderCredentials(model.providerId, config)) {
-    return model
-  }
+export function getAutoModel(config: LLMModelConfig): LLMModel | null {
+  const allModels = bundledModels.models as LLMModel[]
 
-  const fallbackIds = [
-    'models/gemini-2.0-flash',
-    'qwen/qwen3-coder',
-    'anthropic/claude-haiku-4.5',
-    'claude-3-5-haiku-latest',
-    'gpt-4o-mini',
-  ]
-
-  for (const fallbackId of fallbackIds) {
-    const fallbackModel = (bundledModels.models as LLMModel[]).find(
-      (candidate) => candidate.id === fallbackId,
-    )
-
-    if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, config)) {
-      return fallbackModel
+  for (const model of allModels) {
+    if (hasProviderCredentials(model.providerId, config)) {
+      return model
     }
   }
 
-  return model
+  return null
+}
+
+export function getAllConfiguredModels(config: LLMModelConfig): LLMModel[] {
+  const allModels = bundledModels.models as LLMModel[]
+  return allModels.filter((m) => hasProviderCredentials(m.providerId, config))
 }
 
 export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMModel[] {
   const chain: LLMModel[] = []
+  const seenIds = new Set<string>()
 
-  if (hasProviderCredentials(model.providerId, config)) {
+  if (model.id !== 'auto' && hasProviderCredentials(model.providerId, config)) {
     chain.push(model)
+    seenIds.add(model.id)
   }
 
-  const isMagicFree = MAGIC_FREE_MODELS.some((m) => m.id === model.id)
-  const isMagicPlus = MAGIC_PLUS_MODELS.some((m) => m.id === model.id)
+  const allModels = getAllConfiguredModels(config)
 
-  if (isMagicFree || isMagicPlus) {
-    const siblings = (isMagicFree ? MAGIC_FREE_MODELS : MAGIC_PLUS_MODELS).filter(
-      (m) => m.id !== model.id && hasProviderCredentials(m.providerId, config),
-    )
-    for (const sibling of siblings) {
-      if (chain.length >= 6) break
-      chain.push(sibling)
-    }
-  }
-
-  const fallbackIds = [
-    'models/gemini-2.0-flash',
-    'qwen/qwen3-coder',
-    'anthropic/claude-haiku-4.5',
-    'claude-3-5-haiku-latest',
-    'gpt-4o-mini',
-    'openrouter/auto',
-    'anthropic/claude-haiku-4-5-free',
-    'mistral/leanstral-1-5',
-    'google/gemma-4-31b-it',
-  ]
-
-  const seenProviders = new Set<string>(chain.map((m) => m.providerId))
-
-  for (const fallbackId of fallbackIds) {
-    if (chain.length >= 8) break
-    const fallbackModel = (bundledModels.models as LLMModel[]).find(
-      (candidate) => candidate.id === fallbackId,
-    )
-
-    if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, config) && !seenProviders.has(fallbackModel.providerId)) {
-      chain.push(fallbackModel)
-      seenProviders.add(fallbackModel.providerId)
+  for (const candidate of allModels) {
+    if (chain.length >= 20) break
+    if (!seenIds.has(candidate.id)) {
+      chain.push(candidate)
+      seenIds.add(candidate.id)
     }
   }
 
   if (chain.length === 0) {
-    const anyModel = (bundledModels.models as LLMModel[]).find((candidate) =>
-      hasProviderCredentials(candidate.providerId, config),
-    )
-    if (anyModel) chain.push(anyModel)
+    const fallbackIds = [
+      'models/gemini-2.0-flash',
+      'qwen/qwen3-coder',
+      'anthropic/claude-haiku-4.5',
+      'claude-3-5-haiku-latest',
+      'gpt-4o-mini',
+    ]
+
+    for (const fallbackId of fallbackIds) {
+      const fallbackModel = (bundledModels.models as LLMModel[]).find(
+        (candidate) => candidate.id === fallbackId,
+      )
+
+      if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, config)) {
+        chain.push(fallbackModel)
+        break
+      }
+    }
   }
 
   return chain
@@ -145,10 +122,6 @@ export function hasProviderEnvironmentCredentials(providerId: string) {
       return Boolean(process.env.ORCAROUTER_API_KEY)
     case 'requesty':
       return Boolean(process.env.REQUESTY_API_KEY)
-    case 'magicx_coder':
-      return Boolean(process.env.LM_API_TOKEN)
-    case 'magicx':
-      return Boolean(process.env.LM_API_TOKEN)
     default:
       return false
   }
@@ -262,16 +235,6 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
         apiKey: apiKey || process.env.REQUESTY_API_KEY,
         baseURL: baseURL || 'https://router.requesty.ai/v1',
       })(modelNameString),
-    magicx_coder: () =>
-      createOpenAI({
-        apiKey: apiKey || process.env.LM_API_TOKEN,
-        baseURL: baseURL || process.env.MAGICX_CODER_BASE_URL || 'http://185.172.175.223:1234/v1',
-      })(process.env.MAGICX_CODER_MODEL || modelNameString),
-    magicx: () =>
-      createOpenAI({
-        apiKey: apiKey || process.env.LM_API_TOKEN,
-        baseURL: baseURL || process.env.MAGICX_BASE_URL || 'http://localhost:1234/api/v1',
-      })(process.env.MAGICX_MODEL || modelNameString),
   }
 
   const createClient =
@@ -290,13 +253,4 @@ function getProviderModelName(model: LLMModel) {
   }
 
   return model.id
-}
-
-export function getDefaultModelParams(model: LLMModel) {
-  // Return default parameters for the model
-  // This can be customized per provider/model if needed
-  return {
-    temperature: 0.7,
-    maxTokens: 4096,
-  }
 }

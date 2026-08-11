@@ -8,15 +8,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { LLMModel, LLMModelConfig } from '@/lib/models'
-import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS, getRandomModel } from '@/lib/magic-models'
 import type { TemplateId, Templates } from '@/lib/templates'
 import 'core-js/actual/object/group-by'
-import { Sparkles, Zap, Wand2 } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import Image from 'next/image'
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 
 const ETC_PROVIDER_IDS = new Set(['orcarouter', 'requesty', 'llm_gateway', 'novita', 'poolside'])
-const MAGICAL_AI_PROVIDER_IDS = new Set(['magicx_coder', 'magicx'])
 
 export function ChatPicker({
   templates,
@@ -33,31 +31,16 @@ export function ChatPicker({
   languageModel: LLMModelConfig
   onLanguageModelChange: (config: LLMModelConfig) => void
 }) {
-  const magicModelRef = useRef<LLMModel | null>(null)
-  const magicPlusModelRef = useRef<LLMModel | null>(null)
-
   const resolvedModel = useMemo(() => {
     const modelId = languageModel.model
-    if (modelId === 'magic') {
-      if (!magicModelRef.current) {
-        magicModelRef.current = getRandomModel(MAGIC_FREE_MODELS)
-      }
-      return magicModelRef.current
+    if (modelId === 'auto') {
+      return models[0]
     }
-    if (modelId === 'magic+') {
-      if (!magicPlusModelRef.current) {
-        magicPlusModelRef.current = getRandomModel(MAGIC_PLUS_MODELS)
-      }
-      return magicPlusModelRef.current
-    }
-    magicModelRef.current = null
-    magicPlusModelRef.current = null
     return models.find((m) => m.id === modelId)
   }, [languageModel.model, models])
 
   const displayName = useMemo(() => {
-    if (languageModel.model === 'magic') return 'Magic'
-    if (languageModel.model === 'magic+') return 'Magic+'
+    if (languageModel.model === 'auto') return 'Auto'
     return resolvedModel?.name || 'Select model'
   }, [languageModel.model, resolvedModel])
 
@@ -112,9 +95,8 @@ export function ChatPicker({
           <SelectTrigger className="whitespace-nowrap border-none shadow-none focus:ring-0 px-0 py-0 h-6 text-xs bg-transparent">
             <SelectValue>
               <div className="flex items-center space-x-1.5">
-                {languageModel.model === 'magic' && <Wand2 className="h-3 w-3 text-primary" />}
-                {languageModel.model === 'magic+' && <Zap className="h-3 w-3 text-primary" />}
-                {languageModel.model !== 'magic' && languageModel.model !== 'magic+' && resolvedModel && (
+                {languageModel.model === 'auto' && <Sparkles className="h-3 w-3 text-primary" />}
+                {languageModel.model !== 'auto' && resolvedModel && (
                   <Image
                     className="flex"
                     src={`/thirdparty/logos/${resolvedModel.providerId}.svg`}
@@ -129,59 +111,20 @@ export function ChatPicker({
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectLabel>Magical AI</SelectLabel>
-              <SelectItem value="magic">
+              <SelectLabel>Model</SelectLabel>
+              <SelectItem value="auto">
                 <div className="flex items-center space-x-2">
-                  <Wand2 className="h-3.5 w-3.5 text-primary" />
-                  <span className="font-medium">Magic</span>
-                  <span className="text-[10px] text-white/40">Fast & free</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="magic+">
-                <div className="flex items-center space-x-2">
-                  <Zap className="h-3.5 w-3.5 text-primary" />
-                  <span className="font-medium">Magic+</span>
-                  <span className="text-[10px] text-white/40">Best quality</span>
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  <span className="font-medium">Auto</span>
+                  <span className="text-[10px] text-white/40">Auto-select working model</span>
                 </div>
               </SelectItem>
             </SelectGroup>
             <SelectGroup>
-              <SelectLabel>Free models</SelectLabel>
-              {MAGIC_FREE_MODELS.map((model) => (
-                <SelectItem key={model.id} value={model.id}>
-                  <div className="flex items-center space-x-2">
-                    <Image
-                      className="flex"
-                      src={`/thirdparty/logos/${model.providerId}.svg`}
-                      alt={model.provider}
-                      width={14}
-                      height={14}
-                    />
-                    <span>{model.name}</span>
-                    <span className="text-[10px] text-[#22c55e]">Free</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>Magical AI</SelectLabel>
-              {models
-                .filter((m) => MAGICAL_AI_PROVIDER_IDS.has(m.providerId))
-                .map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    <div className="flex items-center space-x-2">
-                      <Wand2 className="h-3.5 w-3.5 text-purple-400" />
-                      <span>{model.name}</span>
-                      <span className="text-[10px] text-purple-400">Local</span>
-                    </div>
-                  </SelectItem>
-                ))}
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>Other models</SelectLabel>
+              <SelectLabel>Available models</SelectLabel>
               {Object.entries(
                 Object.groupBy(
-                  models.filter((m) => !MAGIC_FREE_MODELS.some((f) => f.id === m.id) && !MAGICAL_AI_PROVIDER_IDS.has(m.providerId)),
+                  models,
                   (model) =>
                     model.providerId === 'openrouter'
                       ? 'openrouter'

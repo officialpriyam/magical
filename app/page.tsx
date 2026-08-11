@@ -3,7 +3,6 @@
 import { ViewType } from '@/components/auth';
 import { AuthDialog } from '@/components/auth-dialog';
 import { Chat } from '@/components/chat';
-import { MAGIC_FREE_MODELS, MAGIC_PLUS_MODELS } from '@/lib/magic-models';
 import { PromptInputBox } from '@/components/ui/ai-prompt-box';
 import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
@@ -32,7 +31,7 @@ import type { GitHubWorkspace } from '@/components/github-save';
 import type { PreviewTab } from '@/components/preview';
 import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo } from 'lucide-react';
 
-const DEFAULT_MODEL_ID = 'magic'
+const DEFAULT_MODEL_ID = 'auto'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
 const MAX_AUTO_FIX_ATTEMPTS = 2
 
@@ -373,24 +372,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return true
   }), [availableModels])
 
-  const magicModelRef = useRef<any>(null)
-  const magicPlusModelRef = useRef<any>(null)
-
   const currentModel = useMemo(() => {
-    if (languageModel.model === 'magic') {
-      if (!magicModelRef.current) {
-        magicModelRef.current = MAGIC_FREE_MODELS[Math.floor(Math.random() * MAGIC_FREE_MODELS.length)]
-      }
-      return magicModelRef.current
+    if (languageModel.model === 'auto') {
+      return filteredModels[0] || null
     }
-    if (languageModel.model === 'magic+') {
-      if (!magicPlusModelRef.current) {
-        magicPlusModelRef.current = MAGIC_PLUS_MODELS[Math.floor(Math.random() * MAGIC_PLUS_MODELS.length)]
-      }
-      return magicPlusModelRef.current
-    }
-    magicModelRef.current = null
-    magicPlusModelRef.current = null
     return (
       filteredModels.find((model: any) => model.id === languageModel.model) ||
       filteredModels.find((model: any) => model.id === DEFAULT_MODEL_ID) ||
@@ -485,8 +470,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   useEffect(() => {
     if (filteredModels.length === 0) return
 
-    if (languageModel.model === 'magic' || languageModel.model === 'magic+') return
-
     const selectedModelExists = filteredModels.some(
       (model: any) => model.id === languageModel.model,
     )
@@ -550,6 +533,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       const pendingId = pendingNavigateRef.current
       if (pendingId) {
         pendingNavigateRef.current = null
+        try {
+          sessionStorage.removeItem('isLandingPagePrompt')
+          sessionStorage.removeItem('landingPageProjectId')
+        } catch {}
         router.replace(`/chat/${pendingId}`)
       }
     },
@@ -561,6 +548,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         const pendingId = pendingNavigateRef.current
         if (pendingId && supabase && currentProjectRef.current) {
           pendingNavigateRef.current = null
+          try {
+            sessionStorage.removeItem('isLandingPagePrompt')
+            sessionStorage.removeItem('landingPageProjectId')
+          } catch {}
           const last = messagesRef.current[messagesRef.current.length - 1]
           if (last) {
             void saveMessage(supabase, currentProjectRef.current.id, last, messagesRef.current.length - 1)
@@ -679,6 +670,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         const pendingId = pendingNavigateRef.current
         if (pendingId && supabase && currentProjectRef.current) {
           pendingNavigateRef.current = null
+          try {
+            sessionStorage.removeItem('isLandingPagePrompt')
+            sessionStorage.removeItem('landingPageProjectId')
+          } catch {}
           const last = messagesRef.current[messagesRef.current.length - 1]
           if (last) {
             await saveMessage(supabase, currentProjectRef.current.id, last, messagesRef.current.length - 1)
@@ -982,6 +977,27 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             config: languageModel,
           })
         }
+      } else {
+        try {
+          const flag = sessionStorage.getItem('isLandingPagePrompt')
+          const projectId = sessionStorage.getItem('landingPageProjectId')
+          if (flag === 'true' && projectId === currentProjectId) {
+            sessionStorage.removeItem('isLandingPagePrompt')
+            sessionStorage.removeItem('landingPageProjectId')
+            const lastMsg = projectMessages[projectMessages.length - 1]
+            if (lastMsg && lastMsg.role === 'user') {
+              submit({
+                userID: session?.user?.id,
+                teamID: userTeam?.id,
+                projectID: currentProjectId,
+                messages: toAISDKMessages(projectMessages),
+                template: getTemplateForSubmission(),
+                model: currentModel,
+                config: languageModel,
+              })
+            }
+          }
+        } catch {}
       }
 
       if (skipNextWorkspaceRestoreRef.current === currentProject?.id) {
@@ -1273,6 +1289,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     if (!hadProjectBeforePrompt) {
       pendingNavigateRef.current = projectForPrompt.id
       isLandingPagePromptRef.current = true
+      try {
+        sessionStorage.setItem('isLandingPagePrompt', 'true')
+        sessionStorage.setItem('landingPageProjectId', projectForPrompt.id)
+      } catch {}
       if (supabase) {
         void saveMessage(supabase, projectForPrompt.id, newMessage, 0)
       }
