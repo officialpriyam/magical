@@ -17,26 +17,8 @@ export function MotionSitesGallery() {
         <div>
           <h2 className="text-2xl font-bold">Website Templates</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Curated prompts from MotionSites.ai & WebsitePrompts.ai
+            Start from a template to build your next project
           </p>
-        </div>
-        <div className="flex gap-3">
-          <a
-            href="https://motionsites.ai/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            MotionSites →
-          </a>
-          <a
-            href="https://websiteprompts.ai/prompts"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            WebsitePrompts →
-          </a>
         </div>
       </div>
 
@@ -77,15 +59,9 @@ export function MotionSitesGallery() {
 
 function TemplateCard({ template }: { template: MotionSitesTemplate }) {
   const [imageError, setImageError] = useState(false)
-  const source = template.url.includes('motionsites.ai') ? 'MotionSites' : 'WebsitePrompts'
 
   return (
-    <a
-      href={template.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group relative rounded-lg overflow-hidden bg-muted border border-border hover:border-foreground/20 transition-all"
-    >
+    <div className="group relative rounded-lg overflow-hidden bg-muted border border-border hover:border-foreground/20 transition-all cursor-pointer">
       <div className="aspect-video relative overflow-hidden">
         {!imageError ? (
           <img
@@ -99,20 +75,15 @@ function TemplateCard({ template }: { template: MotionSitesTemplate }) {
             Preview unavailable
           </div>
         )}
-        <div className="absolute top-2 right-2">
-          <span className="text-[10px] bg-black/60 text-white/80 px-1.5 py-0.5 rounded">
-            {source}
-          </span>
-        </div>
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-          <span className="text-xs text-white/80">Click to view prompt</span>
+          <span className="text-xs text-white/80">Click to use template</span>
         </div>
       </div>
       <div className="p-3">
         <h3 className="font-medium text-sm truncate">{template.name}</h3>
-        <p className="text-xs text-muted-foreground mt-1">{template.category}</p>
+        <p className="text-xs text-muted-foreground mt-1">{template.description}</p>
       </div>
-    </a>
+    </div>
   )
 }

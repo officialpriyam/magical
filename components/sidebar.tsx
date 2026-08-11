@@ -253,56 +253,56 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <ChevronDown className="h-4 w-4 text-white/40 shrink-0" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="bottom" align="start" className="w-56 bg-[#111211] border-white/10">
+                <DropdownMenuContent side="bottom" align="start" className="w-64 bg-[#111211] border-white/10">
                   {/* Workspace Header */}
-                  <div className="px-3 py-3 border-b border-white/10">
+                  <div className="px-4 py-4 border-b border-white/10">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
+                      <Avatar className="h-11 w-11">
                         <AvatarFallback className="bg-white/10 text-white/60 text-sm font-medium">
                           {workspaceInitial}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{workspaceName}'s Workspace</p>
+                        <p className="text-sm font-medium text-white">{workspaceName}'s Workspace</p>
                         <p className="text-xs text-white/50">Free Plan · 1 member</p>
                       </div>
                     </div>
                     <Button
                       variant="outline"
-                      className="w-full mt-3 h-8 text-xs border-white/10 bg-transparent text-white hover:bg-white/5"
+                      className="w-full mt-4 h-9 text-sm border-white/10 bg-transparent text-white hover:bg-white/5"
                     >
                       Invite members
                     </Button>
                   </div>
 
                   {/* Credits */}
-                  <div className="px-3 py-3 border-b border-white/10">
+                  <div className="px-4 py-4 border-b border-white/10">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-white/50">Credits</span>
-                      <span className="text-xs text-white/70">3 left ›</span>
+                      <span className="text-sm text-white/50">Credits</span>
+                      <span className="text-sm text-white/70">3 left ›</span>
                     </div>
-                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                       <div className="h-full bg-white/40 rounded-full" style={{ width: '30%' }} />
                     </div>
-                    <p className="text-[10px] text-white/40 mt-2">● Daily credits reset at midnight UTC</p>
+                    <p className="text-xs text-white/40 mt-2">● Daily credits reset at midnight UTC</p>
                   </div>
 
                   {/* Workspaces List */}
-                  <div className="px-3 py-2">
-                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Workspaces</p>
-                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-white/5">
-                      <Avatar className="h-5 w-5">
+                  <div className="px-4 py-3">
+                    <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Workspaces</p>
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-white/5">
+                      <Avatar className="h-6 w-6">
                         <AvatarFallback className="bg-white/10 text-white/60 text-[10px]">
                           {workspaceInitial}
                         </AvatarFallback>
                       </Avatar>
                       <span className="text-sm text-white flex-1">{workspaceName}'s Workspace</span>
-                      <span className="text-[10px] text-white/40 bg-white/10 px-1.5 py-0.5 rounded">Free</span>
+                      <span className="text-xs text-white/40 bg-white/10 px-2 py-0.5 rounded">Free</span>
                       <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     </div>
-                    <button className="flex items-center gap-2 px-2 py-1.5 text-sm text-white/50 hover:text-white/70 transition-colors">
+                    <button className="flex items-center gap-3 px-3 py-2 mt-1 text-sm text-white/50 hover:text-white/70 transition-colors">
                       <Plus className="h-4 w-4" />
                       <span>New workspace</span>
                     </button>
@@ -311,23 +311,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <DropdownMenuSeparator className="bg-white/10" />
 
                   {/* Menu Items */}
-                  <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-white/70 focus:bg-white/5 focus:text-white">
-                    <HelpCircle className="mr-2 h-4 w-4" />
-                    <span>Help Center</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white">
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    <span>My Subscription</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10" />
-                  <DropdownMenuItem onClick={onSignOut} className="text-white/70 focus:bg-white/5 focus:text-white">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sign Out</span>
-                  </DropdownMenuItem>
+                  <div className="py-2">
+                    <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                      <Settings className="mr-3 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                      <HelpCircle className="mr-3 h-4 w-4" />
+                      <span>Help Center</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                      <CreditCard className="mr-3 h-4 w-4" />
+                      <span>My Subscription</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/10 my-1" />
+                    <DropdownMenuItem onClick={onSignOut} className="text-white/70 focus:bg-white/5 focus:text-white px-4 py-2.5">
+                      <LogOut className="mr-3 h-4 w-4" />
+                      <span>Sign Out</span>
+                    </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

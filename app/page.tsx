@@ -209,6 +209,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }, [setAuthView])
   const [errorMessage, setErrorMessage] = useState('')
   const [autoFixMessage, setAutoFixMessage] = useState('')
+  const [templatePrompt, setTemplatePrompt] = useState('')
   
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
@@ -386,6 +387,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   // Determine which API to use based on morph toggle and existing fragment
   const shouldUseMorph = useMorphApply && fragment && fragment.code && fragment.file_path
   const apiEndpoint = shouldUseMorph ? '/api/chat/morph-chat' : '/api/chat'
+
+  // Handle template parameter from URL
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const templateParam = searchParams.get('template')
+    if (templateParam) {
+      const decoded = decodeURIComponent(templateParam)
+      setTemplatePrompt(decoded)
+      // Clear the URL parameter
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   useEffect(() => {
     const projectId = activeProjectId
@@ -1885,6 +1898,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           ? 'Ask Magical AI to plan what to build...'
           : 'Ask Magical AI to build an app, page, or tool...'
       }
+      defaultValue={templatePrompt}
       templates={templates}
       selectedTemplate={selectedTemplate}
       onSelectedTemplateChange={setSelectedTemplate}
