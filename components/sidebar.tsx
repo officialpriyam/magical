@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, Home, LayoutGrid, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut, ChevronDown, CreditCard, HelpCircle, Plus, Link as LinkIcon, FolderOpen, GitBranch } from 'lucide-react';
+import { MessageCircle, Search, Home, LayoutGrid, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, Plus, Link as LinkIcon, FolderOpen, GitBranch } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { WorkspaceDropdown } from '@/components/workspace-dropdown';
 import { PricingModal } from '@/components/pricing';
 
 interface SidebarProps {
@@ -72,7 +73,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return initialIsOpen
   });
   const [isPricingModalOpen, setIsPricingModalOpen] = React.useState(false);
-  const [isWorkspaceOpen, setIsWorkspaceOpen] = React.useState(false);
   const [user, setUser] = React.useState<SupabaseUser | null>(null);
   const [chatHistory, setChatHistory] = React.useState<ChatHistoryItem[]>([]);
   const [credits, setCredits] = React.useState<number>(0);
@@ -81,23 +81,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [deleteError, setDeleteError] = React.useState('');
   const [isDeletingChat, setIsDeletingChat] = React.useState(false);
   const isMobile = useIsMobile();
-  const workspaceRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     localStorage.setItem('sidebar-is-open', String(isOpen))
   }, [isOpen]);
-
-  React.useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (workspaceRef.current && !workspaceRef.current.contains(e.target as Node)) {
-        setIsWorkspaceOpen(false)
-      }
-    }
-    if (isWorkspaceOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isWorkspaceOpen]);
 
   const activeSearchQuery = externalSearchQuery || searchQuery;
 
@@ -255,129 +242,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isOpen ? (
           <div className="flex flex-col h-full">
             {/* Workspace Selector */}
-            <div className="px-3 py-2 border-b border-white/[0.06] relative" ref={workspaceRef}>
+            <div className="px-3 py-2 border-b border-white/[0.06]">
               <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
-                  className="flex-1 flex items-center justify-between h-9 px-2 rounded-md text-white/90 hover:bg-white/[0.08] hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Avatar className="h-5 w-5">
-                      <AvatarFallback className="bg-white/10 text-white/60 text-[10px] font-medium">
-                        {workspaceInitial}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-medium truncate">{workspaceName}&apos;s Workspace</span>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-white/40 shrink-0 transition-transform ${isWorkspaceOpen ? 'rotate-180' : ''}`} />
-                </button>
+                <div className="flex-1">
+                  <WorkspaceDropdown
+                    onSignOut={onSignOut}
+                    onOpenPricing={() => setIsPricingModalOpen(true)}
+                  />
+                </div>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsOpen(false)}
-                  className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/10 shrink-0"
+                  className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/10 shrink-0 ml-1"
                   aria-label="Close sidebar"
                 >
                   <PanelLeftClose className="h-4 w-4" />
                 </Button>
               </div>
-
-              {/* Workspace Dropdown Panel */}
-              {isWorkspaceOpen && (
-                <div className="absolute left-0 right-0 top-full mt-1 mx-0 bg-[#111211] border border-white/10 rounded-xl shadow-2xl z-[100] overflow-hidden">
-                  {/* Workspace Header */}
-                  <div className="px-4 py-4 border-b border-white/10">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-11 w-11">
-                        <AvatarFallback className="bg-white/10 text-white/60 text-sm font-medium">
-                          {workspaceInitial}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-white">{workspaceName}&apos;s Workspace</p>
-                        <p className="text-xs text-white/50">Free Plan · 1 member</p>
-                      </div>
-                    </div>
-                    <button
-                      className="w-full mt-4 h-9 text-sm border border-white/10 bg-transparent text-white hover:bg-white/5 rounded-lg transition-colors"
-                    >
-                      Invite members
-                    </button>
-                  </div>
-
-                  {/* Credits */}
-                  <a href="/credits" onClick={() => setIsWorkspaceOpen(false)} className="block px-4 py-4 border-b border-white/10 hover:bg-white/5 transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-white/50">Credits</span>
-                      <span className="text-sm text-white/70">{credits} left</span>
-                    </div>
-                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-white/40 rounded-full transition-all"
-                        style={{ width: `${Math.min(100, (credits / 500) * 100)}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-white/40 mt-2">● Click to claim daily credits</p>
-                  </a>
-
-                  {/* Workspaces List */}
-                  <div className="px-4 py-3 border-b border-white/10">
-                    <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Workspaces</p>
-                    <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-white/5">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="bg-white/10 text-white/60 text-[10px]">
-                          {workspaceInitial}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm text-white flex-1">{workspaceName}&apos;s Workspace</span>
-                      <span className="text-xs text-white/40 bg-white/10 px-2 py-0.5 rounded">Free</span>
-                      <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    </div>
-                    <button
-                      onClick={() => { setIsWorkspaceOpen(false); onStartNewChat(); }}
-                      className="flex items-center gap-3 px-3 py-2 mt-1 text-sm text-white/50 hover:text-white/70 transition-colors w-full"
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span>New workspace</span>
-                    </button>
-                  </div>
-
-                  {/* Menu Items */}
-                  <div className="py-2">
-                    <button
-                      onClick={() => { setIsWorkspaceOpen(false); setIsPricingModalOpen(true); }}
-                      className="flex items-center w-full px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
-                    >
-                      <Settings className="mr-3 h-4 w-4" />
-                      <span>Settings</span>
-                    </button>
-                    <button
-                      onClick={() => setIsWorkspaceOpen(false)}
-                      className="flex items-center w-full px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
-                    >
-                      <HelpCircle className="mr-3 h-4 w-4" />
-                      <span>Help Center</span>
-                    </button>
-                    <button
-                      onClick={() => { setIsWorkspaceOpen(false); setIsPricingModalOpen(true); }}
-                      className="flex items-center w-full px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
-                    >
-                      <CreditCard className="mr-3 h-4 w-4" />
-                      <span>My Subscription</span>
-                    </button>
-                    <div className="my-1 h-px bg-white/10" />
-                    <button
-                      onClick={() => { setIsWorkspaceOpen(false); onSignOut(); }}
-                      className="flex items-center w-full px-4 py-2.5 text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors"
-                    >
-                      <LogOut className="mr-3 h-4 w-4" />
-                      <span>Sign Out</span>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Navigation */}
