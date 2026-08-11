@@ -374,7 +374,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   const currentModel = useMemo(() => {
     if (languageModel.model === 'auto') {
-      return filteredModels[0] || null
+      return { id: 'auto', name: 'Auto', provider: 'Auto', providerId: 'auto' } as LLMModel
     }
     return (
       filteredModels.find((model: any) => model.id === languageModel.model) ||
@@ -469,6 +469,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   useEffect(() => {
     if (filteredModels.length === 0) return
+
+    if (languageModel.model === 'auto') return
 
     const selectedModelExists = filteredModels.some(
       (model: any) => model.id === languageModel.model,

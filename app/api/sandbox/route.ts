@@ -22,6 +22,7 @@ import {
   hasVercelSandboxConfig,
   installAndStartVercelProject,
   listVercelSandboxFiles,
+  runVercelShellCommand,
   writeVercelProjectFiles,
 } from '@/lib/vercel-sandbox'
 import {
@@ -31,6 +32,7 @@ import {
   hasModalSandboxConfig,
   installAndStartModalProject,
   listModalSandboxFiles,
+  runModalShellCommand,
   writeModalProjectFiles,
 } from '@/lib/modal-sandbox'
 import { Sandbox } from '@e2b/code-interpreter'
@@ -43,18 +45,16 @@ type VercelSandboxInstance =
   | Awaited<ReturnType<typeof createVercelSandbox>>
   | Awaited<ReturnType<typeof getVercelSandbox>>
 
-async function waitForSandboxReady(url: string, maxRetries = 15, delayMs = 1000): Promise<void> {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const res = await fetch(url, {
-        method: 'HEAD',
-        signal: AbortSignal.timeout(3000),
-        redirect: 'follow',
-      })
-      if (res.ok || res.status < 500) return
-    } catch {}
-    await new Promise((r) => setTimeout(r, delayMs))
-  }
+async function waitForPortListening(
+  runCommand: (cmd: string, opts?: { timeoutMs?: number }) => Promise<any>,
+  port: number,
+  maxRetries = 30,
+  delayMs = 1000,
+): Promise<void> {
+  const checkCmd = `until (echo > /dev/tcp/localhost/${port}) 2>/dev/null; do sleep 1; done`
+  try {
+    await runCommand(checkCmd, { timeoutMs: maxRetries * delayMs + 5000 })
+  } catch {}
 }
 
 async function fetchSandboxFiles(sbx: Sandbox): Promise<FileSystemNode[]> {
@@ -280,10 +280,10 @@ export async function POST(req: Request) {
           env: supabaseRuntimeEnv,
         })
 
-        const vercelUrl = getVercelSandboxUrl(vercelSandbox, resolvedPort)
-        if (vercelUrl) {
-          await waitForSandboxReady(vercelUrl)
-        }
+        await waitForPortListening(
+          (cmd, opts) => runVercelShellCommand(vercelSandbox, cmd, { timeoutMs: opts?.timeoutMs }),
+          resolvedPort,
+        )
 
         const files = await listVercelSandboxFiles(vercelSandbox)
 
@@ -292,7 +292,7 @@ export async function POST(req: Request) {
             sbxId: encodeSandboxId('vercel', vercelSandbox.name),
             sandboxProvider: selectedProvider,
             template: fragment.template,
-            url: vercelUrl,
+            url: getVercelSandboxUrl(vercelSandbox, resolvedPort),
             files,
           } as ExecutionResultWeb),
           { headers: { 'Content-Type': 'application/json' } }
@@ -308,19 +308,20 @@ export async function POST(req: Request) {
           env: supabaseRuntimeEnv,
         })
 
-        const files = await listModalSandboxFiles(modalSandbox)
-        const modalUrl = await getModalSandboxUrl(modalSandbox, resolvedPort)
+        await waitForPortListening(
+          (cmd, opts) => runModalShellCommand(modalSandbox, cmd, { timeoutMs: opts?.timeoutMs }),
+          resolvedPort,
+        )
 
-        if (modalUrl) {
-          await waitForSandboxReady(modalUrl)
-        }
+        const files = await listModalSandboxFiles(modalSandbox)
+        const url = await getModalSandboxUrl(modalSandbox, resolvedPort)
 
         return new Response(
           JSON.stringify({
             sbxId: encodeSandboxId('modal', modalSandbox.sandboxId),
             sandboxProvider: selectedProvider,
             template: fragment.template,
-            url: modalUrl,
+            url,
             files,
           } as ExecutionResultWeb),
           { headers: { 'Content-Type': 'application/json' } }

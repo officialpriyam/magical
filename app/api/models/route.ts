@@ -59,7 +59,7 @@ export async function GET() {
   const models = new Map<string, LLMModel>()
 
   for (const model of staticModels.models as LLMModel[]) {
-    if (model.providerId !== 'nvidia' && hasProviderEnvironmentCredentials(model.providerId)) {
+    if (model.providerId !== 'nvidia') {
       models.set(model.id, model)
     }
   }
