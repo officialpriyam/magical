@@ -9,7 +9,7 @@ import {
 import { applyPatch } from '@/lib/morph'
 import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { FragmentSchema, morphEditSchema, MorphEditSchema } from '@/lib/schema'
-import { ensureCredits } from '@/lib/credits'
+import { checkCredits } from '@/lib/credits'
 import { streamObject, streamText, type LanguageModel, type ModelMessage } from 'ai'
 import { sanitizeJsonTextStream } from '@/lib/json-stream'
 
@@ -52,10 +52,10 @@ export async function POST(req: Request) {
   }
 
   if (userID) {
-    const creditCheck = await ensureCredits(userID)
+    const creditCheck = await checkCredits(userID)
     if (!creditCheck.ok) {
       return new Response(
-        'Insufficient credits. Please upgrade your plan or wait for daily credit reset.',
+        'Insufficient credits. Please claim daily credits or upgrade your plan.',
         { status: 402 },
       )
     }

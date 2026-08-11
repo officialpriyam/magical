@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase-server'
 
-const DAILY_CREDIT_AMOUNT = 50
 const SIGNUP_CREDIT_AMOUNT = 500
+const DAILY_CREDIT_AMOUNT = 50
 const CHAT_CREDIT_COST = 1
 
 export async function getCredits(userId: string): Promise<number> {
@@ -16,17 +16,32 @@ export async function getCredits(userId: string): Promise<number> {
   return data.credits ?? 0
 }
 
-export async function grantDailyCredits(userId: string): Promise<number> {
+export async function claimDailyCredit(userId: string) {
   const supabase = await createServerClient(true)
-  const { data, error } = await supabase.rpc('grant_daily_credits', {
+  const { data, error } = await supabase.rpc('claim_daily_credit', {
     p_user_id: userId,
   })
 
   if (error) {
-    console.error('Failed to grant daily credits:', error)
-    return 0
+    console.error('Failed to claim daily credit:', error)
+    return { success: false, message: 'Failed to claim credit', credits: 0 }
   }
-  return data ?? 0
+  return data
+}
+
+export async function getClaimStatus(userId: string, startDate: string, endDate: string) {
+  const supabase = await createServerClient(true)
+  const { data, error } = await supabase.rpc('get_claim_status', {
+    p_user_id: userId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+  })
+
+  if (error) {
+    console.error('Failed to get claim status:', error)
+    return []
+  }
+  return data || []
 }
 
 export async function deductCredits(userId: string, amount: number): Promise<boolean> {
@@ -42,8 +57,8 @@ export async function deductCredits(userId: string, amount: number): Promise<boo
   return true
 }
 
-export async function ensureCredits(userId: string): Promise<{ ok: boolean; credits: number }> {
-  const credits = await grantDailyCredits(userId)
+export async function checkCredits(userId: string): Promise<{ ok: boolean; credits: number }> {
+  const credits = await getCredits(userId)
   if (credits < CHAT_CREDIT_COST) {
     return { ok: false, credits }
   }

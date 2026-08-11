@@ -10,7 +10,7 @@ import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { fragmentSchema as schema } from '@/lib/schema'
 import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
 import { Templates } from '@/lib/templates'
-import { ensureCredits } from '@/lib/credits'
+import { checkCredits } from '@/lib/credits'
 import { streamObject, streamText, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
@@ -237,10 +237,10 @@ export async function POST(req: Request) {
   }
 
   if (userID) {
-    const creditCheck = await ensureCredits(userID)
+    const creditCheck = await checkCredits(userID)
     if (!creditCheck.ok) {
       return new Response(
-        'Insufficient credits. Please upgrade your plan or wait for daily credit reset.',
+        'Insufficient credits. Please claim daily credits or upgrade your plan.',
         { status: 402 },
       )
     }

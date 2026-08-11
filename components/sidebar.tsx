@@ -284,7 +284,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
 
                   {/* Credits */}
-                  <div className="px-4 py-4 border-b border-white/10">
+                  <a href="/credits" className="block px-4 py-4 border-b border-white/10 hover:bg-white/5 transition-colors">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-white/50">Credits</span>
                       <span className="text-sm text-white/70">{credits} left</span>
@@ -295,8 +295,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         style={{ width: `${Math.min(100, (credits / 500) * 100)}%` }}
                       />
                     </div>
-                    <p className="text-xs text-white/40 mt-2">● Daily credits reset at midnight UTC</p>
-                  </div>
+                    <p className="text-xs text-white/40 mt-2">● Click to claim daily credits</p>
+                  </a>
 
                   {/* Workspaces List */}
                   <div className="px-4 py-3">
