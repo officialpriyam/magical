@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motionsitesTemplates, getCategories, type MotionSitesTemplate } from '@/lib/motionsites-templates'
-import { X } from 'lucide-react'
+import { X, Copy, Check } from 'lucide-react'
 
 export default function TemplatesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedTemplate, setSelectedTemplate] = useState<MotionSitesTemplate | null>(null)
+  const [copied, setCopied] = useState(false)
   const categories = getCategories()
   const router = useRouter()
 
@@ -16,8 +17,32 @@ export default function TemplatesPage() {
     : motionsitesTemplates.filter(t => t.category === selectedCategory)
 
   const handleUseTemplate = (template: MotionSitesTemplate) => {
-    const encodedPrompt = encodeURIComponent(template.prompt)
-    router.push(`/?template=${encodedPrompt}`)
+    setSelectedTemplate(template)
+    setCopied(false)
+  }
+
+  const handleCopyAndRedirect = async () => {
+    if (!selectedTemplate) return
+    try {
+      await navigator.clipboard.writeText(selectedTemplate.prompt)
+      setCopied(true)
+      setTimeout(() => {
+        router.push('/')
+      }, 500)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = selectedTemplate.prompt
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopied(true)
+      setTimeout(() => {
+        router.push('/')
+      }, 500)
+    }
   }
 
   return (
@@ -64,7 +89,7 @@ export default function TemplatesPage() {
             <TemplateCard
               key={template.id}
               template={template}
-              onClick={() => setSelectedTemplate(template)}
+              onClick={() => handleUseTemplate(template)}
             />
           ))}
         </div>
@@ -88,10 +113,20 @@ export default function TemplatesPage() {
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => handleUseTemplate(selectedTemplate)}
-                  className="px-4 py-2 bg-white text-black text-sm font-medium rounded-lg hover:bg-white/90 transition-colors"
+                  onClick={handleCopyAndRedirect}
+                  className="flex items-center gap-2 px-4 py-2 bg-white text-black text-sm font-medium rounded-lg hover:bg-white/90 transition-colors"
                 >
-                  Use template
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy prompt & start
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => setSelectedTemplate(null)}
@@ -114,6 +149,10 @@ export default function TemplatesPage() {
               <div className="mt-4">
                 <p className="text-sm text-white/60">{selectedTemplate.description}</p>
                 <p className="text-xs text-white/30 mt-2">Category: {selectedTemplate.category}</p>
+              </div>
+              <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
+                <p className="text-xs text-white/40 mb-2">Prompt preview:</p>
+                <p className="text-sm text-white/70 line-clamp-3">{selectedTemplate.prompt}</p>
               </div>
             </div>
           </div>

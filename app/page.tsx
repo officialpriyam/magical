@@ -209,9 +209,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }, [setAuthView])
   const [errorMessage, setErrorMessage] = useState('')
   const [autoFixMessage, setAutoFixMessage] = useState('')
-  const [templatePrompt, setTemplatePrompt] = useState('')
-  const templateSendAttemptedRef = useRef(false)
-  
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const [projectPreviews, setProjectPreviews] = useState<Record<string, ProjectPreviewCard>>({})
@@ -388,27 +385,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   // Determine which API to use based on morph toggle and existing fragment
   const shouldUseMorph = useMorphApply && fragment && fragment.code && fragment.file_path
   const apiEndpoint = shouldUseMorph ? '/api/chat/morph-chat' : '/api/chat'
-
-  // Handle template parameter from URL
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search)
-    const templateParam = searchParams.get('template')
-    if (templateParam && !templateSendAttemptedRef.current) {
-      const decoded = decodeURIComponent(templateParam)
-      setTemplatePrompt(decoded)
-      templateSendAttemptedRef.current = true
-      // Clear the URL parameter
-      window.history.replaceState({}, '', window.location.pathname)
-    }
-  }, [])
-
-  const handleCopyTemplate = useCallback(() => {
-    if (templatePrompt) {
-      navigator.clipboard.writeText(templatePrompt).then(() => {
-        setTemplatePrompt('')
-      })
-    }
-  }, [templatePrompt])
 
   useEffect(() => {
     const projectId = activeProjectId
@@ -1895,51 +1871,31 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     session?.user.email?.split('@')[0] ||
     'there'
   const promptInput = (
-    <>
-      {templatePrompt && (
-        <div className="mb-3 rounded-xl border border-blue-500/30 bg-blue-500/10 p-3">
-          <div className="flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-blue-400 mb-1">Template prompt loaded</p>
-              <p className="text-xs text-white/60 line-clamp-2">{templatePrompt}</p>
-            </div>
-            <button
-              onClick={handleCopyTemplate}
-              className="shrink-0 rounded-lg bg-blue-500/20 px-3 py-1.5 text-xs font-medium text-blue-400 hover:bg-blue-500/30 transition-colors"
-            >
-              Copy to clipboard
-            </button>
-          </div>
-        </div>
-      )}
-      <PromptInputBox
-        onSend={handleSendPrompt}
-        isLoading={isPromptLoading}
-        chatMode={chatMode}
-        onChatModeChange={setChatMode}
-        sandboxProvider={sandboxProvider}
-        onSandboxProviderChange={setSandboxProvider}
-        onStop={handleStopGeneration}
-        placeholder={
-          chatMode === 'plan'
-            ? 'Ask Magical AI to plan what to build...'
-            : 'Ask Magical AI to build an app, page, or tool...'
-        }
-        defaultValue={templatePrompt}
-        onDefaultValueUsed={() => setTemplatePrompt('')}
-        templates={templates}
-        selectedTemplate={selectedTemplate}
-        onSelectedTemplateChange={setSelectedTemplate}
-        models={filteredModels}
-        languageModel={languageModel}
-        onLanguageModelChange={handleLanguageModelChange}
-        apiKeyConfigurable={!process.env.NEXT_PUBLIC_NO_API_KEY_INPUT}
-        baseURLConfigurable={!process.env.NEXT_PUBLIC_NO_BASE_URL_INPUT}
-        useMorphApply={useMorphApply}
-        onUseMorphApplyChange={setUseMorphApply}
-        className={!isDashboardMode ? "mb-0 border-white/10 bg-[#20211f] shadow-none" : undefined}
-      />
-    </>
+    <PromptInputBox
+      onSend={handleSendPrompt}
+      isLoading={isPromptLoading}
+      chatMode={chatMode}
+      onChatModeChange={setChatMode}
+      sandboxProvider={sandboxProvider}
+      onSandboxProviderChange={setSandboxProvider}
+      onStop={handleStopGeneration}
+      placeholder={
+        chatMode === 'plan'
+          ? 'Ask Magical AI to plan what to build...'
+          : 'Ask Magical AI to build an app, page, or tool...'
+      }
+      templates={templates}
+      selectedTemplate={selectedTemplate}
+      onSelectedTemplateChange={setSelectedTemplate}
+      models={filteredModels}
+      languageModel={languageModel}
+      onLanguageModelChange={handleLanguageModelChange}
+      apiKeyConfigurable={!process.env.NEXT_PUBLIC_NO_API_KEY_INPUT}
+      baseURLConfigurable={!process.env.NEXT_PUBLIC_NO_BASE_URL_INPUT}
+      useMorphApply={useMorphApply}
+      onUseMorphApplyChange={setUseMorphApply}
+      className={!isDashboardMode ? "mb-0 border-white/10 bg-[#20211f] shadow-none" : undefined}
+    />
   )
   const statusNotices = (
     <>

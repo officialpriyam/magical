@@ -490,8 +490,6 @@ interface PromptInputBoxProps {
   isLoading?: boolean;
   placeholder?: string;
   className?: string;
-  defaultValue?: string;
-  onDefaultValueUsed?: () => void;
   templates: Templates
   selectedTemplate: 'auto' | TemplateId
   onSelectedTemplateChange: (template: 'auto' | TemplateId) => void
@@ -518,8 +516,8 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       document.head.removeChild(styleSheet);
     };
   }, []);
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, defaultValue, onDefaultValueUsed, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
-  const [input, setInput] = React.useState(defaultValue || "");
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
+  const [input, setInput] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
@@ -532,14 +530,6 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const [showSlashCommands, setShowSlashCommands] = React.useState(false);
   const [matchingCommands, setMatchingCommands] = React.useState<SlashCommand[]>([]);
   const [selectedCommandIndex, setSelectedCommandIndex] = React.useState(0);
-
-  // Update input when defaultValue changes
-  React.useEffect(() => {
-    if (defaultValue) {
-      setInput(defaultValue);
-      onDefaultValueUsed?.();
-    }
-  }, [defaultValue]);
 
   const handleToggleChange = (value: string) => {
     if (value === "search") {
