@@ -140,11 +140,32 @@ export default function TemplatesPage() {
             {/* Modal Content */}
             <div className="p-6">
               <div className="aspect-video rounded-lg overflow-hidden bg-white/5">
-                <img
-                  src={selectedTemplate.previewImage}
-                  alt={selectedTemplate.name}
-                  className="w-full h-full object-cover"
-                />
+                {selectedTemplate.previewImage && !selectedTemplate.previewImage.includes('undefined') ? (
+                  <img
+                    src={selectedTemplate.previewImage}
+                    alt={selectedTemplate.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      const parent = target.parentElement
+                      if (parent) {
+                        const fallback = document.createElement('div')
+                        fallback.className = 'w-full h-full flex items-center justify-center text-white/50 text-sm font-medium'
+                        fallback.style.background = getGradientFromName(selectedTemplate.name)
+                        fallback.textContent = selectedTemplate.name
+                        parent.appendChild(fallback)
+                      }
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex items-center justify-center text-white/50 text-sm font-medium"
+                    style={{ background: getGradientFromName(selectedTemplate.name) }}
+                  >
+                    {selectedTemplate.name}
+                  </div>
+                )}
               </div>
               <div className="mt-4">
                 <p className="text-sm text-white/60">{selectedTemplate.description}</p>
@@ -162,6 +183,16 @@ export default function TemplatesPage() {
   )
 }
 
+function getGradientFromName(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h1 = Math.abs(hash) % 360
+  const h2 = (h1 + 40) % 360
+  return `linear-gradient(135deg, hsl(${h1}, 60%, 25%), hsl(${h2}, 50%, 15%))`
+}
+
 function TemplateCard({ template, onClick }: { template: MotionSitesTemplate; onClick: () => void }) {
   const [imageError, setImageError] = useState(false)
 
@@ -171,7 +202,7 @@ function TemplateCard({ template, onClick }: { template: MotionSitesTemplate; on
       className="group text-left"
     >
       <div className="aspect-video rounded-xl overflow-hidden bg-white/5 border border-white/[0.06] group-hover:border-white/20 transition-all">
-        {!imageError ? (
+        {!imageError && template.previewImage ? (
           <img
             src={template.previewImage}
             alt={template.name}
@@ -179,8 +210,11 @@ function TemplateCard({ template, onClick }: { template: MotionSitesTemplate; on
             onError={() => setImageError(true)}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-white/30 text-sm">
-            Preview unavailable
+          <div
+            className="w-full h-full flex items-center justify-center text-white/50 text-sm font-medium"
+            style={{ background: getGradientFromName(template.name) }}
+          >
+            {template.name}
           </div>
         )}
       </div>
