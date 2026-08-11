@@ -249,7 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {workspaceInitial}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm font-medium truncate">{workspaceName}'s Workspace</span>
+                        <span className="text-sm font-medium truncate">{workspaceName}&apos;s Workspace</span>
                       </div>
                       <ChevronDown className="h-4 w-4 text-white/40 shrink-0" />
                     </Button>
@@ -264,7 +264,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-white">{workspaceName}'s Workspace</p>
+                        <p className="text-sm font-medium text-white">{workspaceName}&apos;s Workspace</p>
                         <p className="text-xs text-white/50">Free Plan · 1 member</p>
                       </div>
                     </div>
@@ -297,7 +297,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {workspaceInitial}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-sm text-white flex-1">{workspaceName}'s Workspace</span>
+                      <span className="text-sm text-white flex-1">{workspaceName}&apos;s Workspace</span>
                       <span className="text-xs text-white/40 bg-white/10 px-2 py-0.5 rounded">Free</span>
                       <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="20 6 9 17 4 12" />

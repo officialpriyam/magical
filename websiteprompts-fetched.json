@@ -1,0 +1,218 @@
+[
+  {
+    "id": "self-storage",
+    "name": "Self Storage Website Prompt",
+    "description": "Self storage website prompt for Bolt, v0 and Lovable — steel white and high-vis orange, interactive unit size selector, full price table, hazard corners, full copy.",
+    "prompt": "# Blocklane Storage — Self Storage Website Prompt\n## 1. Goal Statement\nBuild a utilitarian, conversion-focused self storage website for **Blocklane Storage**, defined by concrete grey, steel white, and a single high-visibility orange — where the entire page exists to answer one question: which unit size do I need and what does it cost.\n## 2. Tech Stack\nReact + Vite + TypeScript + Tailwind CSS + Framer Motion (motion/react) + shadcn/ui + lucide-react\n## 3. Design System — Colors\n:root { --background: hsl(210, 16%, 97%); --foreground: hsl(214, 22%, 15%); --primary: hsl(24, 94%, 52%); }\n## 9. Full Copy\nBLOCKLANE STORAGE · Leeds · Navbar: Sizes & Prices · What You Get · Business · Supplies · Find Us · 0113 555 0155 · Reserve a Unit\nHero: PICK A SIZE. MOVE IN TODAY.\nSize selector: 25 sq ft £22/week · 50 sq ft £38/week · 100 sq ft £62/week · 200 sq ft £108/week\nAll sizes table with 8 unit sizes from 10 sq ft (£12/wk) to 200 sq ft (£108/wk)\nWhat you get: 24/7 gate access · Individually alarmed units · CCTV · Drive-up loading · Free trolleys · No deposit\nHow it works: Pick a size → Reserve online → Sign and pay → Move in same day",
+    "image": "",
+    "categories": ["Light", "Local Business", "Professional Services"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "bowling-alley",
+    "name": "Bowling Alley Website Prompt",
+    "description": "Bowling alley website prompt for Bolt, v0 and Lovable — midnight teal and hot coral, neon flicker wordmark, live lane availability grid, party packages, full copy.",
+    "prompt": "# Star Lanes — Bowling Alley Website Prompt\n## 1. Goal Statement\nBuild a loud retro-Americana bowling alley website for **Star Lanes**, defined by midnight teal, hot coral, and a chrome-effect script logotype — a 1958 bowling centre rendered with modern motion, built to sell lane bookings and birthday parties.\n## 3. Design System — Colors\n:root { --background: hsl(196, 42%, 11%); --foreground: hsl(42, 44%, 94%); --primary: hsl(4, 84%, 62%); }\n## 9. Full Copy\nSTAR LANES · Est. 1958 · Akron, Ohio\nHero: TWELVE LANES. ZERO ATTITUDE.\nLane booking with 7 time slots from 4:00 PM to 10:00 PM\nPrices: Off-peak $24/lane/hr · Peak $38/lane/hr · Shoes $3/person\nLeagues: Monday Night League $18/wk · Thursday Doubles $22/pair · Star Cadets Kids Club $12/child · Corporate Nights from $32/head\nBirthday parties: The Strike $18/child · The Turkey $26/child · The Perfect Game $34/child\nBar & diner, Arcade with tokens",
+    "image": "",
+    "categories": ["Dark", "Entertainment", "Local Business"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "bookstore",
+    "name": "Bookstore Website Prompt",
+    "description": "Bookstore website prompt for Bolt, v0 and Lovable — aged paper and ink navy, staff pick shelf-talkers, hand-drawn SVG underlines, events and book club, full copy.",
+    "prompt": "# Marginalia Books — Independent Bookstore Website Prompt\n## 1. Goal Statement\nBuild a warm, opinionated independent bookshop website for **Marginalia Books**, defined by aged paper, ink navy, and a bookish serif — built around staff recommendations and events.\n## 9. Full Copy\nMARGINALIA BOOKS · Est. 2011 · Sheffield\nHero: We have read most of these. Ask us.\nStaff picks: Piranesi by Susanna Clarke · The Overstory by Richard Powers · Small Things Like These by Claire Keegan · The Hare with Amber Eyes by Edmund de Waal\nBrowse: Fiction · Non-fiction · Poetry · Children's · Translated · Secondhand · Local Interest · Gifts & Cards\nEvents: Claire Keegan in conversation · Poetry open mic · Children's story hour · Translated fiction evening · Local history talk\nBook club: Second Tuesday, upstairs, seven o'clock. Currently reading: Klara and the Sun",
+    "image": "",
+    "categories": ["Light", "Local Business"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "car-dealership",
+    "name": "Car Dealership Website Prompt",
+    "description": "Car dealership website prompt for Bolt, v0 and Lovable — near-black and electric blue, filterable inventory grid, live payment calculator, trade-in flow, full copy.",
+    "prompt": "# Apex Motors — Car Dealership Website Prompt\n## 1. Goal Statement\nBuild a high-gloss car dealership website for **Apex Motors**, defined by near-black surfaces, electric blue accents, and cinematic vehicle photography — with a filterable inventory grid and monthly payment calculator.\n## 9. Full Copy\nAPEX MOTORS · Miami, Florida\nHero: Find it. Finance it. Drive it home today.\n340 vehicles in stock · New and certified pre-owned across twelve makes\n9 vehicle listings with pricing from $21,900 to $51,200\nFinancing calculator with 4.9% APR · Trade-in flow with instant offer\nHow Buying Works: Browse → Pre-qualify → Test drive → Sign and go\nService Department: Scheduled Maintenance · Repairs & Diagnostics · Parts & Accessories",
+    "image": "",
+    "categories": ["Dark", "Local Business"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "property-management",
+    "name": "Property Management Website Prompt",
+    "description": "Property management website prompt for Bolt, v0 and Lovable — dual owner and tenant paths, live fee calculator, comparison table, forest green palette, full copy.",
+    "prompt": "# Keystone Property Group — Property Management Website Prompt\n## 1. Goal Statement\nBuild a dual-audience property management website for **Keystone Property Group**, defined by clean white space, a confident forest green, and a hard split between two visitor types — owners looking for a manager, and tenants looking for a portal.\n## 9. Full Copy\nKEYSTONE PROPERTY GROUP · Austin, Texas\nHero: Own the property. Skip the 11pm plumbing calls.\nManaging 1,100+ doors · Average 19 days to lease · 98.2% rent collection\nOwner Value Props: Screening tenants · Chasing rent · Coordinating maintenance\nPricing: Single Home 8% · 2-4 Units 7.5% · 5+ Units 7% of collected rent\n10 services included: Marketing, Screening, Lease, Rent Collection, Accounting, Maintenance, Emergency, Inspections, Renewals, Eviction\nComparison: Managed vs Self-Managed (10 rows)\nTenant Section: Pay Rent Online · Submit Maintenance Request · 24/7 Emergency Line\n12 service areas across Austin metro",
+    "image": "",
+    "categories": ["Light", "Professional Services", "Local Business"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "music-venue",
+    "name": "Music Venue Website Prompt",
+    "description": "A dark, atmospheric music venue website prompt with upcoming show listings table, featured artist countdown, venue specs, bar menu, and private events section.",
+    "prompt": "Build a dark, atmospheric live music venue website called \"The Signal\" in Nashville, TN — a 500-capacity independent venue.\nDesign: pure black background (#000000), electric amber primary (#F59E0B), warm red secondary (#DC2626), neon teal accent (#14B8A6).\nSections: navbar, full-height dark hero with concert crowd photo, shows section with 5 show listings table, featured artist with countdown timer, about section with stats (12 Years Open, 500 Capacity, 850+ Artists), venue specs (500 standing, 3 bars, 24-channel PA), bar section \"SIGNAL POURS\", private events, newsletter signup, 6-photo gallery, dark footer.",
+    "image": "",
+    "categories": ["Dark", "Entertainment"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "social-media-agency",
+    "name": "Social Media Agency Website Prompt",
+    "description": "A dark, high-energy social media agency website prompt with live stats ticker, TikTok case studies, platform metrics, and pricing tiers.",
+    "prompt": "Build a bold social media marketing agency website called \"Loud Agency\" in Los Angeles, CA.\nDesign: true black background, electric purple primary (#8B5CF6), hot pink secondary (#EC4899), neon lime accent (#A3E635).\nSections: dark navbar, full-height hero with \"We Make Brands Go Viral\" gradient headline + platform marquee (TikTok, Instagram, LinkedIn, X, Pinterest, YouTube, Reels, Threads), scrolling stats ticker (847M+ Impressions, 4.2M Followers Gained, 97 Brands Grown), 4 service cards, 3 case study cards (2.1M TikTok followers in 90 days), 4-step process, platform performance grid, team section, 4 testimonials, press strip, 3-tier pricing (Starter $1,499/mo, Growth $3,499/mo, Enterprise custom), lead form.",
+    "image": "",
+    "categories": ["Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "solar-company",
+    "name": "Solar Company Website Prompt",
+    "description": "A dark-themed solar installation website prompt with interactive savings calculator, case studies, incentives section, and quote form.",
+    "prompt": "Build a high-converting solar installation company website called \"Summit Solar\" in Denver, CO.\nDesign: deep charcoal background (#0F1117), solar orange primary (#F97316), electric yellow secondary (#FCD34D).\nSections: dark navbar, full-width hero with animated counter (\"412 homes powered\"), interactive savings calculator, 3 service cards (Residential Solar, Battery Storage, EV Charger), stats band (15-Year Warranty, 1-Day Installation, $0 Down), 4-step timeline, 3 case study cards with kW + savings, federal & state incentives (30% tax credit), 3 testimonials, certifications (NABCEP, BBB A+), quote form.",
+    "image": "",
+    "categories": ["Dark", "Local Business"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "personal-stylist",
+    "name": "Personal Stylist Website Prompt",
+    "description": "Personal stylist website prompt for Bolt, v0 & Lovable. Ivory & champagne, before/after wardrobe slider, polaroid moodboard, 10 sections, full copy.",
+    "prompt": "# EDIT STUDIO — Personal Stylist Website Prompt\nBuild a complete personal styling and wardrobe consultancy website for **EDIT STUDIO** — London-based, run by Sophie Laurent.\nDesign: warm ivory tones, champagne accents. Libre Baskerville italic headings, Jost body.\nSignature Animations: Before/After Wardrobe Reveal Slider, Polaroid Moodboard.\nSections: Navbar, Hero with before/after slider, Services (Wardrobe Edit £250, Capsule Build £450, Executive Styling £180/mo, Online Styling £95), About Sophie Laurent, The Process (4 steps), Moodboard (Polaroid layout), Testimonials, Pricing table, FAQ (5 questions), Footer.",
+    "image": "",
+    "categories": ["Beauty", "Light"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "craft-brewery",
+    "name": "Craft Brewery Website Prompt",
+    "description": "Craft brewery website prompt for Bolt, v0 & Lovable. Dark charcoal & amber, 3D flip tap cards, 10 sections, 6 beers, taproom hours, full copy.",
+    "prompt": "# FORGE & GRAIN BREWING CO. — Craft Brewery Website Prompt\nSheffield-based craft brewery with taproom.\nDesign: dark charcoal (#141210), wheat cream foreground, amber primary (#C47D2E). Playfair Display headings, Source Sans 3 body.\nSignature Animations: Beer Card 3D Flip, Amber Pour Bar.\nSections: Navbar, Hero, On Tap Today (6 beer cards with 3D flip), Taproom with hours, Our Story, Brewing Process (3 steps), Events (3 upcoming), Merch (3 products), Visit + Address, Footer.\nBeers: Ironside Pale Ale 4.8% · Coal Face Porter 5.6% · Golden Anvil Lager 4.2% · Ember Wheat 4.5% · Copper Run IPA 6.2% · Session Saison 3.8%",
+    "image": "",
+    "categories": ["Local Business", "Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "tattoo-parlor",
+    "name": "Tattoo Studio Website Prompt",
+    "description": "Generate a raw, editorial tattoo studio website with AI. CSS glitch headline, dual-row portfolio ticker, noise texture overlay & dark red booking CTA.",
+    "prompt": "# Inkwell Studio — Tattoo Studio Website Prompt\nBuild a raw, bold, artist-portfolio-forward website for Inkwell Studio.\nDesign: near-pure black (#050505), electric red primary (#cc2222). Bebas Neue display, Space Mono body.\nSignature Effects: Glitch Animation on wordmark, Dual-Row Portfolio Ticker (infinite marquee), Noise/Grain Texture Overlay.\nSections: Navbar, Hero with glitch wordmark, Portfolio Ticker (16 images), Artists (3: Marcus Kane, Jade Rivers, Sol Mercer), Styles (Fine Line, Traditional, Blackwork, Realism), Process (4 steps), FAQ (6 questions), Booking CTA, Footer.\n18+ ONLY · NO WALK-INS",
+    "image": "",
+    "categories": ["Local Business", "Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "photography-studio",
+    "name": "Photography Studio Website Prompt",
+    "description": "Generate a stunning black-and-white photography portfolio website. Editorial-style studio site with masonry gallery, pricing tiers & booking CTA.",
+    "prompt": "# Still Frame Studio — Portrait Photography Website Prompt\nPortfolio website for a portrait and editorial photography brand.\nDesign: pure black-and-white editorial aesthetic. Libre Baskerville italic headings, Inter body.\nSignature Effects: Custom Cursor (mix-blend-mode), Staggered Masonry Portfolio, Grain Texture.\nSections: Navbar, Hero full-bleed portrait, Portfolio Grid (12 masonry images), Specialties (Portrait, Editorial, Brand), About (Anna Whitfield), Pricing (£395 Essential, £750 Signature, £1,400 Full Day), Testimonials (3), Booking CTA, Footer.",
+    "image": "",
+    "categories": ["Portfolio", "Minimal", "Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "real-estate-agent",
+    "name": "Real Estate Agent Website Prompt",
+    "description": "Build a luxury real estate agent website. Midnight navy palette, split hero, glassmorphism listing cards, animated stat counters.",
+    "prompt": "# Harlow Properties — Luxury Real Estate Agent Website Prompt\nBoutique representation for buyers and sellers in Beverly Hills, Bel Air, Pacific Palisades.\nDesign: midnight navy (#0b1222), warm cream (#f4ede0), antique gold (#c9a96e). Libre Baskerville headings, Inter body.\nSignature Effects: Split-Panel Hero with Parallax, Animated Stat Counters, Glassmorphism Cards.\nSections: Navbar, Hero split panel, Stats Bar (247 Homes Sold, $4.2M Avg Price, 18 Days on Market), Featured Listings (3 properties from $4.25M-$8.1M), About Elena Harlow, Process (4 steps), Testimonials (3), Neighborhoods (6), Contact form, Footer.",
+    "image": "",
+    "categories": ["Professional Services"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "coffee-shop-dark",
+    "name": "Coffee Shop Website Prompt (Dark)",
+    "description": "Moody specialty coffee shop website prompt with SVG steam animation, tabbed menu, count-up stats, and full editorial copy.",
+    "prompt": "# Ember & Ground — Coffee Shop Website Prompt\nSpecialty coffee shop in Marlow, Buckinghamshire.\nDesign: near-black (#0d0b09), amber (#d4892a), cream. Playfair Display italic headings, Plus Jakarta Sans body.\nSignature Effects: Animated SVG Steam, Background Watermark Text, Floating Specials Card, Continuous Marquee.\nSections: Navbar, Hero with steam animation + specials card, Our Story (Since 2019), Count-Up Stats (12 Origins, 3 Roasters, 4.9★), Menu (4 tabs: Espresso, Pour Over, Cold Brew, Food — 14 items total), Signature Drinks (3 cards), Info Marquee, Testimonials (3), Footer.\nHero: Coffee Worth Waking Up For.",
+    "image": "",
+    "categories": ["Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "car-wash",
+    "name": "Car Wash Website Prompt",
+    "description": "Deep navy & electric cyan premium car wash prompt. Space Grotesk 800 headlines, CSS water droplet animation, live wait time card, before/after comparison, and 3-tier service packages.",
+    "prompt": "# Gleam Auto Spa — Car Wash Website Prompt\nPremium car wash and auto detailing in Marlow, Berkshire.\nDesign: deep navy (#081828), electric cyan (#00b4cc). Space Grotesk 800 headings, Inter body.\nSignature Effects: CSS Water Droplet Animation, Pulsing Cyan Dot (wait time), Count-Up Stats.\nSections: Navbar, Hero with wait time card, Service Packages (Express £12, Signature £22, Full Detail £45), How It Works (3 steps), Before/After comparison, Trust Stats (5,000+ Cars, 99% Satisfaction, Est. 2018, 12 Bays), Add-Ons (7 items), Monthly Membership (Basic £19, Signature £29, Detail Pass £49), Footer.\nHero: YOUR CAR DESERVES BETTER.",
+    "image": "",
+    "categories": ["Local Business", "Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "podcast",
+    "name": "Podcast Website Prompt",
+    "description": "A dark, moody business podcast website prompt with animated SVG audio waveform hero component, episode grid, host profile, and email subscription CTA.",
+    "prompt": "# Signal — The Business Podcast Website Prompt\nWeekly business podcast with Alex Monroe.\nDesign: near-black (#0a0a0a), electric amber (#d48c1a). Space Grotesk 700 headlines.\nSignature Effects: Animated SVG Audio Waveform (20 bars), Guest Logo Marquee.\nSections: Navbar, Hero with waveform + stats (120+ Episodes, 2M+ Downloads), Episode Grid (6 episodes), Host Profile (Alex Monroe), Content Pillars (Business Growth, Leadership & Culture, Founder Stories), Guest Marquee (Stripe, Notion, Figma, Monzo, Wise, Depop, Hopin, Phoebe Philo), Platform Buttons (Spotify, Apple, YouTube), Social Proof, Email CTA, Footer.\nHero: STORIES THAT DEMAND ATTENTION.",
+    "image": "",
+    "categories": ["Dark", "Professional Services"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "music-school",
+    "name": "Music School Website Prompt",
+    "description": "A warm, inviting music school website prompt — warm white background, deep mahogany structure, amber accents, DM Serif Display headlines.",
+    "prompt": "# Harmonic Academy — Music School Website Prompt\nMusic lessons for ages 5 to adult in Notting Hill & online.\nDesign: warm off-white (#faf8f2), deep mahogany (#2a1505), warm amber (#d4903a). DM Serif Display headlines, Plus Jakarta Sans body.\nSignature Effects: Floating Trial Lesson Card, Instrument Card Amber Glow.\nSections: Navbar, Hero split layout, Instruments Grid (6: Piano, Guitar, Vocals, Violin, Drums, Music Theory), Age Groups (5-12, 13-17, 18+), Tutor Profiles (3 tutors), Exam Results Marquee (ABRSM, 94% Pass Rate), Testimonials (2), Amber CTA (Your First Lesson Is on Us), Footer.\nHero: Learn Music. Love it for Life.",
+    "image": "",
+    "categories": ["Light", "Health & Fitness"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "chiropractor",
+    "name": "Chiropractor Website Prompt",
+    "description": "A clean light chiropractic clinic website prompt — white background, deep navy structure, electric blue CTAs, DM Serif Display headlines.",
+    "prompt": "# Align Clinic — Chiropractor Website Prompt\nEvidence-based chiropractic care in Clapham and Chelsea.\nDesign: pure white, deep navy (#1a2440), electric blue (#1a8cd4). DM Serif Display headlines, Plus Jakarta Sans body.\nSignature Effects: Floating Availability Card, Condition Chip Grid Hover.\nSections: Navbar, Hero split layout, Conditions Grid (6: Back Pain, Neck Pain, Headaches, Sciatica, Sports Injury, Posture), 3-Step Process, Team (3 clinicians: Dr. Sarah Chen, Dr. Marcus Webb, Dr. Priya Patel), Insurance Trust Strip, Pricing (£75 Initial, £55 Follow-Up, £380 Package of 6), Testimonials (2), Navy CTA, Footer.\nHero: Move Without Pain.",
+    "image": "",
+    "categories": ["Light", "Health & Fitness"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "boutique-hotel",
+    "name": "Boutique Hotel Website Prompt",
+    "description": "Boutique hotel website prompt — deep slate and warm gold, Cormorant Garamond italic, cinematic hero with animated chip strip, room rows, masonry gallery.",
+    "prompt": "# The Aldwick — Boutique Hotel & Restaurant\nBoutique hotel in Bourton-on-the-Water, Cotswolds.\nDesign: deep slate (#13181f), warm gold (#c9a55a). Cormorant Garamond italic headlines, Inter body.\nSections: Navbar, Hero with chip strip (12 Rooms · Dog Friendly · Restaurant · Free Parking · Cotswolds), The Rooms (Classic from £180, Deluxe from £240, Suite from £380), Gallery (6 masonry images), Dining (seasonal tasting menu), Experiences (Walking & Cycling, Private Dining, Spa), Testimonials (3), Location, Book CTA (warm gold bg), Footer.\nHero: A Place Unlike Any Other.",
+    "image": "",
+    "categories": ["Entertainment", "Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "moving-company",
+    "name": "Moving Company Website Prompt",
+    "description": "Moving company website prompt — near-black and signal yellow, Bebas Neue condensed, bold full-bleed hero, services grid, yellow stats strip, fixed-price quote CTA.",
+    "prompt": "# Shift Movers — Moving Company Website Prompt\nRemovals & Storage, London & Nationwide.\nDesign: near-black (#0f0f0f), signal yellow (#f0c52a). Bebas Neue headlines, Inter body.\nSections: Navbar, Hero with photography + trust chips, Services (6: House Moves, Office Relocations, Man & Van, Piano & Antiques, Packing, Storage), Stats Strip (8,000+ Moves, 100% Insured, 4.9★ Google, Same-Day Quote), How It Works (4 steps), Why Shift (No Damage, No Drama, No Delays), Coverage (UK-wide), Testimonials (3), Quote CTA, Footer.\nHero: YOUR MOVE. HANDLED.",
+    "image": "",
+    "categories": ["Local Business", "Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "makeup-artist",
+    "name": "Makeup Artist Website Prompt",
+    "description": "Makeup artist website prompt — near-black and warm gold, Bodoni Moda italic, editorial portrait hero with floating portfolio chip, masonry gallery.",
+    "prompt": "# Ariel Beaumont — Makeup Artist Website Prompt\nEditorial, bridal, commercial, and film makeup in London.\nDesign: near-black (#0a0a0a), warm gold (#c9a55a). Bodoni Moda italic headlines, Inter body.\nSections: Navbar, Hero with editorial portrait + floating portfolio chip, Selected Work (6 masonry images), Services (4: Editorial from £350/day, Bridal from £280, Commercial day rate, Occasions from £150), About (The Artist), Testimonials (3), FAQ (4 questions), Enquiry CTA, Footer.\nHero: Art on Skin.",
+    "image": "",
+    "categories": ["Portfolio", "Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "hair-salon",
+    "name": "Hair Salon Website Prompt",
+    "description": "Hair salon website prompt — near-black and terracotta, Bebas Neue condensed, editorial hero with background name text, services grid, portfolio strip.",
+    "prompt": "# Studio Nora — Hair Salon Website Prompt\nWomen's hair salon in Notting Hill, London.\nDesign: near-black warm (#130e0c), terracotta (#c17a54). Bebas Neue headlines, Inter body.\nSections: Navbar, Hero with background \"NORA\" text + editorial portrait, Services (6: Cut from £65, Colour from £95, Highlights from £85, Blow-Dry from £40, Keratin from £150, Extensions from £200), Portfolio (5 images), Why Studio Nora, Team (3 stylists), Testimonials (3), Booking CTA, Footer.\nHero: YOUR HAIR. YOUR STORY. OUR CRAFT.",
+    "image": "",
+    "categories": ["Local Business", "Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "gym",
+    "name": "Gym Website Prompt",
+    "description": "Gym website prompt — near-black and electric lime, Space Grotesk bold, count-up stats strip, classes grid, membership tiers, trainer cards, full copy.",
+    "prompt": "# APEX Gym — Gym & Fitness Studio Website Prompt\nGym in Shoreditch, London.\nDesign: near-black (#0d0d0d), electric lime (#8fe619). Space Grotesk 700 headlines, Inter body.\nSections: Navbar, Hero with gym photography, Stats Strip (2,500+ Members, 40+ Classes/Week, 3 Floors, Open 6am-10pm), Classes (6: HIIT, Strength & Conditioning, Spin, Boxing, Yoga, Mobility), The Floor (3: Strength Floor, Cardio Deck, Studios), Membership (3: Flex £35/mo, Full Access £55/mo, All In £89/mo), Trainers (3), Testimonials (3), Free Trial CTA, Footer.\nHero: Train Hard. Recover Smart. Repeat.",
+    "image": "",
+    "categories": ["Health & Fitness", "Dark"],
+    "source": "websiteprompts.ai"
+  },
+  {
+    "id": "accountant-website-prompt",
+    "name": "Accountant Website Prompt",
+    "description": "Accountant website prompt — clean white, navy and amber, Plus Jakarta Sans, 6-service grid, 3-tier pricing, FAQ accordion, full copy.",
+    "prompt": "# Harlow & Co Accountants — Accountant Website Prompt\nChartered accountants & financial advisors.\nDesign: white background, deep navy (#0d1b3e), warm amber (#d4892a). Plus Jakarta Sans headlines.\nSections: Navbar, Hero with trust chips (ICAEW Member, 200+ clients, Est. 2008), Trust Bar (count-up stats), Services (6: Accounts & Bookkeeping, Tax Returns, VAT Returns, Payroll, Business Start-Up, Financial Planning), Why Choose Us (4 checkpoints), Pricing (3: Sole Trader from £89/mo, Limited Company from £149/mo, Growing Business from £249/mo), Process (4 steps), Testimonials (3), FAQ (4 questions), CTA Banner, Footer.\nHero: Clear Numbers. Smart Decisions. Peace of Mind.",
+    "image": "",
+    "categories": ["Professional Services", "Light"],
+    "source": "websiteprompts.ai"
+  }
+]

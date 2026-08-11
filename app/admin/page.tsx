@@ -81,7 +81,7 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
-        Admin roles must be assigned directly in Supabase (set <code className="bg-black/20 px-1 rounded">role = 'admin'</code> in the users table).
+        Admin roles must be assigned directly in Supabase (set <code className="bg-black/20 px-1 rounded">role = &apos;admin&apos;</code> in the users table).
       </div>
 
       <div className="relative max-w-md">
