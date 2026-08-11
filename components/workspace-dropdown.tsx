@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, Check, Plus, Settings, HelpCircle, CreditCard, LogOut, User } from 'lucide-react'
 import Link from 'next/link'
 import { HelpModal } from '@/components/help-center'
@@ -195,8 +196,8 @@ export function WorkspaceDropdown({ onSignOut, onOpenPricing }: WorkspaceDropdow
 function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('')
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111315] p-8 shadow-2xl">
         <div className="mb-2 flex justify-end">
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-white/40 hover:bg-white/10 hover:text-white">
@@ -243,6 +244,7 @@ function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
