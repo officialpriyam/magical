@@ -210,6 +210,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [errorMessage, setErrorMessage] = useState('')
   const [autoFixMessage, setAutoFixMessage] = useState('')
   const [templatePrompt, setTemplatePrompt] = useState('')
+  const templateSendAttemptedRef = useRef(false)
   
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
@@ -392,9 +393,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
     const templateParam = searchParams.get('template')
-    if (templateParam) {
+    if (templateParam && !templateSendAttemptedRef.current) {
       const decoded = decodeURIComponent(templateParam)
       setTemplatePrompt(decoded)
+      templateSendAttemptedRef.current = true
       // Clear the URL parameter
       window.history.replaceState({}, '', window.location.pathname)
     }
@@ -1899,6 +1901,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           : 'Ask Magical AI to build an app, page, or tool...'
       }
       defaultValue={templatePrompt}
+      autoSend={!!templatePrompt}
+      onAutoSendComplete={() => setTemplatePrompt('')}
       templates={templates}
       selectedTemplate={selectedTemplate}
       onSelectedTemplateChange={setSelectedTemplate}
