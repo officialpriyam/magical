@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, Home, Grid3X3, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut, ChevronDown, CreditCard, HelpCircle, Plus } from 'lucide-react';
+import { MessageCircle, Search, Home, LayoutGrid, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut, ChevronDown, CreditCard, HelpCircle, Plus, Link as LinkIcon, FolderOpen, GitBranch } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -236,23 +236,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex flex-col h-full">
             {/* Workspace Selector */}
             <div className="px-3 py-2 border-b border-white/[0.06]">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-between h-9 px-2 text-white/90 hover:bg-white/[0.08] hover:text-white"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Avatar className="h-5 w-5">
-                        <AvatarFallback className="bg-white/10 text-white/60 text-[10px] font-medium">
-                          {workspaceInitial}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium truncate">{workspaceName}'s Workspace</span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 text-white/40 shrink-0" />
-                  </Button>
-                </DropdownMenuTrigger>
+              <div className="flex items-center justify-between">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="flex-1 justify-between h-9 px-2 text-white/90 hover:bg-white/[0.08] hover:text-white"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar className="h-5 w-5">
+                          <AvatarFallback className="bg-white/10 text-white/60 text-[10px] font-medium">
+                            {workspaceInitial}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium truncate">{workspaceName}'s Workspace</span>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-white/40 shrink-0" />
+                    </Button>
+                  </DropdownMenuTrigger>
                 <DropdownMenuContent side="bottom" align="start" className="w-64 bg-[#111211] border-white/10">
                   {/* Workspace Header */}
                   <div className="px-4 py-4 border-b border-white/10">
@@ -332,6 +333,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsOpen(false)}
+                className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/10 shrink-0"
+                aria-label="Close sidebar"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </Button>
+              </div>
             </div>
 
             {/* Navigation */}
@@ -363,7 +374,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   variant="ghost"
                   className="w-full justify-start gap-3 h-9 text-white/70 hover:bg-white/[0.08] hover:text-white"
                 >
-                  <Grid3X3 className="h-4 w-4 shrink-0" />
+                  <LayoutGrid className="h-4 w-4 shrink-0" />
                   <span className="text-sm">Templates</span>
                 </Button>
               </Link>
@@ -372,9 +383,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="w-full justify-start gap-3 h-9 text-white/70 hover:bg-white/[0.08] hover:text-white"
                 onClick={onStartNewChat}
               >
-                <Grid3X3 className="h-4 w-4 shrink-0" />
+                <LinkIcon className="h-4 w-4 shrink-0" />
                 <span className="text-sm">Connectors</span>
               </Button>
+              <Link href="/import/github" className="block">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-9 text-white/70 hover:bg-white/[0.08] hover:text-white"
+                >
+                  <GitBranch className="h-4 w-4 shrink-0" />
+                  <span className="text-sm">GitHub Import</span>
+                </Button>
+              </Link>
             </div>
 
             {/* Projects Section */}
@@ -386,7 +406,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     variant="ghost"
                     className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
                   >
-                    <Grid3X3 className="h-3.5 w-3.5 shrink-0" />
+                    <FolderOpen className="h-3.5 w-3.5 shrink-0" />
                     <span className="text-sm">All projects</span>
                   </Button>
                 </Link>
@@ -512,7 +532,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/[0.08]"
                     aria-label="Templates"
                   >
-                    <Grid3X3 className="h-4 w-4" />
+                    <LayoutGrid className="h-4 w-4" />
                   </Button>
                 </Link>
 
@@ -523,8 +543,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/[0.08]"
                   aria-label="Connectors"
                 >
-                  <Grid3X3 className="h-4 w-4" />
+                  <LinkIcon className="h-4 w-4" />
                 </Button>
+
+                <Link href="/import/github">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/[0.08]"
+                    aria-label="GitHub Import"
+                  >
+                    <GitBranch className="h-4 w-4" />
+                  </Button>
+                </Link>
 
                 <div className="flex-1" />
 
