@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, Home, Grid3X3, Star, User, Users, Settings, Gift, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, Plus, LogOut } from 'lucide-react';
+import { MessageCircle, Search, Home, Grid3X3, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -25,8 +25,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { PricingModal } from '@/components/pricing';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MotionSitesGallery } from '@/components/motionsites-gallery';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -74,7 +72,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return initialIsOpen
   });
   const [isPricingModalOpen, setIsPricingModalOpen] = React.useState(false);
-  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = React.useState(false);
   const [user, setUser] = React.useState<SupabaseUser | null>(null);
   const [chatHistory, setChatHistory] = React.useState<ChatHistoryItem[]>([]);
   const [deleteTarget, setDeleteTarget] = React.useState<ChatHistoryItem | null>(null);
@@ -97,11 +94,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       chat.title.toLowerCase().includes(activeSearchQuery.toLowerCase())
     );
   }, [chatHistory, activeSearchQuery]);
-
-  const groupedChats = filteredChatHistory.reduce((acc, chat) => {
-    (acc[chat.date] = acc[chat.date] || []).push(chat);
-    return acc;
-  }, {} as Record<string, ChatHistoryItem[]>);
 
   const recentChats = chatHistory.slice(0, 3);
 
@@ -241,9 +233,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Header - Logo & Brand */}
             <div className="px-3 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-400 via-pink-500 to-purple-500 flex items-center justify-center shrink-0">
-                  <span className="text-white text-sm font-bold">M</span>
-                </div>
+                <Link href="/" className="shrink-0">
+                  <img src="/logo.png" alt="Magical AI" className="h-8 w-8 object-contain" />
+                </Link>
                 <span className="text-sm font-semibold text-white truncate">Magical AI</span>
               </div>
               {!isMobile && (
@@ -283,14 +275,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="text-sm flex-1 text-left">Search</span>
                 <kbd className="text-[10px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded font-mono">Ctrl K</kbd>
               </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-9 text-white bg-white/[0.08] hover:bg-white/[0.12] hover:text-white"
-                onClick={() => setIsTemplatesModalOpen(true)}
-              >
-                <div className="h-4 w-4 shrink-0 rounded-full border-2 border-current" />
-                <span className="text-sm">Templates</span>
-              </Button>
+              <Link href="/templates" className="block">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-9 text-white/70 hover:bg-white/[0.08] hover:text-white"
+                >
+                  <Grid3X3 className="h-4 w-4 shrink-0" />
+                  <span className="text-sm">Templates</span>
+                </Button>
+              </Link>
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-3 h-9 text-white/70 hover:bg-white/[0.08] hover:text-white"
@@ -305,38 +298,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="px-2 py-2">
               <h3 className="px-3 text-xs font-medium text-white/40 uppercase tracking-wider mb-1">Projects</h3>
               <div className="space-y-0.5">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
-                  onClick={() => {
-                    const searchInput = document.querySelector('input[placeholder="Search"]') as HTMLInputElement
-                    searchInput?.focus()
-                  }}
-                >
-                  <Grid3X3 className="h-3.5 w-3.5 shrink-0" />
-                  <span className="text-sm">All projects</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
-                >
-                  <Star className="h-3.5 w-3.5 shrink-0" />
-                  <span className="text-sm">Starred</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
-                >
-                  <User className="h-3.5 w-3.5 shrink-0" />
-                  <span className="text-sm">Owned by me</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
-                >
-                  <Users className="h-3.5 w-3.5 shrink-0" />
-                  <span className="text-sm">Shared with me</span>
-                </Button>
+                <Link href="/projects" className="block">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 h-8 text-white/60 hover:bg-white/[0.08] hover:text-white"
+                  >
+                    <Grid3X3 className="h-3.5 w-3.5 shrink-0" />
+                    <span className="text-sm">All projects</span>
+                  </Button>
+                </Link>
               </div>
             </div>
 
@@ -383,21 +353,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* Referral Banner */}
-            <div className="px-3 py-2">
-              <div className="rounded-lg bg-white/[0.04] border border-white/[0.06] p-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shrink-0">
-                    <Gift className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-white">Share Magical AI</p>
-                    <p className="text-[10px] text-white/40">100 credits per paid referral</p>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* User Info */}
@@ -458,9 +413,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <PanelLeft className="h-4 w-4" />
                 </Button>
 
-                <div className="h-6 w-6 rounded-md bg-gradient-to-br from-orange-400 via-pink-500 to-purple-500 flex items-center justify-center">
-                  <span className="text-white text-[10px] font-bold">M</span>
-                </div>
+                <Link href="/" className="shrink-0">
+                  <img src="/icon.png" alt="Magical AI" className="h-6 w-6 object-contain" />
+                </Link>
 
                 <div className="w-6 h-px bg-white/10 my-1" />
 
@@ -490,14 +445,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Search className="h-4 w-4" />
                 </Button>
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 text-white bg-white/[0.08] hover:bg-white/[0.12]"
-                  aria-label="Templates"
-                >
-                  <div className="h-4 w-4 rounded-full border-2 border-current" />
-                </Button>
+                <Link href="/templates">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-white/50 hover:text-white hover:bg-white/[0.08]"
+                    aria-label="Templates"
+                  >
+                    <Grid3X3 className="h-4 w-4" />
+                  </Button>
+                </Link>
 
                 <Button
                   variant="ghost"
@@ -518,7 +475,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="h-9 w-9 text-green-500 hover:text-green-400 hover:bg-green-500/10"
                   aria-label="Get free tokens"
                 >
-                  <Gift className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -586,14 +542,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </AlertDialogContent>
       </AlertDialog>
       <PricingModal isOpen={isPricingModalOpen} onClose={() => setIsPricingModalOpen(false)} />
-      <Dialog open={isTemplatesModalOpen} onOpenChange={setIsTemplatesModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Website Templates</DialogTitle>
-          </DialogHeader>
-          <MotionSitesGallery />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

@@ -174,6 +174,146 @@ export const motionsitesTemplates: MotionSitesTemplate[] = [
     category: 'Real Estate',
     previewImage: 'https://images.higgs.ai/?default=1&output=webp&url=https%3A%2F%2Fd8j0ntlcm91z4.cloudfront.net%2Fuser_38xzZboKViGWJOttwIXH07lWA1P%2Fhf_20260715_015601_5e651473-dece-49b0-8402-c098804446a1.png&w=1280&q=85',
     url: 'https://motionsites.ai/'
+  },
+  {
+    id: 'coffee-shop',
+    name: 'Coffee Shop',
+    category: 'Local Business',
+    previewImage: 'https://framerusercontent.com/images/vob1JqLgEy4borkaUct7shqE5s.webp?width=1600&height=3154',
+    url: 'https://websiteprompts.ai/prompts/coffee-shop'
+  },
+  {
+    id: 'gym',
+    name: 'Gym',
+    category: 'Health & Fitness',
+    previewImage: 'https://framerusercontent.com/images/hzor4WeeTCpQ2pf4q2EmNZjLaQE.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/gym'
+  },
+  {
+    id: 'real-estate-agent',
+    name: 'Real Estate Agent',
+    category: 'Real Estate',
+    previewImage: 'https://framerusercontent.com/images/afGk7fkrCMcbSmFt4fdjmjqPULQ.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/real-estate-website-prompt'
+  },
+  {
+    id: 'hair-salon',
+    name: 'Hair Salon',
+    category: 'Beauty',
+    previewImage: 'https://framerusercontent.com/images/t8NpiYoAR8laNE8SUkUwmvoOw4.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/hair-salon'
+  },
+  {
+    id: 'photography-studio',
+    name: 'Photography Studio',
+    category: 'Portfolio',
+    previewImage: 'https://framerusercontent.com/images/afGk7fkrCMcbSmFt4fdjmjqPULQ.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/photography-studio'
+  },
+  {
+    id: 'yoga-studio',
+    name: 'Yoga Studio',
+    category: 'Health & Fitness',
+    previewImage: 'https://framerusercontent.com/images/hzor4WeeTCpQ2pf4q2EmNZjLaQE.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/yoga-studio-website-prompt'
+  },
+  {
+    id: 'lawyer',
+    name: 'Lawyer',
+    category: 'Professional Services',
+    previewImage: 'https://framerusercontent.com/images/afGk7fkrCMcbSmFt4fdjmjqPULQ.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/lawyer-website-prompt'
+  },
+  {
+    id: 'dentist',
+    name: 'Dentist',
+    category: 'Health & Fitness',
+    previewImage: 'https://framerusercontent.com/images/hzor4WeeTCpQ2pf4q2EmNZjLaQE.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/dentist'
+  },
+  {
+    id: 'bakery',
+    name: 'Bakery',
+    category: 'Local Business',
+    previewImage: 'https://framerusercontent.com/images/vob1JqLgEy4borkaUct7shqE5s.webp?width=1600&height=3154',
+    url: 'https://websiteprompts.ai/prompts/bakery'
+  },
+  {
+    id: 'digital-agency',
+    name: 'Digital Agency',
+    category: 'Professional Services',
+    previewImage: 'https://framerusercontent.com/images/afGk7fkrCMcbSmFt4fdjmjqPULQ.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/digital-agency'
+  },
+  {
+    id: 'restaurant',
+    name: 'Restaurant',
+    category: 'Local Business',
+    previewImage: 'https://framerusercontent.com/images/vob1JqLgEy4borkaUct7shqE5s.webp?width=1600&height=3154',
+    url: 'https://websiteprompts.ai/prompts/restaurant-website-prompt'
+  },
+  {
+    id: 'wedding-venue',
+    name: 'Wedding Venue',
+    category: 'Events',
+    previewImage: 'https://framerusercontent.com/images/afGk7fkrCMcbSmFt4fdjmjqPULQ.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/wedding-venue'
+  },
+  {
+    id: 'personal-trainer',
+    name: 'Personal Trainer',
+    category: 'Health & Fitness',
+    previewImage: 'https://framerusercontent.com/images/hzor4WeeTCpQ2pf4q2EmNZjLaQE.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/personal-trainer'
+  },
+  {
+    id: 'cleaning-service',
+    name: 'Cleaning Service',
+    category: 'Local Business',
+    previewImage: 'https://framerusercontent.com/images/vob1JqLgEy4borkaUct7shqE5s.webp?width=1600&height=3154',
+    url: 'https://websiteprompts.ai/prompts/cleaning-service'
+  },
+  {
+    id: 'plumber',
+    name: 'Plumber',
+    category: 'Local Business',
+    previewImage: 'https://framerusercontent.com/images/vob1JqLgEy4borkaUct7shqE5s.webp?width=1600&height=3154',
+    url: 'https://websiteprompts.ai/prompts/plumber'
+  },
+  {
+    id: 'car-dealership',
+    name: 'Car Dealership',
+    category: 'Automotive',
+    previewImage: 'https://framerusercontent.com/images/afGk7fkrCMcbSmFt4fdjmjqPULQ.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/car-dealership'
+  },
+  {
+    id: 'pet-groomer',
+    name: 'Pet Groomer',
+    category: 'Local Business',
+    previewImage: 'https://framerusercontent.com/images/vob1JqLgEy4borkaUct7shqE5s.webp?width=1600&height=3154',
+    url: 'https://websiteprompts.ai/prompts/dog-groomer'
+  },
+  {
+    id: 'florist',
+    name: 'Florist',
+    category: 'Local Business',
+    previewImage: 'https://framerusercontent.com/images/vob1JqLgEy4borkaUct7shqE5s.webp?width=1600&height=3154',
+    url: 'https://websiteprompts.ai/prompts/florist'
+  },
+  {
+    id: 'music-school',
+    name: 'Music School',
+    category: 'Education',
+    previewImage: 'https://framerusercontent.com/images/afGk7fkrCMcbSmFt4fdjmjqPULQ.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/music-school'
+  },
+  {
+    id: 'accountant',
+    name: 'Accountant',
+    category: 'Professional Services',
+    previewImage: 'https://framerusercontent.com/images/afGk7fkrCMcbSmFt4fdjmjqPULQ.webp?width=1200&height=630',
+    url: 'https://websiteprompts.ai/prompts/accountant-website-prompt'
   }
 ]
 
