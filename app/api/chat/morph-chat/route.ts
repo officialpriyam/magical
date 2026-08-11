@@ -9,6 +9,7 @@ import {
 import { applyPatch } from '@/lib/morph'
 import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { FragmentSchema, morphEditSchema, MorphEditSchema } from '@/lib/schema'
+import { ensureCredits } from '@/lib/credits'
 import { streamObject, streamText, type LanguageModel, type ModelMessage } from 'ai'
 import { sanitizeJsonTextStream } from '@/lib/json-stream'
 
@@ -48,6 +49,16 @@ export async function POST(req: Request) {
 
   if (limit) {
     return createRateLimitResponse(limit)
+  }
+
+  if (userID) {
+    const creditCheck = await ensureCredits(userID)
+    if (!creditCheck.ok) {
+      return new Response(
+        'Insufficient credits. Please upgrade your plan or wait for daily credit reset.',
+        { status: 402 },
+      )
+    }
   }
 
   const morphApiKey = config.apiKey || process.env.MORPH_API_KEY

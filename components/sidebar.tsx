@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, Home, LayoutGrid, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut, ChevronDown, CreditCard, HelpCircle, Plus, Link as LinkIcon, FolderOpen, GitBranch } from 'lucide-react';
+import { MessageCircle, Search, Home, LayoutGrid, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut, ChevronDown, CreditCard, HelpCircle, Plus, Link as LinkIcon, FolderOpen, GitBranch, Sparkles } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -75,6 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isPricingModalOpen, setIsPricingModalOpen] = React.useState(false);
   const [user, setUser] = React.useState<SupabaseUser | null>(null);
   const [chatHistory, setChatHistory] = React.useState<ChatHistoryItem[]>([]);
+  const [credits, setCredits] = React.useState<number>(0);
   const [deleteTarget, setDeleteTarget] = React.useState<ChatHistoryItem | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = React.useState('');
   const [deleteError, setDeleteError] = React.useState('');
@@ -191,6 +192,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setUser(user);
       if (user) {
         fetchChatHistory();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('credits')
+          .eq('user_id', user.id)
+          .single();
+        if (profile) setCredits(profile.credits ?? 0);
       }
     };
     getUser();
@@ -254,7 +261,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <ChevronDown className="h-4 w-4 text-white/40 shrink-0" />
                     </Button>
                   </DropdownMenuTrigger>
-                <DropdownMenuContent side="bottom" align="start" className="w-64 bg-[#111211] border-white/10">
+                <DropdownMenuContent side="bottom" align="start" className="w-64 bg-[#111211] border-white/10 z-[100]">
                   {/* Workspace Header */}
                   <div className="px-4 py-4 border-b border-white/10">
                     <div className="flex items-center gap-3">
@@ -280,10 +287,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="px-4 py-4 border-b border-white/10">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-white/50">Credits</span>
-                      <span className="text-sm text-white/70">3 left ›</span>
+                      <span className="text-sm text-white/70">{credits} left</span>
                     </div>
                     <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-white/40 rounded-full" style={{ width: '30%' }} />
+                      <div
+                        className="h-full bg-white/40 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (credits / 500) * 100)}%` }}
+                      />
                     </div>
                     <p className="text-xs text-white/40 mt-2">● Daily credits reset at midnight UTC</p>
                   </div>
@@ -494,7 +504,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </Button>
 
                 <Link href="/" className="shrink-0">
-                  <img src="/icon.png" alt="Magical AI" className="h-6 w-6 object-contain" />
+                  <div className="h-6 w-6 flex items-center justify-center rounded-md bg-gradient-to-br from-purple-500 to-blue-500">
+                    <Sparkles className="h-3.5 w-3.5 text-white" />
+                  </div>
                 </Link>
 
                 <div className="w-6 h-px bg-white/10 my-1" />

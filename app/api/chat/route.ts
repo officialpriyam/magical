@@ -10,6 +10,7 @@ import { applyChatRateLimit } from '@/lib/chat-rate-limit'
 import { fragmentSchema as schema } from '@/lib/schema'
 import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
 import { Templates } from '@/lib/templates'
+import { ensureCredits } from '@/lib/credits'
 import { streamObject, streamText, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
@@ -233,6 +234,16 @@ export async function POST(req: Request) {
 
   if (limit) {
     return createRateLimitResponse(limit)
+  }
+
+  if (userID) {
+    const creditCheck = await ensureCredits(userID)
+    if (!creditCheck.ok) {
+      return new Response(
+        'Insufficient credits. Please upgrade your plan or wait for daily credit reset.',
+        { status: 402 },
+      )
+    }
   }
 
   const fallbackChain = getFallbackChain(model, config)
