@@ -124,7 +124,17 @@ ${currentFragment.code}
           const jsonStr = cleaned.split('\n').filter(l => l.trim()).pop() || cleaned
           editInstructions = JSON.parse(jsonStr)
         } catch {
-          editInstructions = JSON.parse(accumulated)
+          try {
+            editInstructions = JSON.parse(accumulated)
+          } catch {
+            // Try to extract JSON from the response
+            const match = accumulated.match(/\{[\s\S]*\}/)
+            if (match) {
+              editInstructions = JSON.parse(match[0])
+            } else {
+              throw new Error('Failed to parse model response as JSON')
+            }
+          }
         }
       } else {
         const result = streamObject({
@@ -153,7 +163,17 @@ ${currentFragment.code}
           const jsonStr = cleaned.split('\n').filter(l => l.trim()).pop() || cleaned
           editInstructions = JSON.parse(jsonStr)
         } catch {
-          editInstructions = JSON.parse(accumulated)
+          try {
+            editInstructions = JSON.parse(accumulated)
+          } catch {
+            // Try to extract JSON from the response
+            const match = accumulated.match(/\{[\s\S]*\}/)
+            if (match) {
+              editInstructions = JSON.parse(match[0])
+            } else {
+              throw new Error('Failed to parse model response as JSON')
+            }
+          }
         }
       }
 

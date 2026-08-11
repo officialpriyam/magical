@@ -91,11 +91,30 @@ async function readStreamToText(stream: ReadableStream<string>): Promise<string>
 }
 
 function extractJson(text: string): string {
+  // First try to find JSON in markdown code blocks
+  const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
+  if (codeBlockMatch) {
+    const inner = codeBlockMatch[1].trim()
+    const start = inner.indexOf('{')
+    if (start !== -1) {
+      const extracted = extractJsonObject(inner, start)
+      if (extracted) return extracted
+    }
+  }
+
+  // Try direct JSON extraction
   const start = text.indexOf('{')
   if (start === -1) {
     throwObjectGenerationError('NoObjectGeneratedError', 'The model returned an empty response.')
   }
 
+  const extracted = extractJsonObject(text, start)
+  if (extracted) return extracted
+
+  throwObjectGenerationError('NoObjectGeneratedError', 'The model returned incomplete JSON.')
+}
+
+function extractJsonObject(text: string, start: number): string | null {
   let depth = 0
   let inString = false
   let escaped = false
@@ -124,7 +143,7 @@ function extractJson(text: string): string {
     }
   }
 
-  throwObjectGenerationError('NoObjectGeneratedError', 'The model returned incomplete JSON.')
+  return null
 }
 
 function throwObjectGenerationError(name: string, message: string): never {
@@ -140,11 +159,47 @@ function parseAndValidateFragment(text: string) {
   try {
     parsed = JSON.parse(json)
   } catch (cause) {
-    throwObjectGenerationError('JSONParseError', 'The model returned invalid JSON.')
+    // Try to fix common JSON issues
+    const fixed = json
+      .replace(/,\s*}/g, '}')  // Remove trailing commas
+      .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
+      .replace(/\n/g, ' ')     // Remove newlines
+      .replace(/\t/g, ' ')     // Remove tabs
+    
+    try {
+      parsed = JSON.parse(fixed)
+    } catch {
+      throwObjectGenerationError('JSONParseError', 'The model returned invalid JSON.')
+    }
+  }
+
+  // Ensure parsed is an object
+  if (typeof parsed !== 'object' || parsed === null) {
+    throwObjectGenerationError('TypeValidationError', 'The model response is not an object.')
   }
 
   const result = schema.safeParse(parsed)
   if (!result.success) {
+    // Try to fill in missing fields with defaults
+    const data = parsed as Record<string, unknown>
+    const filledData = {
+      commentary: typeof data.commentary === 'string' ? data.commentary : 'Building the requested feature',
+      template: typeof data.template === 'string' ? data.template : 'default',
+      title: typeof data.title === 'string' ? data.title : 'Untitled',
+      description: typeof data.description === 'string' ? data.description : '',
+      additional_dependencies: Array.isArray(data.additional_dependencies) ? data.additional_dependencies : [],
+      has_additional_dependencies: typeof data.has_additional_dependencies === 'boolean' ? data.has_additional_dependencies : false,
+      install_dependencies_command: typeof data.install_dependencies_command === 'string' ? data.install_dependencies_command : '',
+      port: data.port ?? null,
+      file_path: typeof data.file_path === 'string' ? data.file_path : 'src/App.tsx',
+      code: typeof data.code === 'string' ? data.code : '',
+    }
+
+    // If we have code, try to use the filled data
+    if (filledData.code) {
+      return filledData as any
+    }
+
     throwObjectGenerationError('TypeValidationError', 'The model response failed schema validation.')
   }
 

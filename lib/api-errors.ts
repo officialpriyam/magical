@@ -73,8 +73,19 @@ export function handleAPIError(
   }
 
   if (isObjectGenerationError(error)) {
+    const detail = error?.cause?.message || error?.message || ''
+    let hint = 'Try again, or choose a different model.'
+    
+    if (detail.includes('empty response') || detail.includes('NoObjectGeneratedError')) {
+      hint = 'The model returned no code. This can happen with some models — try again or use a different model.'
+    } else if (detail.includes('invalid JSON') || detail.includes('JSONParseError')) {
+      hint = 'The model returned malformed JSON. Try again — this is often a transient issue.'
+    } else if (detail.includes('schema validation') || detail.includes('TypeValidationError')) {
+      hint = 'The model response did not match the expected format. Try again with a simpler request.'
+    }
+    
     return new Response(
-      'The AI provider returned an empty or invalid code response. Try again, or choose a different model.',
+      `The AI provider returned an empty or invalid code response. ${hint}`,
       { status: 422 },
     )
   }

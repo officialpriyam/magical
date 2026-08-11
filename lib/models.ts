@@ -73,6 +73,11 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
       'anthropic/claude-haiku-4.5',
       'claude-3-5-haiku-latest',
       'gpt-4o-mini',
+      'deepseek/deepseek-chat',
+      'mistralai/mistral-small-latest',
+      'groq/llama-3.1-8b-instant',
+      'togetherai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo',
+      'fireworks/accounts/fireworks/models/llama-v3p1-8b-instruct',
     ]
 
     for (const fallbackId of fallbackIds) {
@@ -82,7 +87,6 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
 
       if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, config)) {
         chain.push(fallbackModel)
-        break
       }
     }
   }
