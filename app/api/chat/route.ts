@@ -284,8 +284,11 @@ export async function POST(req: Request) {
 
   let lastError: any = null
 
+  console.log(`Fallback chain: ${fallbackChain.map(m => `${m.id} (${m.providerId})`).join(' → ')}`)
+
   for (const candidate of fallbackChain) {
     try {
+      console.log(`Trying model: ${candidate.id} (${candidate.providerId})`)
       const modelClient = getModelClient(candidate, config)
       const useFallback = STREAM_TEXT_PROVIDER_IDS.has(candidate.providerId)
       let text: string

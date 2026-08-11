@@ -1,196 +1,119 @@
 # Magical AI
 
-Magical AI is an AI app builder and coding workspace developed by priyx.
+An AI-powered website builder that generates complete, production-ready websites from natural language prompts. Built with Next.js, React, and TypeScript.
 
-It uses Next.js 16, shadcn/ui, Tailwind CSS, the Vercel AI SDK, Supabase, and E2B or Vercel sandboxes to generate and execute code from chat.
+## What It Does
 
-## Features
+Describe what you want in plain English, and Magical AI generates a full website — code, design, animations, and all. No coding required.
 
-- AI chat for generating runnable apps and code artifacts.
-- Secure code execution with selectable E2B or Vercel sandboxes.
-- Support for npm and pip package installation inside generated projects.
-- Built-in templates for Python data analysis, Next.js, Vue.js, Streamlit, and Gradio.
-- Multiple AI providers, including OpenAI, Anthropic, Google, Groq, Fireworks, Together AI, OpenRouter, Mistral, xAI, DeepSeek, NVIDIA, Ollama, LLM Gateway, OrcaRouter, and Requesty.
-- Optional Supabase authentication, GitHub sync, and private Cloudflare R2 workspace backup.
+**Example prompts:**
+- "Build a dark-themed SaaS landing page with pricing table and testimonials"
+- "Create a coffee shop website with menu, gallery, and online ordering"
+- "Make a portfolio site with 3D card effects and smooth scroll animations"
 
-## Setup
+## Key Features
 
-Install dependencies:
+### AI Code Generation
+- Generates complete React + TypeScript + Tailwind CSS components
+- Includes Framer Motion animations, responsive design, and accessibility
+- Supports multiple AI models with automatic failover
 
-```sh
-pnpm install
+### Auto Model Selection
+When you select "Auto" mode, the system tries up to 20 configured AI models in sequence. If one fails, it automatically falls back to the next — no manual intervention needed.
+
+**Fallback chain logic:**
+1. If a specific model is selected, try it first
+2. Add all configured models (up to 20)
+3. If no models are configured, try built-in fallbacks (Gemini, Qwen, Claude, GPT-4o-mini, DeepSeek, Mistral, Groq, etc.)
+4. Each model is tried until one succeeds or all fail
+
+### Template Library
+- **250+ templates** from websiteprompts.ai and rocket.new
+- Categories: Local Business, Health & Fitness, Entertainment, Restaurant, Portfolio, Professional Services, Beauty, Education, Travel, and more
+- Copy-paste ready prompts with full design specifications
+
+### Asset Import System
+Server-side utilities for fetching assets during code generation:
+
+| Provider | Type | API Key Required |
+|----------|------|------------------|
+| Pexels | Photos (primary) | Yes |
+| Unsplash | Photos (fallback) | Yes |
+| Pixabay | Photos | Yes |
+| Poly Haven | 3D Models | No |
+| Sketchfab | 3D Models | Yes |
+| Google Fonts | Fonts | No |
+| Iconify | Icons | No |
+
+### Vendored UI Components
+Pre-built React components from Aceternity UI and Magic UI:
+- 3D cards, spotlight effects, pin containers
+- Magnetic buttons, glowing beams, text reveals
+- Marquees, animated numbers, docks, particles
+- Word rotate, shimmer buttons, CSS grid backgrounds
+
+### Real-time Preview
+- Instant preview of generated code
+- Live sandbox with hot reload
+- Terminal access for debugging
+
+### Project Management
+- Save and organize projects
+- Chat history with context
+- GitHub integration for import/export
+- Supabase integration for persistence
+
+## Tech Stack
+
+- **Frontend:** Next.js 14, React 18, TypeScript
+- **Styling:** Tailwind CSS, Framer Motion
+- **AI:** Vercel AI SDK with multi-provider support
+- **Database:** Supabase (PostgreSQL)
+- **Deployment:** Vercel
+
+## Environment Variables
+
+See `.env.example` for all required and optional environment variables.
+
+**Required:**
+- `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` or `GOOGLE_AI_API_KEY` (at least one)
+
+**Optional (for asset imports):**
+- `PEXELS_API_KEY` - Primary image source
+- `UNSPLASH_ACCESS_KEY` - Fallback images
+- `PIXABAY_API_KEY` - Additional images
+- `SKETCHFAB_API_TOKEN` - 3D model search
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Copy `.env.example` to `.env.local` and add your API keys
+4. Run the development server: `npm run dev`
+5. Open http://localhost:3000
+
+## How Auto Model Works
+
+The "Auto" model selector provides intelligent failover across all configured AI providers:
+
+```
+User selects "Auto" → System builds fallback chain →
+1. Try Model A → Failed? → 2. Try Model B → Failed? →
+3. Try Model C → ... → 20. Try Model T → All failed? → Show error
 ```
 
-Create a `.env.local` file in the project root from the example file:
+**Each model attempt:**
+- Sends the prompt to the AI provider
+- Parses the response (handles markdown, trailing commas, etc.)
+- Validates against the schema
+- Fills in missing fields with defaults if partial response
+- Returns success or moves to next model
 
-```sh
-cp .env.example .env.local
-```
-
-Fill in the keys you need. Never commit real secrets.
-
-Configure at least one sandbox provider. E2B is still required for the Python code-interpreter template:
-
-```sh
-E2B_API_KEY=
-```
-
-Vercel Sandbox is optional and works for app preview templates. On Vercel, OIDC is preferred. Locally, run `vercel link` and `vercel env pull`, or use access-token auth:
-
-```sh
-VERCEL_OIDC_TOKEN=
-VERCEL_TEAM_ID=
-VERCEL_PROJECT_ID=
-VERCEL_TOKEN=
-```
-
-The prompt box lets users choose `Let AI choose`, `Vercel`, or `E2B`. If the user skips this or chooses `Let AI choose`, the server randomly selects one configured provider that supports the generated template.
-
-At least one hosted AI provider key is recommended:
-
-```sh
-# Direct providers
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-GOOGLE_AI_API_KEY=
-MISTRAL_API_KEY=
-GROQ_API_KEY=
-FIREWORKS_API_KEY=
-TOGETHER_API_KEY=
-XAI_API_KEY=
-DEEPSEEK_API_KEY=
-NVIDIA_API_KEY=
-
-# Aggregators / gateways
-OPENROUTER_API_KEY=       # 200+ models from multiple providers
-LLM_GATEWAY_API_KEY=      # Free Claude Haiku 4.5
-ORCAROUTER_API_KEY=       # Free DeepSeek V4 Flash/Pro
-REQUESTY_API_KEY=         # NVIDIA, Poolside, Mistral, Google models
-```
-
-Supabase is needed for auth and saved workspace data:
-
-```sh
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-```
-
-Optional Supabase OAuth connector for AI database migrations in users' Supabase accounts:
-
-```sh
-SUPABASE_OAUTH_CLIENT_ID=
-SUPABASE_OAUTH_CLIENT_SECRET=
-# optional; blank means retry client_secret_basic then client_secret_post
-SUPABASE_OAUTH_TOKEN_AUTH_METHOD=
-```
-
-Create the OAuth app in the Supabase Dashboard and set this callback URL:
-
-```txt
-https://your-domain.com/api/supabase/callback
-```
-
-Configure the OAuth app with Management API scopes for `organizations:read`, `projects:read`, `projects:write`, `database:write`, and `secrets:read`. Magical uses OAuth to connect a user's Supabase account, automatically creates or reuses one Supabase project per Magical project, applies generated migrations there, and injects the project's public Supabase env values into the preview sandbox.
-
-For server-owned fallback deployments, `SUPABASE_MANAGEMENT_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` are still supported.
-
-### Supabase OAuth Client ID and Secret
-
-To get `SUPABASE_OAUTH_CLIENT_ID` and `SUPABASE_OAUTH_CLIENT_SECRET`:
-
-1. Sign in to the Supabase Dashboard.
-2. Open your organization settings.
-3. Go to **OAuth Apps**.
-4. Click **Add application**.
-5. Add the callback URL for each environment:
-
-```txt
-http://localhost:3000/api/supabase/callback
-https://your-domain.com/api/supabase/callback
-```
-
-6. Select the required Management API scopes: `organizations:read`, `projects:read`, `projects:write`, `database:write`, and `secrets:read`.
-7. Save the app, then copy the generated client ID and client secret into `.env.local` or Vercel environment variables.
-
-Supabase documents this as an OAuth integration created from organization settings. Their docs also note that scopes are configured on the OAuth app, and existing users must re-authorize if scopes change.
-
-Run the bundled Supabase schema or at least `supabase/migrations/20260603000600_ensure_user_integrations_table.sql` before using OAuth integrations. If `user_integrations` is not present, GitHub and Supabase OAuth can temporarily fall back to Vercel KV when `KV_REST_API_URL` and `KV_REST_API_TOKEN` are configured.
-
-### Cloudflare R2 Workspace Backup
-
-Cloudflare R2 is optional private object storage for generated project files when a signed-in user has not connected that project to GitHub. If these variables are blank, the app still runs; projects without GitHub just will not have the R2 restore fallback. The app stores files under an owner-scoped key prefix, checks Supabase project ownership before saving or restoring, and does not expose public R2 URLs.
-
-Set these variables:
-
-```sh
-CLOUDFLARE_R2_ACCOUNT_ID=
-CLOUDFLARE_R2_BUCKET=
-CLOUDFLARE_R2_ACCESS_KEY_ID=
-CLOUDFLARE_R2_SECRET_ACCESS_KEY=
-```
-
-To get them:
-
-1. In Cloudflare Dashboard, open **Storage & databases > R2**.
-2. Create a private bucket for Magical workspace backups.
-3. Open **R2 > Overview > Manage API Tokens**.
-4. Create an account or user API token with **Object Read & Write** permission scoped to that bucket.
-5. Copy the Access Key ID and Secret Access Key into your environment variables.
-6. Copy the Account ID from the R2 overview page into `CLOUDFLARE_R2_ACCOUNT_ID`.
-
-R2 backups are a fallback source. Once a project is connected to GitHub, GitHub is treated as the primary workspace and R2 writes are skipped for that project.
-
-Start the app only when you are ready:
-
-```sh
-pnpm dev
-```
-
-Build for production:
-
-```sh
-pnpm build
-```
-
-## Deploy to Vercel
-
-This project includes `vercel.json` for Vercel deployment.
-
-Use these project settings on Vercel:
-
-- Framework preset: Next.js
-- Install command: `pnpm install --frozen-lockfile`
-- Build command: `pnpm build`
-- Output directory: `.next`
-
-Add the runtime environment variables from `.env.local` in Vercel Project Settings. At minimum, set one sandbox provider (`E2B_API_KEY` or Vercel Sandbox OIDC/access-token envs), one AI provider key (e.g. `OPENROUTER_API_KEY`, `GOOGLE_AI_API_KEY`, or `ANTHROPIC_API_KEY`), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL=https://magicalai.iampriyam.me`. For user-owned private repository import and saving generated code to GitHub, create a GitHub OAuth App and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. For non-GitHub workspace recovery, optionally set the `CLOUDFLARE_R2_*` variables.
-
-Use this GitHub OAuth callback URL:
-
-```txt
-https://magicalai.iampriyam.me/api/github/callback
-```
-
-## Environment
-
-The generated `.env.local` contains placeholders for all runtime keys referenced by the app:
-
-- AI providers (OpenAI, Anthropic, Google, Mistral, Groq, Fireworks, Together, xAI, DeepSeek, NVIDIA, OpenRouter, LLM Gateway, OrcaRouter, Requesty)
-- Sandbox providers (E2B, Modal, Vercel)
-- Supabase auth and database
-- GitHub / GitLab OAuth connection settings
-- Cloudflare R2 private workspace backup
-- Morph apply mode
-- PostHog analytics toggle
-- Optional ZeroBounce email validation
-
-Chat rate limiting is disabled by default. To enable it, set `RATE_LIMIT_ENABLED=true`, `RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_WINDOW`, `KV_REST_API_URL`, and `KV_REST_API_TOKEN` in Vercel. To force it off, set `RATE_LIMIT_ENABLED=false`.
-
-## Developer
-
-Developed by priyx.
+**Logging:**
+- All attempts are logged with model ID and provider
+- Errors include specific failure reasons
+- Final error shows which models were tried
 
 ## License
 
-Proprietary. All rights reserved. See `LICENSE`.
+Private - All rights reserved.
