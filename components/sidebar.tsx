@@ -1,12 +1,13 @@
 import React from 'react';
 import Link from 'next/link';
-import { MessageCircle, Search, Home, Grid3X3, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut } from 'lucide-react';
+import { MessageCircle, Search, Home, Grid3X3, Settings, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, LogOut, ChevronDown, CreditCard, HelpCircle, Plus } from 'lucide-react';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -208,6 +209,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [refreshKey]);
 
+  const workspaceName = user?.user_metadata?.name ?? 'Anonymous';
+  const workspaceInitial = workspaceName.charAt(0).toUpperCase();
+
   return (
     <div className="flex h-dvh shrink-0 md:h-screen">
       {isMobile && isOpen && (
@@ -230,25 +234,102 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         {isOpen ? (
           <div className="flex flex-col h-full">
-            {/* Header - Logo & Brand */}
-            <div className="px-3 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Link href="/" className="shrink-0">
-                  <img src="/logo.png" alt="Magical AI" className="h-8 w-8 object-contain" />
-                </Link>
-                <span className="text-sm font-semibold text-white truncate">Magical AI</span>
-              </div>
-              {!isMobile && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsOpen(false)}
-                  className="h-7 w-7 text-white/40 hover:text-white hover:bg-white/10"
-                  aria-label="Collapse sidebar"
-                >
-                  <PanelLeftClose className="h-4 w-4" />
-                </Button>
-              )}
+            {/* Workspace Selector */}
+            <div className="px-3 py-2 border-b border-white/[0.06]">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between h-9 px-2 text-white/90 hover:bg-white/[0.08] hover:text-white"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Avatar className="h-5 w-5">
+                        <AvatarFallback className="bg-white/10 text-white/60 text-[10px] font-medium">
+                          {workspaceInitial}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium truncate">{workspaceName}'s Workspace</span>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-white/40 shrink-0" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="bottom" align="start" className="w-56 bg-[#111211] border-white/10">
+                  {/* Workspace Header */}
+                  <div className="px-3 py-3 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-white/10 text-white/60 text-sm font-medium">
+                          {workspaceInitial}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{workspaceName}'s Workspace</p>
+                        <p className="text-xs text-white/50">Free Plan · 1 member</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full mt-3 h-8 text-xs border-white/10 bg-transparent text-white hover:bg-white/5"
+                    >
+                      Invite members
+                    </Button>
+                  </div>
+
+                  {/* Credits */}
+                  <div className="px-3 py-3 border-b border-white/10">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-white/50">Credits</span>
+                      <span className="text-xs text-white/70">3 left ›</span>
+                    </div>
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full bg-white/40 rounded-full" style={{ width: '30%' }} />
+                    </div>
+                    <p className="text-[10px] text-white/40 mt-2">● Daily credits reset at midnight UTC</p>
+                  </div>
+
+                  {/* Workspaces List */}
+                  <div className="px-3 py-2">
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Workspaces</p>
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-white/5">
+                      <Avatar className="h-5 w-5">
+                        <AvatarFallback className="bg-white/10 text-white/60 text-[10px]">
+                          {workspaceInitial}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm text-white flex-1">{workspaceName}'s Workspace</span>
+                      <span className="text-[10px] text-white/40 bg-white/10 px-1.5 py-0.5 rounded">Free</span>
+                      <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <button className="flex items-center gap-2 px-2 py-1.5 text-sm text-white/50 hover:text-white/70 transition-colors">
+                      <Plus className="h-4 w-4" />
+                      <span>New workspace</span>
+                    </button>
+                  </div>
+
+                  <DropdownMenuSeparator className="bg-white/10" />
+
+                  {/* Menu Items */}
+                  <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-white/70 focus:bg-white/5 focus:text-white">
+                    <HelpCircle className="mr-2 h-4 w-4" />
+                    <span>Help Center</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)} className="text-white/70 focus:bg-white/5 focus:text-white">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    <span>My Subscription</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem onClick={onSignOut} className="text-white/70 focus:bg-white/5 focus:text-white">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign Out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Navigation */}
@@ -358,43 +439,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* User Info */}
             <div className="px-3 py-3 border-t border-white/[0.06]">
               <div className="flex items-center gap-2.5">
-                <div className="relative">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.user_metadata?.name ?? 'User'} />
-                    <AvatarFallback className="bg-white/10 text-white/60 text-xs">
-                      {user?.user_metadata?.name?.charAt(0).toUpperCase() ?? 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-red-500 border-2 border-[#0a0a0b]" />
-                </div>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.user_metadata?.name ?? 'User'} />
+                  <AvatarFallback className="bg-white/10 text-white/60 text-xs">
+                    {workspaceInitial}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-white truncate">
-                    {user?.user_metadata?.name ?? 'Anonymous'}
+                    {workspaceName}
                   </p>
                   <p className="text-[10px] text-white/40 truncate">
                     {userPlan}
                   </p>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-white/40 hover:text-white hover:bg-white/10"
-                    >
-                      <Settings className="h-3.5 w-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent side="top" align="start">
-                    <DropdownMenuItem onClick={() => setIsPricingModalOpen(true)}>
-                      <span>Pricing</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onSignOut}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Sign out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             </div>
           </div>
