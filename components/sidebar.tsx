@@ -248,6 +248,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <WorkspaceDropdown
                     onSignOut={onSignOut}
                     onOpenPricing={() => setIsPricingModalOpen(true)}
+                    onCreate={() => onStartNewChat()}
                   />
                 </div>
                 <Button

@@ -9,6 +9,7 @@ import { HelpModal } from '@/components/help-center'
 interface WorkspaceDropdownProps {
   onSignOut?: () => void
   onOpenPricing?: () => void
+  onCreate?: (name: string) => void
 }
 
 interface Workspace {
@@ -23,7 +24,7 @@ const demoWorkspaces: Workspace[] = [
   { id: '1', name: "Priyam's Workspace", plan: 'Free', isCurrent: true, memberCount: 1 },
 ]
 
-export function WorkspaceDropdown({ onSignOut, onOpenPricing }: WorkspaceDropdownProps) {
+export function WorkspaceDropdown({ onSignOut, onOpenPricing, onCreate }: WorkspaceDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [workspaces] = useState<Workspace[]>(demoWorkspaces)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -187,14 +188,21 @@ export function WorkspaceDropdown({ onSignOut, onOpenPricing }: WorkspaceDropdow
       </div>
 
       {showCreateModal && (
-        <CreateWorkspaceModal onClose={() => setShowCreateModal(false)} />
+        <CreateWorkspaceModal onClose={() => setShowCreateModal(false)} onCreate={onCreate} />
       )}
     </>
   )
 }
 
-function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
+function CreateWorkspaceModal({ onClose, onCreate }: { onClose: () => void; onCreate?: (name: string) => void }) {
   const [name, setName] = useState('')
+
+  const handleCreate = () => {
+    if (name.trim()) {
+      onCreate?.(name.trim())
+      onClose()
+    }
+  }
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -222,8 +230,10 @@ function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
             placeholder="Enter workspace name"
             className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-primary/50"
+            autoFocus
           />
         </div>
 
@@ -237,10 +247,11 @@ function CreateWorkspaceModal({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="button"
+            onClick={handleCreate}
             disabled={!name.trim()}
             className="flex-1 rounded-xl bg-gradient-to-r from-primary to-primary/80 py-2.5 text-sm font-semibold text-white transition hover:from-primary/80 hover:to-[#dc2626] disabled:opacity-40"
           >
-            Continue to plan
+            Create
           </button>
         </div>
       </div>
