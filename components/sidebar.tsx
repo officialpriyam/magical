@@ -275,12 +275,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <p className="text-xs text-white/50">Free Plan · 1 member</p>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      className="w-full mt-4 h-9 text-sm border-white/10 bg-transparent text-white hover:bg-white/5"
-                    >
+                    <DropdownMenuItem className="w-full mt-4 h-9 text-sm border border-white/10 bg-transparent text-white hover:bg-white/5 justify-center">
                       Invite members
-                    </Button>
+                    </DropdownMenuItem>
                   </div>
 
                   {/* Credits */}
@@ -301,7 +298,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {/* Workspaces List */}
                   <div className="px-4 py-3">
                     <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Workspaces</p>
-                    <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-white/5">
+                    <DropdownMenuItem className="flex items-center gap-3 px-3 py-2 rounded-md bg-white/5">
                       <Avatar className="h-6 w-6">
                         <AvatarFallback className="bg-white/10 text-white/60 text-[10px]">
                           {workspaceInitial}
@@ -312,11 +309,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
-                    </div>
-                    <button className="flex items-center gap-3 px-3 py-2 mt-1 text-sm text-white/50 hover:text-white/70 transition-colors">
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="flex items-center gap-3 px-3 py-2 text-sm text-white/50 hover:text-white/70">
                       <Plus className="h-4 w-4" />
                       <span>New workspace</span>
-                    </button>
+                    </DropdownMenuItem>
                   </div>
 
                   <DropdownMenuSeparator className="bg-white/10" />
