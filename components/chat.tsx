@@ -2,6 +2,7 @@ import { Message, MessagePlan } from '@/lib/messages'
 import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
 import { getFragmentFiles } from '@/lib/fragment-files'
+import { AgentMetadataDisplay } from '@/components/agent-status'
 import { DeepPartial } from 'ai'
 import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -207,13 +208,16 @@ function GeneratedArtifactCard({
             <div className="text-xs text-white/42">+{files.length - 5} more files</div>
           )}
         </div>
-      )}
-
-      {migrations.length > 0 && (
+      )}      {migrations.length > 0 && (
         <div className="mb-4 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-200">
           <Database className="h-3.5 w-3.5" />
           {migrations.length} Supabase migration{migrations.length === 1 ? '' : 's'} ready
         </div>
+      )}
+
+      {/* Agent Metadata Display */}
+      {(message.object as any)?.agent_metadata && (
+        <AgentMetadataDisplay metadata={(message.object as any).agent_metadata} />
       )}
 
       <div className="grid grid-cols-2 gap-2">

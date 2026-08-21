@@ -25,6 +25,8 @@ export function ChatSettings({
   onLanguageModelChange,
   useMorphApply,
   onUseMorphApplyChange,
+  useAgentic,
+  onUseAgenticChange,
 }: {
   apiKeyConfigurable: boolean
   baseURLConfigurable: boolean
@@ -32,6 +34,8 @@ export function ChatSettings({
   onLanguageModelChange: (model: LLMModelConfig) => void
   useMorphApply?: boolean
   onUseMorphApplyChange?: (value: boolean) => void
+  useAgentic?: boolean
+  onUseAgenticChange?: (value: boolean) => void
 }) {
   const [showMorphWarning, setShowMorphWarning] = useState(false)
 
@@ -232,6 +236,26 @@ export function ChatSettings({
                   id="morph-apply"
                   checked={useMorphApply}
                   onCheckedChange={handleMorphToggle}
+                />
+              </div>
+            </>
+          )}
+          {onUseAgenticChange && (
+            <>
+              <DropdownMenuSeparator />
+              <div className="flex items-center justify-between px-2 py-2">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="agentic-mode" className="text-sm font-medium">
+                    🤖 Agentic Mode
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    Multi-agent system for better results
+                  </span>
+                </div>
+                <Switch
+                  id="agentic-mode"
+                  checked={useAgentic}
+                  onCheckedChange={onUseAgenticChange}
                 />
               </div>
             </>

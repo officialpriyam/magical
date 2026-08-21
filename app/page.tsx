@@ -29,7 +29,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { invalidateCache } from '@/lib/caching';
 import type { GitHubWorkspace } from '@/components/github-save';
 import type { PreviewTab } from '@/components/preview';
-import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo } from 'lucide-react';
+import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo, Cpu, Zap } from 'lucide-react';
 
 const DEFAULT_MODEL_ID = 'auto'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
@@ -158,6 +158,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [useMorphApply, setUseMorphApply] = useLocalStorage(
     'useMorphApply',
     false,
+  )
+  const [useAgentic, setUseAgentic] = useLocalStorage(
+    'useAgentic',
+    true,
   )
   const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'build')
   const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
@@ -382,9 +386,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     )
   }, [languageModel.model, filteredModels])
 
-  // Determine which API to use based on morph toggle and existing fragment
+  // Determine which API to use based on morph toggle, agentic toggle, and existing fragment
   const shouldUseMorph = useMorphApply && fragment && fragment.code && fragment.file_path
-  const apiEndpoint = shouldUseMorph ? '/api/chat/morph-chat' : '/api/chat'
+  const apiEndpoint = shouldUseMorph
+    ? '/api/chat/morph-chat'
+    : useAgentic
+      ? '/api/chat/agentic'
+      : '/api/chat'
 
   useEffect(() => {
     const projectId = activeProjectId
@@ -1894,6 +1902,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       baseURLConfigurable={!process.env.NEXT_PUBLIC_NO_BASE_URL_INPUT}
       useMorphApply={useMorphApply}
       onUseMorphApplyChange={setUseMorphApply}
+      useAgentic={useAgentic}
+      onUseAgenticChange={setUseAgentic}
       className={!isDashboardMode ? "mb-0 border-white/10 bg-[#20211f] shadow-none" : undefined}
     />
   )

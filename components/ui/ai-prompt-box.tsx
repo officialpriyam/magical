@@ -500,6 +500,8 @@ interface PromptInputBoxProps {
   baseURLConfigurable: boolean
   useMorphApply?: boolean
   onUseMorphApplyChange?: (value: boolean) => void
+  useAgentic?: boolean
+  onUseAgenticChange?: (value: boolean) => void
   chatMode?: ChatMode
   onChatModeChange?: (mode: ChatMode) => void
   sandboxProvider?: SandboxProviderMode
@@ -516,7 +518,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       document.head.removeChild(styleSheet);
     };
   }, []);
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, useAgentic = true, onUseAgenticChange, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
   const [input, setInput] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
@@ -715,6 +717,8 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
             onLanguageModelChange={onLanguageModelChange}
             useMorphApply={useMorphApply}
             onUseMorphApplyChange={onUseMorphApplyChange}
+            useAgentic={useAgentic}
+            onUseAgenticChange={onUseAgenticChange}
           />
         </div>
         {files.length > 0 && !isRecording && (
