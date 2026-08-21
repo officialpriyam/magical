@@ -165,6 +165,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     true,
   )
   const [selectedStyle, setSelectedStyle] = useLocalStorage<string | null>('selectedStyle', null)
+  const [customStylePrompt, setCustomStylePrompt] = useLocalStorage<string>('customStylePrompt', '')
   const [showStyleSelector, setShowStyleSelector] = useState(false)
   const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'build')
   const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
@@ -1278,11 +1279,17 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
     // Inject selected style into the prompt
     if (selectedStyle) {
-      const stylePreset = STYLE_PRESETS.find(s => s.id === selectedStyle)
-      if (stylePreset) {
+      if (selectedStyle === 'custom' && customStylePrompt) {
         currentInput = `${currentInput}
 
+[Custom Style] ${customStylePrompt}`
+      } else {
+        const stylePreset = STYLE_PRESETS.find(s => s.id === selectedStyle)
+        if (stylePreset) {
+          currentInput = `${currentInput}
+
 [Style: ${stylePreset.name}] ${stylePreset.prompt}`
+        }
       }
     }
 
@@ -1988,6 +1995,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           <StyleSelector
             selectedStyle={selectedStyle}
             onSelectStyle={setSelectedStyle}
+            customStylePrompt={customStylePrompt}
+            onCustomStylePromptChange={setCustomStylePrompt}
             onClose={() => setShowStyleSelector(false)}
           />
         )}
