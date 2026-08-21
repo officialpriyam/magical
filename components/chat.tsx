@@ -487,6 +487,7 @@ const AGENT_LABELS: Record<AgentRole, string> = {
 function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPartial<FragmentSchema> }) {
   const [elapsedTime, setElapsedTime] = useState(0)
   const startTimeRef = useRef(Date.now())
+  const [completedAgents, setCompletedAgents] = useState<AgentRole[]>([])
 
   // Derive live state from currentFragment
   const files = getFragmentFiles(currentFragment)
@@ -494,27 +495,46 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
   const hasCode = Boolean(cleanText(currentFragment?.code))
   const commentary = cleanText(currentFragment?.commentary)
   const template = cleanText(currentFragment?.template)
+  const title = cleanText(currentFragment?.title)
 
-  // Determine which agents are active based on streaming progress
-  const activeAgents: AgentRole[] = []
-  if (!currentFragment) {
-    activeAgents.push('orchestrator')
-  } else if (!template) {
-    activeAgents.push('planner')
-  } else if (files.length === 0 && !currentFilePath) {
-    activeAgents.push('architect')
-  } else if (files.length < 3) {
-    activeAgents.push('frontend')
-  } else {
-    activeAgents.push('frontend', 'backend')
+  // Parse the commentary to detect which agent is currently active
+  // Commentary format from backend: "AgentName: doing something..."
+  const currentAgentMatch = commentary?.match(/^(\w+):\s*(.+)/)
+  const currentAgentName = currentAgentMatch?.[1]?.toLowerCase() || ''
+  const currentAgentMessage = currentAgentMatch?.[2] || commentary
+
+  // Map commentary agent names to roles
+  const agentNameToRole: Record<string, AgentRole> = {
+    orchestrator: 'orchestrator',
+    planner: 'planner',
+    architect: 'architect',
+    frontend: 'frontend',
+    backend: 'backend',
+    reviewer: 'reviewer',
+    optimizer: 'optimizer',
+    fixer: 'fixer',
   }
 
-  // If we have code, reviewer/optimizer may be running
-  if (hasCode && files.length > 0) {
-    activeAgents.push('reviewer')
-  }
+  const activeRole = agentNameToRole[currentAgentName] || null
 
-  const totalAgents = activeAgents.length
+  // Build the agent pipeline based on what's happened
+  const allAgents: AgentRole[] = ['orchestrator', 'planner', 'architect', 'frontend', 'backend', 'reviewer', 'optimizer']
+  
+  // Determine completed agents from fragment state
+  useEffect(() => {
+    const completed: AgentRole[] = []
+    if (template && template !== 'default') completed.push('orchestrator')
+    if (title) completed.push('planner')
+    if (files.length > 0 || hasCode) completed.push('architect')
+    if (files.length > 2) completed.push('frontend')
+    if (hasCode && files.length > 0) completed.push('backend')
+    setCompletedAgents(completed)
+  }, [template, title, files.length, hasCode])
+
+  // Progress calculation
+  const completedCount = completedAgents.length
+  const totalCount = 7
+  const progressPercent = Math.min(((completedCount + (activeRole ? 0.5 : 0)) / totalCount) * 100, 95)
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -541,7 +561,7 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
         <div className="flex items-center gap-2 text-[11px]">
           <span className="inline-flex items-center gap-1 text-blue-400/70">
             <Activity className="h-3 w-3" />
-            {totalAgents} agent{totalAgents !== 1 ? 's' : ''} active
+            {completedCount}/{totalCount} agents
           </span>
           <span className="text-white/20">|</span>
           <span className="text-white/40">{elapsedTime}s</span>
@@ -553,24 +573,42 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
         <motion.div
           className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
           initial={{ width: '0%' }}
-          animate={{ width: hasCode ? '85%' : files.length > 0 ? '60%' : '25%' }}
+          animate={{ width: `${progressPercent}%` }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         />
       </div>
 
-      {/* Active agents */}
+      {/* Active agent badges */}
       <div className="mb-2.5 flex flex-wrap gap-1.5">
-        {activeAgents.map((role) => {
+        {allAgents.map((role) => {
           const Icon = AGENT_ICONS[role]
+          const isCompleted = completedAgents.includes(role)
+          const isActive = role === activeRole
+          
+          // Don't show agents that haven't started yet
+          if (!isCompleted && !isActive) return null
+          
           return (
-            <span
+            <motion.span
               key={role}
-              className="inline-flex items-center gap-1 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-300"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                isActive
+                  ? 'border border-blue-500/30 bg-blue-500/15 text-blue-300'
+                  : isCompleted
+                    ? 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-400/70'
+                    : 'border border-white/10 bg-white/5 text-white/30'
+              }`}
             >
-              <LoaderIcon className="h-2.5 w-2.5 animate-spin" />
+              {isActive ? (
+                <LoaderIcon className="h-2.5 w-2.5 animate-spin" />
+              ) : isCompleted ? (
+                <Check className="h-2.5 w-2.5" />
+              ) : null}
               <Icon className="h-2.5 w-2.5" />
               {AGENT_DISPLAY_NAMES[role]}
-            </span>
+            </motion.span>
           )
         })}
       </div>
@@ -611,11 +649,16 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
         )}
       </div>
 
-      {/* Live commentary */}
-      {commentary && (
-        <div className="mt-2.5 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-[11px] leading-relaxed text-white/40">
-          {commentary.length > 120 ? `${commentary.slice(0, 120)}...` : commentary}
-        </div>
+      {/* Live commentary from current agent */}
+      {currentAgentMessage && (
+        <motion.div
+          key={commentary}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-2.5 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-[11px] leading-relaxed text-white/40"
+        >
+          {currentAgentMessage.length > 120 ? `${currentAgentMessage.slice(0, 120)}...` : currentAgentMessage}
+        </motion.div>
       )}
     </motion.div>
   )
