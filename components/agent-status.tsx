@@ -3,7 +3,7 @@
 import { AgentRole } from '@/lib/agents/types'
 import { AGENT_DISPLAY_NAMES } from '@/lib/agents/prompts'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, CheckCircle2, XCircle, Circle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Circle, Cpu } from 'lucide-react'
 
 interface AgentStatusData {
   role: AgentRole
@@ -82,7 +82,7 @@ export function AgentStatusTracker({ agents, isAgenticMode }: AgentStatusTracker
     >
       <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-blue-300">
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/20">
-          🤖
+          <Cpu className="h-3 w-3 text-blue-400" />
         </span>
         Agentic Pipeline
         <span className="ml-auto text-[10px] text-blue-400/60">
@@ -135,7 +135,7 @@ export function AgentMetadataDisplay({ metadata }: AgentMetadataDisplayProps) {
   return (
     <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.035] p-2.5 text-xs">
       <div className="mb-1.5 flex items-center gap-2 text-white/60">
-        <span>🤖</span>
+        <Cpu className="h-3.5 w-3.5 text-blue-400" />
         <span className="font-medium">Agentic Generation Info</span>
       </div>
       <div className="grid grid-cols-2 gap-1.5 text-[11px]">

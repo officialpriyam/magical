@@ -3,10 +3,10 @@ import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
 import { getFragmentFiles } from '@/lib/fragment-files'
 import { AgentMetadataDisplay } from '@/components/agent-status'
-import { AGENT_DISPLAY_NAMES, AGENT_STATUS_MESSAGES } from '@/lib/agents/prompts'
+import { AGENT_DISPLAY_NAMES } from '@/lib/agents/prompts'
 import type { AgentRole } from '@/lib/agents/types'
 import { DeepPartial } from 'ai'
-import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil, Cpu } from 'lucide-react'
+import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil, Cpu, Activity, Braces, Palette, Server, Shield, Zap, Wrench } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -150,7 +150,7 @@ export function Chat({
       {(isLoading || isPreviewLoading || autoFixMessage) && (
         <>
           {useAgentic && isLoading && (
-            <AgentProgressIndicator />
+            <AgentProgressIndicator currentFragment={currentFragment} />
           )}
           <GenerationStatusCard
             messages={messages}
@@ -462,20 +462,59 @@ function WebSearchCard({
   )
 }
 
-function AgentProgressIndicator() {
-  const [currentStep, setCurrentStep] = useState(0)
+const AGENT_ICONS: Record<AgentRole, React.ComponentType<any>> = {
+  orchestrator: Activity,
+  planner: Braces,
+  architect: Server,
+  frontend: Palette,
+  backend: Server,
+  reviewer: Shield,
+  optimizer: Zap,
+  fixer: Wrench,
+}
+
+const AGENT_LABELS: Record<AgentRole, string> = {
+  orchestrator: 'Analyzing request complexity',
+  planner: 'Creating implementation plan',
+  architect: 'Designing project architecture',
+  frontend: 'Building UI components',
+  backend: 'Building API & data layer',
+  reviewer: 'Reviewing code quality',
+  optimizer: 'Optimizing performance',
+  fixer: 'Fixing issues',
+}
+
+function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPartial<FragmentSchema> }) {
   const [elapsedTime, setElapsedTime] = useState(0)
   const startTimeRef = useRef(Date.now())
 
-  const agentSteps: { role: AgentRole; label: string; duration: number }[] = [
-    { role: 'orchestrator', label: 'Analyzing request', duration: 2000 },
-    { role: 'planner', label: 'Planning architecture', duration: 3000 },
-    { role: 'architect', label: 'Designing structure', duration: 2500 },
-    { role: 'frontend', label: 'Building UI components', duration: 4000 },
-    { role: 'backend', label: 'Building API routes', duration: 3500 },
-    { role: 'reviewer', label: 'Reviewing code quality', duration: 2000 },
-    { role: 'optimizer', label: 'Optimizing performance', duration: 1500 },
-  ]
+  // Derive live state from currentFragment
+  const files = getFragmentFiles(currentFragment)
+  const currentFilePath = cleanText(currentFragment?.file_path)
+  const hasCode = Boolean(cleanText(currentFragment?.code))
+  const commentary = cleanText(currentFragment?.commentary)
+  const template = cleanText(currentFragment?.template)
+
+  // Determine which agents are active based on streaming progress
+  const activeAgents: AgentRole[] = []
+  if (!currentFragment) {
+    activeAgents.push('orchestrator')
+  } else if (!template) {
+    activeAgents.push('planner')
+  } else if (files.length === 0 && !currentFilePath) {
+    activeAgents.push('architect')
+  } else if (files.length < 3) {
+    activeAgents.push('frontend')
+  } else {
+    activeAgents.push('frontend', 'backend')
+  }
+
+  // If we have code, reviewer/optimizer may be running
+  if (hasCode && files.length > 0) {
+    activeAgents.push('reviewer')
+  }
+
+  const totalAgents = activeAgents.length
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -484,28 +523,6 @@ function AgentProgressIndicator() {
     return () => clearInterval(interval)
   }, [])
 
-  useEffect(() => {
-    const totalDuration = agentSteps.reduce((sum, step) => sum + step.duration, 0)
-    let elapsed = 0
-    const timers: ReturnType<typeof setTimeout>[] = []
-
-    agentSteps.forEach((step, index) => {
-      timers.push(
-        setTimeout(() => {
-          setCurrentStep(index)
-        }, elapsed)
-      )
-      elapsed += step.duration
-    })
-
-    return () => timers.forEach(clearTimeout)
-  }, [])
-
-  const completedSteps = agentSteps.slice(0, currentStep + 1)
-  const activeStep = agentSteps[currentStep]
-  const totalAgents = agentSteps.length
-  const completedCount = completedSteps.length
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -513,6 +530,7 @@ function AgentProgressIndicator() {
       exit={{ opacity: 0, y: -8 }}
       className="w-full max-w-[36rem] rounded-xl border border-blue-500/20 bg-blue-500/5 p-3"
     >
+      {/* Header */}
       <div className="mb-2.5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/20">
@@ -521,10 +539,11 @@ function AgentProgressIndicator() {
           <span className="text-xs font-semibold text-blue-300">Agentic Pipeline</span>
         </div>
         <div className="flex items-center gap-2 text-[11px]">
-          <span className="text-blue-400/70">
-            {completedCount}/{totalAgents} agents
+          <span className="inline-flex items-center gap-1 text-blue-400/70">
+            <Activity className="h-3 w-3" />
+            {totalAgents} agent{totalAgents !== 1 ? 's' : ''} active
           </span>
-          <span className="text-white/30">•</span>
+          <span className="text-white/20">|</span>
           <span className="text-white/40">{elapsedTime}s</span>
         </div>
       </div>
@@ -534,47 +553,70 @@ function AgentProgressIndicator() {
         <motion.div
           className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
           initial={{ width: '0%' }}
-          animate={{
-            width: `${((currentStep + 1) / totalAgents) * 100}%`,
-          }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          animate={{ width: hasCode ? '85%' : files.length > 0 ? '60%' : '25%' }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
         />
       </div>
 
-      {/* Agent steps */}
+      {/* Active agents */}
+      <div className="mb-2.5 flex flex-wrap gap-1.5">
+        {activeAgents.map((role) => {
+          const Icon = AGENT_ICONS[role]
+          return (
+            <span
+              key={role}
+              className="inline-flex items-center gap-1 rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-300"
+            >
+              <LoaderIcon className="h-2.5 w-2.5 animate-spin" />
+              <Icon className="h-2.5 w-2.5" />
+              {AGENT_DISPLAY_NAMES[role]}
+            </span>
+          )
+        })}
+      </div>
+
+      {/* Live file creation feed */}
       <div className="space-y-1">
         <AnimatePresence mode="popLayout">
-          {completedSteps.map((step, index) => {
-            const isActive = index === currentStep
-            const isCompleted = index < currentStep
-            return (
-              <motion.div
-                key={step.role}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-                className={`flex items-center gap-2 rounded-lg px-2 py-1 text-[11px] transition-colors ${
-                  isActive
-                    ? 'bg-blue-500/10 text-blue-300'
-                    : isCompleted
-                      ? 'text-white/40'
-                      : 'text-white/30'
-                }`}
-              >
-                {isCompleted ? (
-                  <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                ) : isActive ? (
-                  <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400" />
-                ) : (
-                  <div className="h-3 w-3 shrink-0 rounded-full border border-white/20" />
-                )}
-                <span className="font-medium">{AGENT_DISPLAY_NAMES[step.role]}</span>
-                <span className="ml-auto text-white/30">{step.label}</span>
-              </motion.div>
-            )
-          })}
+          {files.slice(0, 5).map((file, idx) => (
+            <motion.div
+              key={file.path}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center gap-2 rounded-lg bg-blue-500/5 px-2 py-1 text-[11px] text-white/50"
+            >
+              <FileCode2 className="h-3 w-3 shrink-0 text-blue-400/60" />
+              <span className="truncate">{file.path}</span>
+              <span className="ml-auto shrink-0 text-[10px] text-emerald-400/60">done</span>
+            </motion.div>
+          ))}
         </AnimatePresence>
+
+        {/* Currently writing file */}
+        {currentFilePath && !files.find(f => f.path === currentFilePath) && (
+          <motion.div
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-2 rounded-lg bg-blue-500/10 px-2 py-1 text-[11px] text-blue-300"
+          >
+            <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400" />
+            <span className="truncate">{currentFilePath}</span>
+            <span className="ml-auto shrink-0 text-[10px] text-blue-400/60">writing</span>
+          </motion.div>
+        )}
+
+        {files.length > 5 && (
+          <div className="text-[11px] text-white/30 pl-5">+{files.length - 5} more files</div>
+        )}
       </div>
+
+      {/* Live commentary */}
+      {commentary && (
+        <div className="mt-2.5 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-[11px] leading-relaxed text-white/40">
+          {commentary.length > 120 ? `${commentary.slice(0, 120)}...` : commentary}
+        </div>
+      )}
     </motion.div>
   )
 }

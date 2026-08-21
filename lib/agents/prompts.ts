@@ -365,14 +365,14 @@ export function getAgentPrompt(role: AgentRole, context?: Record<string, any>): 
 
 // ─── Agent Display Names ────────────────────────────────────────
 export const AGENT_DISPLAY_NAMES: Record<AgentRole, string> = {
-  orchestrator: '🎯 Orchestrator',
-  planner: '📋 Planner',
-  architect: '🏗️ Architect',
-  frontend: '🎨 Frontend',
-  backend: '⚙️ Backend',
-  reviewer: '🔍 Reviewer',
-  optimizer: '⚡ Optimizer',
-  fixer: '🔧 Fixer',
+  orchestrator: 'Orchestrator',
+  planner: 'Planner',
+  architect: 'Architect',
+  frontend: 'Frontend',
+  backend: 'Backend',
+  reviewer: 'Reviewer',
+  optimizer: 'Optimizer',
+  fixer: 'Fixer',
 }
 
 // ─── Agent Status Messages ──────────────────────────────────────
