@@ -1,7 +1,7 @@
 import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowUp, Check, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCog, Server, Shuffle, Settings2 } from "lucide-react";
+import { ArrowUp, Check, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCog, Server, Shuffle, Settings2, Palette } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ChatSettings } from '../chat-settings'
@@ -502,6 +502,9 @@ interface PromptInputBoxProps {
   onUseMorphApplyChange?: (value: boolean) => void
   useAgentic?: boolean
   onUseAgenticChange?: (value: boolean) => void
+  selectedStyle?: string | null
+  onStyleSelect?: (styleId: string | null) => void
+  onOpenStyleSelector?: () => void
   chatMode?: ChatMode
   onChatModeChange?: (mode: ChatMode) => void
   sandboxProvider?: SandboxProviderMode
@@ -518,7 +521,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       document.head.removeChild(styleSheet);
     };
   }, []);
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, useAgentic = true, onUseAgenticChange, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, useAgentic = true, onUseAgenticChange, selectedStyle, onStyleSelect, onOpenStyleSelector, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
   const [input, setInput] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
@@ -924,6 +927,42 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                       className="text-xs overflow-hidden whitespace-nowrap text-[#F97316] flex-shrink-0"
                     >
                       Canvas
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </button>
+
+              <CustomDivider />
+
+              <button
+                type="button"
+                onClick={onOpenStyleSelector}
+                className={cn(
+                  "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                  selectedStyle
+                    ? "bg-[#ec4899]/15 border-[#ec4899] text-[#ec4899]"
+                    : "bg-transparent border-transparent text-muted-foreground hover:text-primary"
+                )}
+              >
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                  <motion.div
+                    animate={{ rotate: selectedStyle ? 360 : 0, scale: selectedStyle ? 1.1 : 1 }}
+                    whileHover={{ rotate: selectedStyle ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
+                    transition={{ type: "spring", stiffness: 260, damping: 25 }}
+                  >
+                    <Palette className={cn("w-4 h-4", selectedStyle ? "text-[#ec4899]" : "text-inherit")} />
+                  </motion.div>
+                </div>
+                <AnimatePresence>
+                  {selectedStyle && (
+                    <motion.span
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: "auto", opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-xs overflow-hidden whitespace-nowrap text-[#ec4899] flex-shrink-0"
+                    >
+                      Style
                     </motion.span>
                   )}
                 </AnimatePresence>

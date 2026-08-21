@@ -23,6 +23,7 @@ import { usePostHog } from 'posthog-js/react';
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
+import { StyleSelector, type StylePreset, STYLE_PRESETS } from '@/components/style-selector';
 import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -163,6 +164,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     'useAgentic',
     true,
   )
+  const [selectedStyle, setSelectedStyle] = useLocalStorage<string | null>('selectedStyle', null)
+  const [showStyleSelector, setShowStyleSelector] = useState(false)
   const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'build')
   const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
 
@@ -1271,7 +1274,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       return
     }
 
-    const currentInput = message
+    let currentInput = message
+
+    // Inject selected style into the prompt
+    if (selectedStyle) {
+      const stylePreset = STYLE_PRESETS.find(s => s.id === selectedStyle)
+      if (stylePreset) {
+        currentInput = `${currentInput}
+
+[Style: ${stylePreset.name}] ${stylePreset.prompt}`
+      }
+    }
+
     const currentFiles = files
     const shouldRenameProject =
       projectForPrompt.title === DEFAULT_NEW_CHAT_TITLE &&
@@ -1904,6 +1918,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       onUseMorphApplyChange={setUseMorphApply}
       useAgentic={useAgentic}
       onUseAgenticChange={setUseAgentic}
+      selectedStyle={selectedStyle}
+      onStyleSelect={setSelectedStyle}
+      onOpenStyleSelector={() => setShowStyleSelector(true)}
       className={!isDashboardMode ? "mb-0 border-white/10 bg-[#20211f] shadow-none" : undefined}
     />
   )
@@ -1965,6 +1982,16 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         isOpen={isPricingModalOpen}
         onClose={() => setIsPricingModalOpen(false)}
       />
+
+      <AnimatePresence>
+        {showStyleSelector && (
+          <StyleSelector
+            selectedStyle={selectedStyle}
+            onSelectStyle={setSelectedStyle}
+            onClose={() => setShowStyleSelector(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {session && (
         <Sidebar

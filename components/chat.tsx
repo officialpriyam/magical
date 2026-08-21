@@ -653,67 +653,124 @@ function GenerationStatusCard({
   const commentary = cleanText(currentFragment?.commentary) || ''
   const currentFilePath = cleanText(currentFragment?.file_path)
   const hasCode = Boolean(cleanText(currentFragment?.code))
+  const title = cleanText(currentFragment?.title)
+  const description = cleanText(currentFragment?.description)
 
   return (
-    <div className="mt-2 w-full max-w-[36rem] rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 shadow-sm">
-      <div className="flex items-center justify-between gap-3 text-sm font-medium text-white">
-        <div className="flex min-w-0 items-center gap-2">
-          <Sparkles strokeWidth={2} className="h-4 w-4 shrink-0 animate-pulse text-foreground/70" />
-          <span className="min-w-0 break-words">{status.title}</span>
-        </div>
-        {onStop && (
-          <button
-            type="button"
-            onClick={onStop}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-red-500/30 bg-red-500/10 text-red-200 transition hover:bg-red-500/20"
-          >
-            <Square className="h-3 w-3 fill-current" />
-          </button>
-        )}
-      </div>
-      <div className="mt-2 flex items-center gap-2 text-sm text-white/55">
-        <LoaderIcon strokeWidth={2} className="h-3.5 w-3.5 shrink-0 animate-spin" />
-        <span className="min-w-0 break-words">{status.detail}</span>
-      </div>
-
-      {commentary && (
-        <div className="mt-2.5 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-xs leading-relaxed text-white/50">
-          {commentary.length > 200 ? `${commentary.slice(0, 200)}...` : commentary}
-        </div>
-      )}
-
-      {currentFilePath && (
-        <div className="mt-2 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-xs text-primary/80">
-          <FileCode2 className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">Writing {currentFilePath}</span>
-          <LoaderIcon strokeWidth={2} className="h-3 w-3 shrink-0 animate-spin ml-auto" />
-        </div>
-      )}
-
-      {files.length > 0 && (
-        <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-          {files.slice(0, 8).map((file, idx) => (
-            <div
-              key={file.path}
-              className="flex min-w-0 items-center gap-2 rounded-md border border-white/10 bg-black/15 px-2 py-1.5 text-xs text-white/62"
+    <div className="mt-2 w-full max-w-[36rem] space-y-2">
+      {/* Streaming output indicator */}
+      {isLoading && !isPreviewLoading && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3"
+        >
+          <div className="flex items-center gap-2">
+            <LoaderIcon strokeWidth={2} className="h-4 w-4 animate-spin text-blue-400" />
+            <span className="text-sm font-medium text-white/80">Writing response</span>
+          </div>
+          <span className="text-xs text-white/30">·</span>
+          <span className="text-xs text-white/40">streaming output</span>
+          {onStop && (
+            <button
+              type="button"
+              onClick={onStop}
+              className="ml-auto flex h-6 items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 text-[11px] font-medium text-red-300 transition hover:bg-red-500/20"
             >
-              <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/36" />
-              <span className="truncate">{file.path}</span>
-              {idx === files.length - 1 && hasCode && (
-                <LoaderIcon strokeWidth={2} className="h-3 w-3 shrink-0 animate-spin ml-auto text-primary/60" />
-              )}
-            </div>
-          ))}
-          {files.length > 8 && (
-            <div className="text-xs text-white/42">+{files.length - 8} more files</div>
+              <Square className="h-2.5 w-2.5 fill-current" />
+              Stop
+            </button>
           )}
-        </div>
+        </motion.div>
       )}
+
+      {/* Live commentary / reasoning */}
+      {commentary && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3"
+        >
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/30">
+            <Sparkles className="h-3 w-3" />
+            Reasoning
+          </div>
+          <p className="text-xs leading-relaxed text-white/50">
+            {commentary.length > 300 ? `${commentary.slice(0, 300)}...` : commentary}
+          </p>
+        </motion.div>
+      )}
+
+      {/* Live file edits feed */}
+      {(files.length > 0 || currentFilePath) && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3"
+        >
+          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/30">
+            <FileCode2 className="h-3 w-3" />
+            Files
+          </div>
+          <div className="space-y-1">
+            {/* Completed files */}
+            {files.map((file, idx) => (
+              <motion.div
+                key={file.path}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2, delay: idx * 0.05 }}
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs"
+              >
+                <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/30" />
+                <span className="flex-1 truncate text-white/60">{file.path}</span>
+                <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-emerald-400/70">edited</span>
+                <Check className="h-3 w-3 shrink-0 text-emerald-400/70" />
+              </motion.div>
+            ))}
+
+            {/* Currently writing */}
+            {currentFilePath && !files.find(f => f.path === currentFilePath) && (
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="flex items-center gap-2 rounded-lg bg-blue-500/5 px-2 py-1.5 text-xs"
+              >
+                <LoaderIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-400" />
+                <span className="flex-1 truncate text-blue-300/80">{currentFilePath}</span>
+                <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-blue-400/60">writing</span>
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Title + description (when available) */}
+      {(title || description) && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3"
+        >
+          {title && (
+            <div className="text-sm font-medium text-white/80">{title}</div>
+          )}
+          {description && (
+            <div className="mt-1 text-xs text-white/40">{description}</div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Supabase migrations */}
       {migrations.length > 0 && (
-        <div className="mt-3 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-200">
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 text-xs text-emerald-300/80"
+        >
           <Database className="h-3.5 w-3.5" />
           Preparing {migrations.length} Supabase migration{migrations.length === 1 ? '' : 's'}
-        </div>
+        </motion.div>
       )}
     </div>
   )
