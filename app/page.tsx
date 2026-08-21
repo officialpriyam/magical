@@ -2306,6 +2306,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     onStop={handleStopGeneration}
                     onAcceptPlan={handleAcceptPlan}
                     setCurrentPreview={setCurrentPreview}
+                    useAgentic={useAgentic}
                   />
                 )}
               </div>

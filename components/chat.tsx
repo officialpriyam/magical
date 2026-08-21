@@ -3,10 +3,12 @@ import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
 import { getFragmentFiles } from '@/lib/fragment-files'
 import { AgentMetadataDisplay } from '@/components/agent-status'
+import { AGENT_DISPLAY_NAMES, AGENT_STATUS_MESSAGES } from '@/lib/agents/prompts'
+import type { AgentRole } from '@/lib/agents/types'
 import { DeepPartial } from 'ai'
-import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil, Cpu } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export function Chat({
   messages,
@@ -17,6 +19,7 @@ export function Chat({
   onStop,
   onAcceptPlan,
   setCurrentPreview,
+  useAgentic = false,
 }: {
   messages: Message[]
   isLoading: boolean
@@ -29,6 +32,7 @@ export function Chat({
     fragment: DeepPartial<FragmentSchema> | undefined
     result: ExecutionResult | undefined
   }) => void
+  useAgentic?: boolean
 }) {
 
   useEffect(() => {
@@ -144,14 +148,19 @@ export function Chat({
         </motion.div>
       ))}
       {(isLoading || isPreviewLoading || autoFixMessage) && (
-        <GenerationStatusCard
-          messages={messages}
-          currentFragment={currentFragment}
-          isLoading={isLoading}
-          isPreviewLoading={isPreviewLoading}
-          autoFixMessage={autoFixMessage}
-          onStop={onStop}
-        />
+        <>
+          {useAgentic && isLoading && (
+            <AgentProgressIndicator />
+          )}
+          <GenerationStatusCard
+            messages={messages}
+            currentFragment={currentFragment}
+            isLoading={isLoading}
+            isPreviewLoading={isPreviewLoading}
+            autoFixMessage={autoFixMessage}
+            onStop={onStop}
+          />
+        </>
       )}
     </div>
   )
@@ -450,6 +459,123 @@ function WebSearchCard({
         })}
       </div>
     </div>
+  )
+}
+
+function AgentProgressIndicator() {
+  const [currentStep, setCurrentStep] = useState(0)
+  const [elapsedTime, setElapsedTime] = useState(0)
+  const startTimeRef = useRef(Date.now())
+
+  const agentSteps: { role: AgentRole; label: string; duration: number }[] = [
+    { role: 'orchestrator', label: 'Analyzing request', duration: 2000 },
+    { role: 'planner', label: 'Planning architecture', duration: 3000 },
+    { role: 'architect', label: 'Designing structure', duration: 2500 },
+    { role: 'frontend', label: 'Building UI components', duration: 4000 },
+    { role: 'backend', label: 'Building API routes', duration: 3500 },
+    { role: 'reviewer', label: 'Reviewing code quality', duration: 2000 },
+    { role: 'optimizer', label: 'Optimizing performance', duration: 1500 },
+  ]
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const totalDuration = agentSteps.reduce((sum, step) => sum + step.duration, 0)
+    let elapsed = 0
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+    agentSteps.forEach((step, index) => {
+      timers.push(
+        setTimeout(() => {
+          setCurrentStep(index)
+        }, elapsed)
+      )
+      elapsed += step.duration
+    })
+
+    return () => timers.forEach(clearTimeout)
+  }, [])
+
+  const completedSteps = agentSteps.slice(0, currentStep + 1)
+  const activeStep = agentSteps[currentStep]
+  const totalAgents = agentSteps.length
+  const completedCount = completedSteps.length
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className="w-full max-w-[36rem] rounded-xl border border-blue-500/20 bg-blue-500/5 p-3"
+    >
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/20">
+            <Cpu className="h-3.5 w-3.5 text-blue-400" />
+          </div>
+          <span className="text-xs font-semibold text-blue-300">Agentic Pipeline</span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className="text-blue-400/70">
+            {completedCount}/{totalAgents} agents
+          </span>
+          <span className="text-white/30">•</span>
+          <span className="text-white/40">{elapsedTime}s</span>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-2.5 h-1 overflow-hidden rounded-full bg-white/5">
+        <motion.div
+          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
+          initial={{ width: '0%' }}
+          animate={{
+            width: `${((currentStep + 1) / totalAgents) * 100}%`,
+          }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        />
+      </div>
+
+      {/* Agent steps */}
+      <div className="space-y-1">
+        <AnimatePresence mode="popLayout">
+          {completedSteps.map((step, index) => {
+            const isActive = index === currentStep
+            const isCompleted = index < currentStep
+            return (
+              <motion.div
+                key={step.role}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2 }}
+                className={`flex items-center gap-2 rounded-lg px-2 py-1 text-[11px] transition-colors ${
+                  isActive
+                    ? 'bg-blue-500/10 text-blue-300'
+                    : isCompleted
+                      ? 'text-white/40'
+                      : 'text-white/30'
+                }`}
+              >
+                {isCompleted ? (
+                  <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                ) : isActive ? (
+                  <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400" />
+                ) : (
+                  <div className="h-3 w-3 shrink-0 rounded-full border border-white/20" />
+                )}
+                <span className="font-medium">{AGENT_DISPLAY_NAMES[step.role]}</span>
+                <span className="ml-auto text-white/30">{step.label}</span>
+              </motion.div>
+            )
+          })}
+        </AnimatePresence>
+      </div>
+    </motion.div>
   )
 }
 
