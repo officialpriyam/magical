@@ -12,11 +12,6 @@ import { Templates } from '@/lib/templates'
 import { toPrompt, PromptContext } from '@/lib/prompt'
 import { fragmentSchema as schema } from '@/lib/schema'
 import {
-  getFallbackChain as getChain,
-  getModelClient as getClient,
-} from '@/lib/models'
-import {
-  streamObject,
   streamText,
   type LanguageModel,
   type ModelMessage,
@@ -26,6 +21,7 @@ import {
   AgentResult,
   AgentStatus,
   TaskComplexity,
+  OrchestratorConfig,
 } from '@/lib/agents/types'
 import {
   COMPLEXITY_ANALYSIS_PROMPT,
@@ -54,7 +50,7 @@ const EXECUTION_PLANS: Record<TaskComplexity, AgentRole[]> = {
 
 const PARALLEL_GROUPS: Record<TaskComplexity, AgentRole[][]> = {
   simple: [['planner'], ['frontend']],
-  moderate: [['planner'], ['architect'], ['frontend'], ['reviewer']],
+  moderate: [['planner'], ['architect'], ['frontend', 'backend'], ['reviewer']],
   complex: [['planner'], ['architect'], ['frontend', 'backend'], ['reviewer'], ['optimizer']],
   enterprise: [['planner'], ['architect'], ['frontend', 'backend'], ['reviewer'], ['optimizer'], ['reviewer']],
 }
@@ -110,253 +106,163 @@ export async function POST(req: Request) {
   delete modelParams.apiKey
   delete modelParams.baseURL
 
-  // ─── Streaming response ────────────────────────────────────
-  const encoder = new TextEncoder()
-  const stream = new ReadableStream({
-    async start(controller) {
-      // Helper to send a partial fragment update in the AI SDK streaming format
-      // useObject expects: 0:{json}\n for each partial update
-      const sendFragment = (fragment: Record<string, any>) => {
-        try {
-          const json = JSON.stringify(fragment)
-          controller.enqueue(encoder.encode(`0:${json}\n`))
-        } catch {}
+  try {
+    // ── Step 1: Analyze complexity ────────────────────────────
+    const complexity = await analyzeComplexity(messages, model, config)
+    const agentsNeeded = EXECUTION_PLANS[complexity]
+
+    console.log(`[Agentic] Complexity: ${complexity}, Agents: ${agentsNeeded.length}`)
+
+    // ── Step 2: Run agents ────────────────────────────────────
+    const plan = PARALLEL_GROUPS[complexity]
+    const agentResults: AgentResult[] = []
+    let latestFragment: Record<string, any> = {
+      commentary: '',
+      template: 'default',
+      title: '',
+      description: '',
+      additional_dependencies: [],
+      has_additional_dependencies: false,
+      install_dependencies_command: '',
+      port: null,
+      file_path: '',
+      code: '',
+      files: [],
+    }
+
+    for (const group of plan) {
+      const contextMessages = buildAgentMessages(messages, agentResults, latestFragment)
+      const context: Record<string, any> = {
+        supabase: supabaseContext,
       }
 
-      // Helper to build the commentary for each agent step
-      const buildCommentary = (activeRole: AgentRole, extra?: string) => {
-        const name = AGENT_DISPLAY_NAMES[activeRole] || activeRole
-        const label = extra || AGENT_STATUS_MESSAGES[activeRole]?.generating || 'working...'
-        return `${name}: ${label}`
-      }
+      const plannerResult = agentResults.find(r => r.role === 'planner')
+      if (plannerResult) context.plan = plannerResult.output
 
-      try {
-        // ── Step 1: Analyze complexity ───────────────────────
-        sendFragment({
-          commentary: 'Analyzing your request to determine the best approach...',
-          template: 'default',
-          title: 'Planning',
-          description: 'Determining task complexity and agent allocation',
-          additional_dependencies: [],
-          has_additional_dependencies: false,
-          install_dependencies_command: '',
-          port: null,
-          file_path: '',
-          code: '',
-          files: [],
-        })
+      const architectResult = agentResults.find(r => r.role === 'architect')
+      if (architectResult?.fragment) context.architecture = architectResult.fragment
 
-        const complexity = await analyzeComplexity(messages, model, config)
+      if (latestFragment.code) context.existingCode = latestFragment.code
+      if (latestFragment.files?.length) context.files = latestFragment.files
 
-        sendFragment({
-          commentary: `Task complexity: ${complexity}. Dispatching ${EXECUTION_PLANS[complexity].length} agents...`,
-          template: 'default',
-          title: 'Planning',
-          description: `Using ${complexity} pipeline with ${EXECUTION_PLANS[complexity].length} agents`,
-          additional_dependencies: [],
-          has_additional_dependencies: false,
-          install_dependencies_command: '',
-          port: null,
-          file_path: '',
-          code: '',
-          files: [],
-        })
-
-        // ── Step 2: Run agents ──────────────────────────────
-        const plan = PARALLEL_GROUPS[complexity]
-        const agentResults: AgentResult[] = []
-        let latestFragment: Record<string, any> = {
-          commentary: '',
-          template: 'default',
-          title: '',
-          description: '',
-          additional_dependencies: [],
-          has_additional_dependencies: false,
-          install_dependencies_command: '',
-          port: null,
-          file_path: '',
-          code: '',
-          files: [],
-        }
-
-        for (const group of plan) {
-          // Build messages for this agent group
-          const contextMessages = buildAgentMessages(messages, agentResults, latestFragment)
-          const context: Record<string, any> = {
-            supabase: supabaseContext,
-          }
-
-          const plannerResult = agentResults.find(r => r.role === 'planner')
-          if (plannerResult) context.plan = plannerResult.output
-
-          const architectResult = agentResults.find(r => r.role === 'architect')
-          if (architectResult?.fragment) context.architecture = architectResult.fragment
-
-          if (latestFragment.code) context.existingCode = latestFragment.code
-          if (latestFragment.files?.length) context.files = latestFragment.files
-
-          // Run agents in this group
-          for (const role of group) {
-            // Send "starting" commentary
-            sendFragment({
-              ...latestFragment,
-              commentary: buildCommentary(role, 'starting...'),
-            })
-
-            const agentInput = {
-              role,
-              systemPrompt: '',
-              messages: contextMessages,
-              config: {
-                model,
-                config,
-                messages: contextMessages,
-                template,
-                supabase: supabaseContext as any,
-              },
-              context,
-              fallbackChain,
-            }
-
-            const result = await runAgent(agentInput, (status) => {
-              // Send live status updates as agents progress
-              sendFragment({
-                ...latestFragment,
-                commentary: buildCommentary(role, status.message),
-              })
-            })
-
-            agentResults.push(result)
-
-            // Merge agent output into the fragment
-            if (result.success && result.fragment) {
-              const fragment = result.fragment as Record<string, any>
-
-              // Update commentary
-              if (fragment.commentary) {
-                latestFragment.commentary = `${AGENT_DISPLAY_NAMES[role]}: ${fragment.commentary}`
-              }
-
-              // Update template
-              if (fragment.template && fragment.template !== 'default') {
-                latestFragment.template = fragment.template
-              }
-
-              // Update title/description
-              if (fragment.title) latestFragment.title = fragment.title
-              if (fragment.description) latestFragment.description = fragment.description
-
-              // Update code and file_path
-              if (fragment.code) latestFragment.code = fragment.code
-              if (fragment.file_path) latestFragment.file_path = fragment.file_path
-
-              // Merge files
-              if (Array.isArray(fragment.files) && fragment.files.length > 0) {
-                const existingPaths = new Set(
-                  (latestFragment.files || []).map((f: any) => f.path)
-                )
-                for (const file of fragment.files) {
-                  if (!existingPaths.has(file.path)) {
-                    latestFragment.files = [...(latestFragment.files || []), file]
-                  } else {
-                    // Update existing file
-                    latestFragment.files = latestFragment.files.map((f: any) =>
-                      f.path === file.path ? file : f
-                    )
-                  }
-                }
-              }
-
-              // Update dependencies
-              if (Array.isArray(fragment.additional_dependencies)) {
-                const existing = new Set(latestFragment.additional_dependencies || [])
-                for (const dep of fragment.additional_dependencies) {
-                  existing.add(dep)
-                }
-                latestFragment.additional_dependencies = Array.from(existing)
-                latestFragment.has_additional_dependencies = latestFragment.additional_dependencies.length > 0
-              }
-
-              if (fragment.install_dependencies_command) {
-                latestFragment.install_dependencies_command = fragment.install_dependencies_command
-              }
-
-              if (fragment.port !== undefined && fragment.port !== null) {
-                latestFragment.port = fragment.port
-              }
-
-              // Merge supabase migrations
-              if (Array.isArray(fragment.supabase_migrations)) {
-                latestFragment.supabase_migrations = [
-                  ...(latestFragment.supabase_migrations || []),
-                  ...fragment.supabase_migrations,
-                ]
-              }
-
-              // Send the updated fragment
-              sendFragment({ ...latestFragment })
-            }
-          }
-        }
-
-        // ── Step 3: Send final result ────────────────────────
-        const agentsUsed = agentResults.filter(r => r.success).map(r => r.role)
-        const totalDuration = agentResults.reduce((sum, r) => sum + (r.duration || 0), 0)
-
-        const finalFragment = {
-          ...latestFragment,
-          agent_metadata: {
-            agents_used: agentsUsed,
-            complexity,
-            total_duration: totalDuration,
-            agent_durations: Object.fromEntries(
-              agentResults.map(r => [r.role, r.duration || 0])
-            ),
+      for (const role of group) {
+        const agentInput = {
+          role,
+          systemPrompt: '',
+          messages: contextMessages,
+          config: {
+            model,
+            config,
+            messages: contextMessages,
+            template,
+            supabase: supabaseContext as any,
           },
-          commentary: `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s. ${latestFragment.commentary}`,
+          context,
+          fallbackChain,
         }
 
-        sendFragment(finalFragment)
-        controller.close()
-      } catch (error: any) {
-        console.error('[Agentic] Streaming error:', error)
+        console.log(`[Agentic] Running ${AGENT_DISPLAY_NAMES[role]}...`)
+        const result = await runAgent(agentInput)
 
-        // Send error state
-        sendFragment({
-          commentary: `Error: ${error?.message || 'Agentic generation failed'}. Falling back...`,
-          template: 'default',
-          title: 'Error',
-          description: 'Agentic pipeline failed',
-          additional_dependencies: [],
-          has_additional_dependencies: false,
-          install_dependencies_command: '',
-          port: null,
-          file_path: 'src/App.tsx',
-          code: '',
-          files: [],
-        })
+        agentResults.push(result)
 
-        // Fallback: try single-model generation
-        try {
-          const fallbackFragment = await generateFallback(
-            messages, model, config, template, supabaseContext
-          )
-          sendFragment(fallbackFragment)
-        } catch (fallbackError) {
-          console.error('[Agentic] Fallback also failed:', fallbackError)
+        // Merge agent output into the fragment
+        if (result.success && result.fragment) {
+          const fragment = result.fragment as Record<string, any>
+
+          if (fragment.commentary) {
+            latestFragment.commentary = `${latestFragment.commentary ? latestFragment.commentary + '\n\n' : ''}${AGENT_DISPLAY_NAMES[role]}: ${fragment.commentary}`
+          }
+          if (fragment.template && fragment.template !== 'default') {
+            latestFragment.template = fragment.template
+          }
+          if (fragment.title) latestFragment.title = fragment.title
+          if (fragment.description) latestFragment.description = fragment.description
+          if (fragment.code) latestFragment.code = fragment.code
+          if (fragment.file_path) latestFragment.file_path = fragment.file_path
+
+          // Merge files
+          if (Array.isArray(fragment.files) && fragment.files.length > 0) {
+            const existingPaths = new Set(
+              (latestFragment.files || []).map((f: any) => f.path)
+            )
+            for (const file of fragment.files) {
+              if (!existingPaths.has(file.path)) {
+                latestFragment.files = [...(latestFragment.files || []), file]
+              } else {
+                latestFragment.files = latestFragment.files.map((f: any) =>
+                  f.path === file.path ? file : f
+                )
+              }
+            }
+          }
+
+          // Merge dependencies
+          if (Array.isArray(fragment.additional_dependencies)) {
+            const existing = new Set(latestFragment.additional_dependencies || [])
+            for (const dep of fragment.additional_dependencies) {
+              existing.add(dep)
+            }
+            latestFragment.additional_dependencies = Array.from(existing)
+            latestFragment.has_additional_dependencies = latestFragment.additional_dependencies.length > 0
+          }
+
+          if (fragment.install_dependencies_command) {
+            latestFragment.install_dependencies_command = fragment.install_dependencies_command
+          }
+          if (fragment.port !== undefined && fragment.port !== null) {
+            latestFragment.port = fragment.port
+          }
+
+          // Merge supabase migrations
+          if (Array.isArray(fragment.supabase_migrations)) {
+            latestFragment.supabase_migrations = [
+              ...(latestFragment.supabase_migrations || []),
+              ...fragment.supabase_migrations,
+            ]
+          }
         }
-
-        controller.close()
       }
-    },
-  })
+    }
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache',
-    },
-  })
+    // ── Step 3: Build final result ────────────────────────────
+    const agentsUsed = agentResults.filter(r => r.success).map(r => r.role)
+    const totalDuration = agentResults.reduce((sum, r) => sum + (r.duration || 0), 0)
+
+    const finalFragment = {
+      ...latestFragment,
+      agent_metadata: {
+        agents_used: agentsUsed,
+        complexity,
+        total_duration: totalDuration,
+        agent_durations: Object.fromEntries(
+          agentResults.map(r => [r.role, r.duration || 0])
+        ),
+      },
+      commentary: latestFragment.commentary
+        ? `Worked ${agentsUsed.length} steps\n\n${latestFragment.commentary}`
+        : `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`,
+    }
+
+    return new Response(JSON.stringify(finalFragment), {
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+  } catch (error: any) {
+    console.error('[Agentic] Pipeline error:', error)
+
+    // Fallback: try single-model generation
+    try {
+      const fallbackFragment = await generateFallback(
+        messages, model, config, template, supabaseContext
+      )
+      return new Response(JSON.stringify(fallbackFragment), {
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      })
+    } catch (fallbackError) {
+      console.error('[Agentic] Fallback also failed:', fallbackError)
+      return handleAPIError(error, { hasOwnApiKey: !!config.apiKey })
+    }
+  }
 }
 
 // ─── Analyze complexity ─────────────────────────────────────

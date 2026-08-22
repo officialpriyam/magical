@@ -487,55 +487,28 @@ const AGENT_LABELS: Record<AgentRole, string> = {
 function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPartial<FragmentSchema> }) {
   const [elapsedTime, setElapsedTime] = useState(0)
   const startTimeRef = useRef(Date.now())
-  const [completedAgents, setCompletedAgents] = useState<AgentRole[]>([])
+  const [activeStep, setActiveStep] = useState(0)
 
-  // Derive live state from currentFragment
-  const files = getFragmentFiles(currentFragment)
-  const currentFilePath = cleanText(currentFragment?.file_path)
-  const hasCode = Boolean(cleanText(currentFragment?.code))
+  // Agent steps to animate through during loading
+  const agentSteps: { role: AgentRole; label: string; description: string; duration: number }[] = [
+    { role: 'orchestrator', label: 'Orchestrator', description: 'Analyzing request complexity', duration: 3000 },
+    { role: 'planner', label: 'Planner', description: 'Creating implementation plan', duration: 4000 },
+    { role: 'architect', label: 'Architect', description: 'Designing project architecture', duration: 4000 },
+    { role: 'frontend', label: 'Frontend', description: 'Building UI components', duration: 8000 },
+    { role: 'backend', label: 'Backend', description: 'Building API & data layer', duration: 8000 },
+    { role: 'reviewer', label: 'Reviewer', description: 'Reviewing code quality', duration: 5000 },
+    { role: 'optimizer', label: 'Optimizer', description: 'Optimizing performance', duration: 4000 },
+  ]
+
+  // Check if we have a completed fragment
+  const hasFragment = Boolean(currentFragment?.code || (currentFragment?.files && currentFragment.files.length > 0))
   const commentary = cleanText(currentFragment?.commentary)
-  const template = cleanText(currentFragment?.template)
-  const title = cleanText(currentFragment?.title)
 
-  // Parse the commentary to detect which agent is currently active
-  // Commentary format from backend: "AgentName: doing something..."
-  const currentAgentMatch = commentary?.match(/^(\w+):\s*(.+)/)
-  const currentAgentName = currentAgentMatch?.[1]?.toLowerCase() || ''
-  const currentAgentMessage = currentAgentMatch?.[2] || commentary
+  // If fragment is done, show completed state
+  const completedStepCount = hasFragment ? agentSteps.length : activeStep
+  const progressPercent = hasFragment ? 100 : Math.min(((completedStepCount + 0.5) / agentSteps.length) * 100, 95)
 
-  // Map commentary agent names to roles
-  const agentNameToRole: Record<string, AgentRole> = {
-    orchestrator: 'orchestrator',
-    planner: 'planner',
-    architect: 'architect',
-    frontend: 'frontend',
-    backend: 'backend',
-    reviewer: 'reviewer',
-    optimizer: 'optimizer',
-    fixer: 'fixer',
-  }
-
-  const activeRole = agentNameToRole[currentAgentName] || null
-
-  // Build the agent pipeline based on what's happened
-  const allAgents: AgentRole[] = ['orchestrator', 'planner', 'architect', 'frontend', 'backend', 'reviewer', 'optimizer']
-  
-  // Determine completed agents from fragment state
-  useEffect(() => {
-    const completed: AgentRole[] = []
-    if (template && template !== 'default') completed.push('orchestrator')
-    if (title) completed.push('planner')
-    if (files.length > 0 || hasCode) completed.push('architect')
-    if (files.length > 2) completed.push('frontend')
-    if (hasCode && files.length > 0) completed.push('backend')
-    setCompletedAgents(completed)
-  }, [template, title, files.length, hasCode])
-
-  // Progress calculation
-  const completedCount = completedAgents.length
-  const totalCount = 7
-  const progressPercent = Math.min(((completedCount + (activeRole ? 0.5 : 0)) / totalCount) * 100, 95)
-
+  // Elapsed timer
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000))
@@ -543,121 +516,126 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
     return () => clearInterval(interval)
   }, [])
 
+  // Animate through agent steps while loading
+  useEffect(() => {
+    if (hasFragment) return
+    let stepIdx = 0
+    let elapsed = 0
+    const interval = setInterval(() => {
+      elapsed += 500
+      // Advance to next step based on accumulated time
+      let accumulated = 0
+      for (let i = 0; i < agentSteps.length; i++) {
+        accumulated += agentSteps[i].duration
+        if (elapsed < accumulated) {
+          stepIdx = i
+          break
+        }
+        if (i === agentSteps.length - 1) stepIdx = i
+      }
+      setActiveStep(stepIdx)
+    }, 500)
+    return () => clearInterval(interval)
+  }, [hasFragment])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      className="w-full max-w-[36rem] rounded-xl border border-blue-500/20 bg-blue-500/5 p-3"
+      className="w-full max-w-[36rem] overflow-hidden rounded-xl border border-blue-500/20 bg-blue-500/[0.04]"
     >
       {/* Header */}
-      <div className="mb-2.5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-2.5">
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/20">
             <Cpu className="h-3.5 w-3.5 text-blue-400" />
           </div>
-          <span className="text-xs font-semibold text-blue-300">Agentic Pipeline</span>
+          <span className="text-xs font-semibold text-blue-300">
+            {hasFragment ? 'Pipeline complete' : 'Working...'}
+          </span>
         </div>
         <div className="flex items-center gap-2 text-[11px]">
           <span className="inline-flex items-center gap-1 text-blue-400/70">
             <Activity className="h-3 w-3" />
-            {completedCount}/{totalCount} agents
+            {completedStepCount}/{agentSteps.length} steps
           </span>
           <span className="text-white/20">|</span>
-          <span className="text-white/40">{elapsedTime}s</span>
+          <span className="text-white/40 tabular-nums">{elapsedTime}s</span>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="mb-2.5 h-1 overflow-hidden rounded-full bg-white/5">
+      <div className="h-[2px] w-full bg-white/5">
         <motion.div
-          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
+          className="h-full bg-gradient-to-r from-blue-500 to-cyan-400"
           initial={{ width: '0%' }}
           animate={{ width: `${progressPercent}%` }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
         />
       </div>
 
-      {/* Active agent badges */}
-      <div className="mb-2.5 flex flex-wrap gap-1.5">
-        {allAgents.map((role) => {
-          const Icon = AGENT_ICONS[role]
-          const isCompleted = completedAgents.includes(role)
-          const isActive = role === activeRole
-          
-          // Don't show agents that haven't started yet
-          if (!isCompleted && !isActive) return null
-          
-          return (
-            <motion.span
-              key={role}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                isActive
-                  ? 'border border-blue-500/30 bg-blue-500/15 text-blue-300'
-                  : isCompleted
-                    ? 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-400/70'
-                    : 'border border-white/10 bg-white/5 text-white/30'
-              }`}
-            >
-              {isActive ? (
-                <LoaderIcon className="h-2.5 w-2.5 animate-spin" />
-              ) : isCompleted ? (
-                <Check className="h-2.5 w-2.5" />
-              ) : null}
-              <Icon className="h-2.5 w-2.5" />
-              {AGENT_DISPLAY_NAMES[role]}
-            </motion.span>
-          )
-        })}
+      {/* Agent steps list */}
+      <div className="px-4 py-2.5">
+        <div className="space-y-0.5">
+          {agentSteps.map((step, idx) => {
+            const Icon = AGENT_ICONS[step.role]
+            const isCompleted = hasFragment || idx < activeStep
+            const isCurrent = !hasFragment && idx === activeStep
+            const isPending = !hasFragment && idx > activeStep
+
+            if (isPending) return null
+
+            return (
+              <motion.div
+                key={step.role}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-center gap-2.5 py-1"
+              >
+                {/* Status icon */}
+                <div className="flex h-4 w-4 shrink-0 items-center justify-center">
+                  {isCompleted && !isCurrent ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  ) : isCurrent ? (
+                    <LoaderIcon className="h-3.5 w-3.5 animate-spin text-blue-400" />
+                  ) : null}
+                </div>
+
+                {/* Agent icon + name + description */}
+                <Icon className="h-3 w-3 shrink-0 text-white/30" />
+                <span className={`text-xs font-medium ${isCompleted && !isCurrent ? 'text-white/40' : isCurrent ? 'text-blue-300' : 'text-white/30'}`}>
+                  {step.label}
+                </span>
+                <span className="text-[11px] text-white/25">{step.description}</span>
+
+                {/* Current step spinner */}
+                {isCurrent && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="ml-auto"
+                  >
+                    <span className="text-[10px] text-blue-400/60">running</span>
+                  </motion.div>
+                )}
+              </motion.div>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Live file creation feed */}
-      <div className="space-y-1">
-        <AnimatePresence mode="popLayout">
-          {files.slice(0, 5).map((file, idx) => (
-            <motion.div
-              key={file.path}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center gap-2 rounded-lg bg-blue-500/5 px-2 py-1 text-[11px] text-white/50"
-            >
-              <FileCode2 className="h-3 w-3 shrink-0 text-blue-400/60" />
-              <span className="truncate">{file.path}</span>
-              <span className="ml-auto shrink-0 text-[10px] text-emerald-400/60">done</span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {/* Currently writing file */}
-        {currentFilePath && !files.find(f => f.path === currentFilePath) && (
-          <motion.div
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2 rounded-lg bg-blue-500/10 px-2 py-1 text-[11px] text-blue-300"
-          >
-            <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400" />
-            <span className="truncate">{currentFilePath}</span>
-            <span className="ml-auto shrink-0 text-[10px] text-blue-400/60">writing</span>
-          </motion.div>
-        )}
-
-        {files.length > 5 && (
-          <div className="text-[11px] text-white/30 pl-5">+{files.length - 5} more files</div>
-        )}
-      </div>
-
-      {/* Live commentary from current agent */}
-      {currentAgentMessage && (
+      {/* Live commentary from fragment (when available) */}
+      {commentary && (
         <motion.div
-          key={commentary}
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-2.5 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-[11px] leading-relaxed text-white/40"
+          className="border-t border-white/[0.06] px-4 py-2.5"
         >
-          {currentAgentMessage.length > 120 ? `${currentAgentMessage.slice(0, 120)}...` : currentAgentMessage}
+          <div className="text-[11px] leading-relaxed text-white/35">
+            {commentary.length > 200 ? `${commentary.slice(0, 200)}...` : commentary}
+          </div>
         </motion.div>
       )}
     </motion.div>
@@ -694,8 +672,6 @@ function GenerationStatusCard({
     ? currentFragment.supabase_migrations
     : []
   const commentary = cleanText(currentFragment?.commentary) || ''
-  const currentFilePath = cleanText(currentFragment?.file_path)
-  const hasCode = Boolean(cleanText(currentFragment?.code))
   const title = cleanText(currentFragment?.title)
   const description = cleanText(currentFragment?.description)
 
@@ -710,10 +686,8 @@ function GenerationStatusCard({
         >
           <div className="flex items-center gap-2">
             <LoaderIcon strokeWidth={2} className="h-4 w-4 animate-spin text-blue-400" />
-            <span className="text-sm font-medium text-white/80">Writing response</span>
+            <span className="text-sm font-medium text-white/80">Generating</span>
           </div>
-          <span className="text-xs text-white/30">·</span>
-          <span className="text-xs text-white/40">streaming output</span>
           {onStop && (
             <button
               type="button"
@@ -727,8 +701,8 @@ function GenerationStatusCard({
         </motion.div>
       )}
 
-      {/* Live commentary / reasoning */}
-      {commentary && (
+      {/* Commentary / reasoning (shown after response arrives) */}
+      {commentary && !isLoading && (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
@@ -736,16 +710,20 @@ function GenerationStatusCard({
         >
           <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/30">
             <Sparkles className="h-3 w-3" />
-            Reasoning
+            Steps
           </div>
-          <p className="text-xs leading-relaxed text-white/50">
-            {commentary.length > 300 ? `${commentary.slice(0, 300)}...` : commentary}
-          </p>
+          <div className="space-y-2">
+            {commentary.split('\n\n').filter(Boolean).map((paragraph, i) => (
+              <div key={i} className="text-xs leading-relaxed text-white/50">
+                {paragraph}
+              </div>
+            ))}
+          </div>
         </motion.div>
       )}
 
-      {/* Live file edits feed */}
-      {(files.length > 0 || currentFilePath) && (
+      {/* Files (shown after response arrives) */}
+      {files.length > 0 && !isLoading && (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
@@ -753,16 +731,15 @@ function GenerationStatusCard({
         >
           <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/30">
             <FileCode2 className="h-3 w-3" />
-            Files
+            Files ({files.length})
           </div>
           <div className="space-y-1">
-            {/* Completed files */}
             {files.map((file, idx) => (
               <motion.div
                 key={file.path}
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2, delay: idx * 0.05 }}
+                transition={{ duration: 0.15, delay: idx * 0.03 }}
                 className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs"
               >
                 <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/30" />
@@ -772,18 +749,7 @@ function GenerationStatusCard({
               </motion.div>
             ))}
 
-            {/* Currently writing */}
-            {currentFilePath && !files.find(f => f.path === currentFilePath) && (
-              <motion.div
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-2 rounded-lg bg-blue-500/5 px-2 py-1.5 text-xs"
-              >
-                <LoaderIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-400" />
-                <span className="flex-1 truncate text-blue-300/80">{currentFilePath}</span>
-                <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-blue-400/60">writing</span>
-              </motion.div>
-            )}
+
           </div>
         </motion.div>
       )}
