@@ -743,17 +743,40 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   // Sync agentic stream fragment to existing state + update message object
   useEffect(() => {
-    if (useAgentic && agenticStream.fragment?.code) {
-      setFragment(agenticStream.fragment)
-      setCurrentPreview({ fragment: agenticStream.fragment, result: undefined })
-      // Also update the assistant message so GeneratedArtifactCard shows
-      setMessages(prev => {
-        const nextMessages = withLatestAssistantFragment(prev, agenticStream.fragment)
-        messagesRef.current = nextMessages
-        return nextMessages
-      })
+    if (useAgentic && agenticStream.fragment) {
+      const frag = agenticStream.fragment
+      const hasContent = frag.code || (frag.files && frag.files.length > 0) || frag.title
+      if (hasContent) {
+        setFragment(frag)
+        setCurrentPreview({ fragment: frag, result: undefined })
+        // Also update the assistant message so GeneratedArtifactCard shows
+        setMessages(prev => {
+          const nextMessages = withLatestAssistantFragment(prev, frag)
+          messagesRef.current = nextMessages
+          return nextMessages
+        })
+      }
     }
   }, [useAgentic, agenticStream.fragment])
+
+  // Safety: when agentic streaming ends, ensure an assistant message exists
+  useEffect(() => {
+    if (!useAgentic || agenticStream.isStreaming) return
+    // Only run once when streaming just ended
+    const lastMsg = messagesRef.current[messagesRef.current.length - 1]
+    const hasAssistantResponse = lastMsg?.role === 'assistant'
+    if (!hasAssistantResponse && messagesRef.current.length > 0) {
+      // Create a minimal assistant message so the chat isn't empty
+      const frag = agenticStream.fragment || fragment
+      if (frag && (frag.code || frag.files || frag.title || frag.description || frag.commentary)) {
+        setMessages(prev => {
+          const nextMessages = withLatestAssistantFragment(prev, frag)
+          messagesRef.current = nextMessages
+          return nextMessages
+        })
+      }
+    }
+  }, [useAgentic, agenticStream.isStreaming])
 
   function getTemplateForSubmission(preferredTemplate?: string) {
     if (selectedTemplate !== 'auto') {

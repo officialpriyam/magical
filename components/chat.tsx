@@ -187,7 +187,7 @@ export function Chat({
           )}
         </motion.div>
       ))}
-      {/* Live streaming message — shows during AND after generation */}
+      {/* Live streaming message — shows during AND after generation when actions exist */}
       {useAgentic && (agenticStreaming || agenticActions.length > 0) && (
         <LiveStreamingMessage
           key="live-stream"
@@ -197,8 +197,11 @@ export function Chat({
           onStop={onStop}
         />
       )}
-      {/* Status card — only show when NOT using agentic mode */}
-      {!useAgentic && (
+      {/* Status card — shows during non-agentic loading, OR as fallback when agentic finishes with no actions */}
+      {(
+        !useAgentic ||
+        (!agenticStreaming && agenticActions.length === 0)
+      ) && (
         <GenerationStatusCard
           messages={messages}
           currentFragment={currentFragment}
@@ -1359,10 +1362,11 @@ function getGenerationStatus({
 
   if (!isLoading && !isPreviewLoading && !autoFixMessage) {
     // After generation: keep showing status if we have a generated fragment
-    if (latestObject?.code || latestObject?.title) {
+    const fragmentFiles = getFragmentFiles(latestObject)
+    if (latestObject?.code || latestObject?.title || fragmentFiles.length > 0) {
       return {
         title: cleanText(latestObject?.title) || 'Generation complete',
-        detail: cleanText(latestObject?.description) || `Built ${promptTarget}`,
+        detail: cleanText(latestObject?.description) || (fragmentFiles.length > 0 ? `Generated ${fragmentFiles.length} file${fragmentFiles.length === 1 ? '' : 's'}` : `Built ${promptTarget}`),
       }
     }
     return null
