@@ -157,6 +157,7 @@ export function Chat({
       {/* Live streaming message — appears inline during generation */}
       {useAgentic && agenticStreaming && agenticActions.length > 0 && (
         <LiveStreamingMessage
+          key="live-stream"
           actions={agenticActions}
           todos={agenticTodos}
           isStreaming={agenticStreaming}
@@ -176,8 +177,8 @@ export function Chat({
           </div>
         </motion.div>
       )}
-      {/* Post-generation status — stays visible after streaming ends */}
-      {!agenticStreaming && (
+      {/* Post-generation status — only during loading, not after artifact is shown */}
+      {!agenticStreaming && !currentFragment?.code && (
         <GenerationStatusCard
           messages={messages}
           currentFragment={currentFragment}
