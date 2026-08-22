@@ -167,6 +167,12 @@ export async function POST(req: Request) {
   // Emit connected event immediately so the frontend knows the stream is alive
   emit({ type: 'connected', timestamp: Date.now() })
 
+  // Detect agent skill from message prefix
+  const detectedAgent = detectAgentFromMessage(messages)
+  if (detectedAgent) {
+    emitAction('thinking', `Using ${detectedAgent} agent for your request...`)
+  }
+
   // Auto web search: detect if the query needs up-to-date information
   const autoSearchQuery = detectAutoSearchQuery(messages)
   let enrichedMessages = [...messages]
@@ -223,6 +229,7 @@ export async function POST(req: Request) {
     template,
     supabaseContext,
     fallbackChain,
+    detectedAgent,
     emitAction,
     emitTodos,
     emitProgress,
@@ -251,6 +258,7 @@ async function runPipeline({
   template,
   supabaseContext,
   fallbackChain,
+  detectedAgent,
   emitAction,
   emitTodos,
   emitProgress,
@@ -263,6 +271,7 @@ async function runPipeline({
   template: Templates
   supabaseContext: PromptContext['supabase']
   fallbackChain: any[]
+  detectedAgent?: string | null
   emitAction: (type: string, content: string, detail?: string) => void
   emitTodos: (todos: { id: string; text: string; completed: boolean }[]) => void
   emitProgress: (completed: number, total: number) => void
@@ -273,11 +282,34 @@ async function runPipeline({
     // ── Step 1: Analyze complexity ────────────────────────────
     emitAction('thinking', 'Analyzing your request to determine the best approach...')
 
-    const complexity = await analyzeComplexity(messages, model, config)
-    const agentsNeeded = EXECUTION_PLANS[complexity]
+    // If agent was explicitly selected, use it; otherwise analyze complexity
+    let complexity: TaskComplexity
+    let agentsNeeded: AgentRole[]
+
+    if (detectedAgent && detectedAgent !== 'auto') {
+      // Map slash command agent to agent roles
+      const agentMap: Record<string, AgentRole[]> = {
+        planner: ['planner', 'frontend'],
+        build: ['planner', 'architect', 'frontend', 'backend', 'reviewer'],
+        architect: ['planner', 'architect', 'frontend'],
+        frontend: ['planner', 'frontend'],
+        backend: ['planner', 'backend'],
+        reviewer: ['planner', 'frontend', 'reviewer'],
+        optimizer: ['planner', 'frontend', 'optimizer'],
+        fixer: ['planner', 'frontend', 'fixer'],
+        search: ['planner', 'frontend'],
+        think: ['planner', 'architect', 'frontend'],
+      }
+      agentsNeeded = agentMap[detectedAgent] || EXECUTION_PLANS.simple
+      complexity = detectedAgent === 'build' ? 'complex' : detectedAgent === 'planner' ? 'simple' : 'moderate'
+    } else {
+      complexity = await analyzeComplexity(messages, model, config)
+      agentsNeeded = EXECUTION_PLANS[complexity]
+    }
+
     const totalSteps = agentsNeeded.length
 
-    console.log(`[Agentic] Complexity: ${complexity}, Agents: ${agentsNeeded.length}`)
+    console.log(`[Agentic] Complexity: ${complexity}, Agents: ${agentsNeeded.length}${detectedAgent ? ` (user: ${detectedAgent})` : ''}`)
 
     emitAction('commentary', `Task complexity: ${complexity}. Dispatching ${agentsNeeded.length} agents...`)
     emitProgress(0, totalSteps)

@@ -17,7 +17,7 @@ import {
 import type { LLMModel, LLMModelConfig } from '@/lib/models'
 import type { TemplateId, Templates } from '@/lib/templates'
 import { SANDBOX_PROVIDER_OPTIONS, type SandboxProviderMode } from '@/lib/sandbox-provider'
-import { getMatchingCommands, isSlashCommand, extractCommand, SlashCommand } from '@/lib/slash-commands'
+import { getMatchingCommands, isSlashCommand, extractCommand, detectAgentFromPrompt, SlashCommand } from '@/lib/slash-commands'
 import { SlashCommandMenu } from '../slash-command-menu'
 
 const cn = (...classes: (string | undefined | null | false)[]) => classes.filter(Boolean).join(" ");
@@ -620,7 +620,6 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
 
       if (!hasAgentPrefix) {
         // Auto-detect agent from prompt content
-        const { detectAgentFromPrompt } = require('@/lib/slash-commands');
         const detectedAgent = detectAgentFromPrompt(input);
         if (detectedAgent) {
           formattedInput = `[Agent: ${detectedAgent}] ${input}`;
