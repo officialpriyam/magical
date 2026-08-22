@@ -2,7 +2,7 @@
 
 import { FragmentSchema } from '@/lib/schema'
 import { DeepPartial } from 'ai'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type ToolAction = {
   type: 'thinking' | 'file_write' | 'file_edit' | 'file_read' | 'web_search' | 'web_fetch' | 'todo' | 'commentary' | 'commentary_chunk' | 'status'
@@ -74,12 +74,71 @@ function mergeFragment(
   return result as DeepPartial<FragmentSchema>
 }
 
-export function useAgenticStream() {
-  const [state, setState] = useState<AgenticStreamState>(INITIAL_STATE)
+const STREAM_STORAGE_PREFIX = 'agentic-stream:'
+
+function loadPersistedState(key?: string): AgenticStreamState | null {
+  if (!key) return null
+  try {
+    const saved = localStorage.getItem(STREAM_STORAGE_PREFIX + key)
+    if (!saved) return null
+    const parsed = JSON.parse(saved)
+    // Only restore if the stream was not streaming when saved
+    if (parsed.isStreaming) return null
+    return { ...INITIAL_STATE, ...parsed, isStreaming: false, error: null }
+  } catch { return null }
+}
+
+function persistState(key: string | undefined, state: AgenticStreamState) {
+  if (!key) return
+  try {
+    // Only persist when stream is done and has meaningful data
+    if (state.isStreaming) return
+    if (state.actions.length === 0 && !state.fragment?.code && !state.fragment?.title) return
+    localStorage.setItem(STREAM_STORAGE_PREFIX + key, JSON.stringify({
+      actions: state.actions,
+      todos: state.todos,
+      fragment: state.fragment,
+      completedSteps: state.completedSteps,
+      totalSteps: state.totalSteps,
+      isStreaming: false,
+    }))
+  } catch {}
+}
+
+function clearPersistedState(key?: string) {
+  if (!key) return
+  try { localStorage.removeItem(STREAM_STORAGE_PREFIX + key) } catch {}
+}
+
+export function useAgenticStream(storageKey?: string) {
+  const [state, setState] = useState<AgenticStreamState>(() => {
+    const persisted = loadPersistedState(storageKey)
+    return persisted || INITIAL_STATE
+  })
   const abortControllerRef = useRef<AbortController | null>(null)
   const accumulatedRef = useRef<DeepPartial<FragmentSchema>>({})
+  const storageKeyRef = useRef(storageKey)
+  storageKeyRef.current = storageKey
+
+  // Persist state when stream completes
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestStateRef = useRef(state)
+  latestStateRef.current = state
+
+  // Debounced persist when streaming ends
+  if (!state.isStreaming && state.actions.length > 0) {
+    if (!persistTimeoutRef.current) {
+      persistTimeoutRef.current = setTimeout(() => {
+        persistState(storageKeyRef.current, latestStateRef.current)
+        persistTimeoutRef.current = null
+      }, 500)
+    }
+  }
 
   const reset = useCallback(() => {
+    if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
+    persistTimeoutRef.current = null
+    clearPersistedState(storageKeyRef.current)
     accumulatedRef.current = {}
     setState(INITIAL_STATE)
   }, [])
@@ -88,6 +147,9 @@ export function useAgenticStream() {
     abortControllerRef.current?.abort()
     const controller = new AbortController()
     abortControllerRef.current = controller
+
+    // Clear old persisted state for this project
+    clearPersistedState(storageKeyRef.current)
 
     accumulatedRef.current = {}
     setState({
@@ -172,8 +234,28 @@ export function useAgenticStream() {
                   }
                   return { ...prev, actions }
                 })
+              } else if (actionType === 'file_write' || actionType === 'file_edit' || actionType === 'file_read') {
+                // Deduplicate file actions: only add if not already present
+                setState(prev => {
+                  const exists = prev.actions.some(
+                    a => a.type === actionType && a.content === (event.content || '')
+                  )
+                  if (exists) return prev
+                  return {
+                    ...prev,
+                    actions: [
+                      ...prev.actions,
+                      {
+                        type: actionType,
+                        content: event.content || '',
+                        detail: event.detail || '',
+                        timestamp: Date.now(),
+                      },
+                    ],
+                  }
+                })
               } else {
-                // Regular action: thinking, file_write, web_search, etc.
+                // Regular action: thinking, web_search, status, etc.
                 setState(prev => ({
                   ...prev,
                   actions: [
@@ -236,6 +318,24 @@ export function useAgenticStream() {
   const stop = useCallback(() => {
     abortControllerRef.current?.abort()
     setState(prev => ({ ...prev, isStreaming: false }))
+  }, [])
+
+  // Persist state when stream completes (safety net)
+  const prevStateRef = useRef(state.isStreaming)
+  useEffect(() => {
+    if (prevStateRef.current && !state.isStreaming && state.actions.length > 0) {
+      persistState(storageKeyRef.current, state)
+    }
+    prevStateRef.current = state.isStreaming
+  }, [state.isStreaming, state.actions.length])
+
+  // Cleanup persist timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current)
+      }
+    }
   }, [])
 
   return {

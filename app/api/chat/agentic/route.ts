@@ -24,6 +24,7 @@ import {
 import { runAgent, type AgentEventEmitter } from '@/lib/agents/agent-runner'
 
 export const maxDuration = 300
+export const runtime = 'edge'
 
 const STREAM_TEXT_PROVIDER_IDS = new Set([
   'orcarouter',
@@ -296,6 +297,7 @@ async function runPipeline({
     }
 
     let completedAgents = 0
+    const emittedFilePaths = new Set<string>()
 
     for (const group of plan) {
       const contextMessages = buildAgentMessages(messages, agentResults, latestFragment)
@@ -319,11 +321,12 @@ async function runPipeline({
         emitAction('thinking', `${agentName}: Analyzing and generating...`)
         emitAction('status', `Running ${agentName}...`)
 
-        // Emit file reads from context (existing project files the agent sees)
+        // Emit file reads from context (existing project files the agent sees, deduplicated)
         if (latestFragment.files && latestFragment.files.length > 0) {
           emitAction('commentary', `Read ${latestFragment.files.length} file${latestFragment.files.length === 1 ? '' : 's'}`)
           for (const file of latestFragment.files.slice(0, 8)) {
-            if (file?.path) {
+            if (file?.path && !emittedFilePaths.has(`read:${file.path}`)) {
+              emittedFilePaths.add(`read:${file.path}`)
               emitAction('file_read', file.path)
             }
           }
@@ -331,11 +334,21 @@ async function runPipeline({
 
         console.log(`[Agentic] Running ${agentName}...`)
 
-        // Create event emitter for live streaming
+        // Create event emitter for live streaming (with deduplication)
         const agentEmitter: AgentEventEmitter = {
           emitThinking: (content) => emitAction('thinking', content),
-          emitFileRead: (path) => emitAction('file_read', path),
-          emitFileWrite: (path, purpose) => emitAction('file_write', path, purpose),
+          emitFileRead: (path) => {
+            if (!emittedFilePaths.has(`read:${path}`)) {
+              emittedFilePaths.add(`read:${path}`)
+              emitAction('file_read', path)
+            }
+          },
+          emitFileWrite: (path, purpose) => {
+            if (!emittedFilePaths.has(path)) {
+              emittedFilePaths.add(path)
+              emitAction('file_write', path, purpose)
+            }
+          },
           emitWebSearch: (query) => emitAction('web_search', query),
           emitCommentary: (content) => emitAction('commentary_chunk', content),
         }
@@ -369,18 +382,20 @@ async function runPipeline({
             emitAction('commentary', agentCommentary)
           }
 
-          // Emit REAL file paths from the agent's fragment
+          // Emit REAL file paths from the agent's fragment (deduplicated)
           if (result.fragment) {
             const fragment = result.fragment as Record<string, any>
             if (Array.isArray(fragment.files)) {
               for (const file of fragment.files) {
-                if (file?.path) {
+                if (file?.path && !emittedFilePaths.has(file.path)) {
+                  emittedFilePaths.add(file.path)
                   emitAction('file_write', file.path, file.purpose || undefined)
                 }
               }
             }
             // Also emit main file_path if no files array
-            if (fragment.file_path && (!fragment.files || fragment.files.length === 0)) {
+            if (fragment.file_path && !fragment.files?.length && !emittedFilePaths.has(fragment.file_path)) {
+              emittedFilePaths.add(fragment.file_path)
               emitAction('file_write', fragment.file_path)
             }
           }

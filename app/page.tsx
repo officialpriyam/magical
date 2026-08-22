@@ -210,7 +210,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [selectedStyle, setSelectedStyle] = useLocalStorage<string | null>('selectedStyle', null)
   const [customStylePrompt, setCustomStylePrompt] = useLocalStorage<string>('customStylePrompt', '')
   const [showStyleSelector, setShowStyleSelector] = useState(false)
-  const agenticStream = useAgenticStream()
   const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'plan')
   const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
 
@@ -273,6 +272,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const { session, loading: authLoading } = useAuth(setAuthDialogCallback, setAuthViewCallback)
   const { userTeam } = useUserTeam()
   const currentProjectId = currentProject?.id
+  const agenticStream = useAgenticStream(currentProjectId || undefined)
   const currentProjectGitHubWorkspace = useMemo(
     () => getProjectGitHubWorkspace(currentProject),
     [currentProject],
