@@ -29,10 +29,20 @@ const STREAM_TEXT_PROVIDER_IDS = new Set([
 // ─── Status Callback Type ───────────────────────────────────────
 export type StatusCallback = (status: AgentStatus) => void
 
+// ─── Event Emitter Type (for live streaming) ─────────────────────
+export type AgentEventEmitter = {
+  emitThinking: (content: string) => void
+  emitFileRead: (path: string) => void
+  emitFileWrite: (path: string, purpose?: string) => void
+  emitWebSearch: (query: string) => void
+  emitCommentary: (content: string) => void
+}
+
 // ─── Run a single agent ────────────────────────────────────────
 export async function runAgent(
   input: AgentInput,
   onStatus?: StatusCallback,
+  eventEmitter?: AgentEventEmitter,
 ): Promise<AgentResult> {
   const startTime = Date.now()
   const { role, config, fallbackChain, context } = input
@@ -85,7 +95,7 @@ export async function runAgent(
           ...modelParams,
         })
 
-        text = await readStreamToText(result.textStream)
+        text = await readStreamWithEvents(result.textStream, eventEmitter, role)
       } else {
         onStatus?.({
           role,
@@ -102,7 +112,7 @@ export async function runAgent(
           ...modelParams,
         })
 
-        text = await readStreamToText(result.textStream)
+        text = await readStreamWithEvents(result.textStream, eventEmitter, role)
       }
 
       // Parse the response
@@ -182,6 +192,80 @@ async function readStreamToText(stream: ReadableStream<string>): Promise<string>
       const { done, value } = await reader.read()
       if (done) break
       text += value
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  return text
+}
+
+// Read stream and emit live events as patterns are detected in the text
+async function readStreamWithEvents(
+  stream: ReadableStream<string>,
+  emitter?: AgentEventEmitter,
+  role?: AgentRole,
+): Promise<string> {
+  if (!emitter) return readStreamToText(stream)
+
+  const reader = stream.getReader()
+  let text = ''
+  let buffer = ''
+  let lastEmitTime = Date.now()
+  const EMIT_INTERVAL = 2000 // Emit commentary at most every 2s
+
+  // Track what we've already emitted to avoid duplicates
+  const emittedPaths = new Set<string>()
+  const emittedSearches = new Set<string>()
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      text += value
+      buffer += value
+
+      // Emit commentary from the streaming text periodically
+      const now = Date.now()
+      if (now - lastEmitTime > EMIT_INTERVAL && buffer.length > 50) {
+        // Try to extract a meaningful commentary line
+        const lines = buffer.split('\n').filter(l => l.trim().length > 10)
+        const lastMeaningful = lines[lines.length - 1]
+        if (lastMeaningful && !lastMeaningful.startsWith('{') && !lastMeaningful.startsWith('"')) {
+          emitter.emitCommentary(lastMeaningful.trim().slice(0, 200))
+        }
+        lastEmitTime = now
+        buffer = ''
+      }
+
+      // Detect file read patterns in the streaming text
+      const readFilePatterns = buffer.matchAll(/(?:reading|read)\s+([\w\/\._\-]+\.[\w]+)/gi)
+      for (const match of readFilePatterns) {
+        const path = match[1]
+        if (!emittedPaths.has(`read:${path}`)) {
+          emittedPaths.add(`read:${path}`)
+          emitter.emitFileRead(path)
+        }
+      }
+
+      // Detect file write patterns
+      const writeFilePatterns = buffer.matchAll(/(?:writing|write|created?|creating)\s+([\w\/\._\-]+\.[\w]+)/gi)
+      for (const match of writeFilePatterns) {
+        const path = match[1]
+        if (!emittedPaths.has(`write:${path}`)) {
+          emittedPaths.add(`write:${path}`)
+          emitter.emitFileWrite(path)
+        }
+      }
+
+      // Detect web search patterns
+      const searchPatterns = buffer.matchAll(/(?:search(?:ing)?|fetch(?:ing)?|looking up)\s+(?:for\s+)?([\w\s\.\/\-]{5,60})/gi)
+      for (const match of searchPatterns) {
+        const query = match[1].trim()
+        if (!emittedSearches.has(query)) {
+          emittedSearches.add(query)
+          emitter.emitWebSearch(query)
+        }
+      }
     }
   } finally {
     reader.releaseLock()

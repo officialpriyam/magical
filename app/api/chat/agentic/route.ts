@@ -21,7 +21,7 @@ import {
   COMPLEXITY_ANALYSIS_PROMPT,
   AGENT_DISPLAY_NAMES,
 } from '@/lib/agents/prompts'
-import { runAgent } from '@/lib/agents/agent-runner'
+import { runAgent, type AgentEventEmitter } from '@/lib/agents/agent-runner'
 
 export const maxDuration = 300
 
@@ -255,6 +255,16 @@ async function runPipeline({
         emitAction('status', `Running ${AGENT_DISPLAY_NAMES[role]}...`)
 
         console.log(`[Agentic] Running ${AGENT_DISPLAY_NAMES[role]}...`)
+
+        // Create event emitter for live streaming
+        const agentEmitter: AgentEventEmitter = {
+          emitThinking: (content) => emitAction('thinking', content),
+          emitFileRead: (path) => emitAction('file_read', `Reading ${path}`),
+          emitFileWrite: (path, purpose) => emitAction('file_write', `Writing ${path}`, purpose),
+          emitWebSearch: (query) => emitAction('web_search', `Searching ${query}`),
+          emitCommentary: (content) => emitAction('commentary', content),
+        }
+
         const result = await runAgent({
           role,
           systemPrompt: '',
@@ -268,7 +278,7 @@ async function runPipeline({
           },
           context,
           fallbackChain,
-        })
+        }, undefined, agentEmitter)
 
         agentResults.push(result)
         completedAgents++

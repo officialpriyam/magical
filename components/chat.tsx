@@ -306,6 +306,28 @@ function AgenticLiveActions({
 
       {/* Scrollable content */}
       <div ref={scrollRef} className="max-h-[300px] overflow-y-auto">
+        {/* Status updates — shown as individual items */}
+        {statusActions.length > 0 && (
+          <div className="space-y-0.5 border-b border-white/[0.04] px-4 py-2">
+            {statusActions.map((action, i) => (
+              <motion.div
+                key={`${action.timestamp}-${i}`}
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="flex items-center gap-2 py-0.5"
+              >
+                {isStreaming && i === statusActions.length - 1 ? (
+                  <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400" />
+                ) : (
+                  <Check className="h-3 w-3 shrink-0 text-emerald-400/60" />
+                )}
+                <span className="text-[11px] text-white/50">{action.content}</span>
+                <span className="shrink-0 tabular-nums text-[10px] text-white/20">{formatDuration(getActionDuration(i, statusActions))}</span>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
         {/* Thinking / Reasoning */}
         {thinkingActions.length > 0 && (
           <Collapsible open={expandedSections.has('thinking')} onOpenChange={() => toggleSection('thinking')}>

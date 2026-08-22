@@ -1,4 +1,4 @@
-export type SandboxProvider = 'e2b' | 'vercel' | 'modal'
+export type SandboxProvider = 'e2b' | 'vercel' | 'modal' | 'daytona' | 'cloudflare'
 export type SandboxProviderMode = 'auto' | SandboxProvider
 
 export const SANDBOX_PROVIDER_OPTIONS: {
@@ -26,10 +26,20 @@ export const SANDBOX_PROVIDER_OPTIONS: {
     label: 'E2B',
     description: 'Run the project in E2B.',
   },
+  {
+    value: 'daytona',
+    label: 'Daytona',
+    description: 'Run the project in Daytona Sandbox.',
+  },
+  {
+    value: 'cloudflare',
+    label: 'Cloudflare',
+    description: 'Run the project on Cloudflare Workers.',
+  },
 ]
 
 export function normalizeSandboxProviderMode(value: unknown): SandboxProviderMode {
-  return value === 'e2b' || value === 'vercel' || value === 'modal' || value === 'auto'
+  return value === 'e2b' || value === 'vercel' || value === 'modal' || value === 'daytona' || value === 'cloudflare' || value === 'auto'
     ? value
     : 'auto'
 }
@@ -51,7 +61,7 @@ export function decodeSandboxId(value: string): {
   const provider = value.slice(0, separatorIndex)
   const rawId = value.slice(separatorIndex + 1)
 
-  if (provider !== 'e2b' && provider !== 'vercel' && provider !== 'modal') {
+  if (provider !== 'e2b' && provider !== 'vercel' && provider !== 'modal' && provider !== 'daytona' && provider !== 'cloudflare') {
     return { provider: 'e2b', id: value }
   }
 

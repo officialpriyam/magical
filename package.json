@@ -22,6 +22,7 @@
     "@ai-sdk/react": "^3.0.197",
     "@aws-sdk/client-s3": "^3.1060.0",
     "@aws-sdk/lib-storage": "^3.1060.0",
+    "@daytona/sdk": "^0.205.1",
     "@e2b/code-interpreter": "^2.5.0",
     "@hookform/resolvers": "^5.4.0",
     "@monaco-editor/react": "^4.7.0",
