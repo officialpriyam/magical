@@ -135,6 +135,17 @@ export function useAgenticStream(storageKey?: string) {
     }
   }
 
+  // Reload persisted state when storageKey changes (e.g. from undefined → project ID on mount)
+  useEffect(() => {
+    if (!storageKey) return
+    setState(prev => {
+      // Only reload if state is empty (no actions, not streaming)
+      if (prev.isStreaming || prev.actions.length > 0) return prev
+      const persisted = loadPersistedState(storageKey)
+      return persisted || prev
+    })
+  }, [storageKey])
+
   const reset = useCallback(() => {
     if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
     persistTimeoutRef.current = null
@@ -329,11 +340,17 @@ export function useAgenticStream(storageKey?: string) {
     prevStateRef.current = state.isStreaming
   }, [state.isStreaming, state.actions.length])
 
-  // Cleanup persist timeout on unmount
+  // Persist state on unmount so it survives page refresh
   useEffect(() => {
     return () => {
       if (persistTimeoutRef.current) {
         clearTimeout(persistTimeoutRef.current)
+        persistTimeoutRef.current = null
+      }
+      // Flush any pending state to localStorage before unmounting
+      const current = latestStateRef.current
+      if (current && current.actions.length > 0 && !current.isStreaming) {
+        persistState(storageKeyRef.current, current)
       }
     }
   }, [])

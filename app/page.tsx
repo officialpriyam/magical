@@ -726,15 +726,20 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       if (hasContent) {
         setFragment(frag)
         setCurrentPreview({ fragment: frag, result: undefined })
+        // Include latest commentary from agentic actions in the fragment
+        // so the assistant message content persists with the full text
+        const commentaryActions = agenticStream.actions.filter((a: any) => a.type === 'commentary' || a.type === 'commentary_chunk')
+        const latestCommentary = commentaryActions.length > 0 ? commentaryActions[commentaryActions.length - 1].content : ''
+        const fragWithCommentary = latestCommentary ? { ...frag, commentary: frag.commentary || latestCommentary } : frag
         // Also update the assistant message so GeneratedArtifactCard shows
         setMessages(prev => {
-          const nextMessages = withLatestAssistantFragment(prev, frag)
+          const nextMessages = withLatestAssistantFragment(prev, fragWithCommentary)
           messagesRef.current = nextMessages
           return nextMessages
         })
       }
     }
-  }, [useAgentic, agenticStream.fragment])
+  }, [useAgentic, agenticStream.fragment, agenticStream.actions])
 
   // Safety: when agentic streaming ends, ensure an assistant message exists
   useEffect(() => {
@@ -745,15 +750,19 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     if (!hasAssistantResponse && messagesRef.current.length > 0) {
       // Create a minimal assistant message so the chat isn't empty
       const frag = agenticStream.fragment || fragment
-      if (frag && (frag.code || frag.files || frag.title || frag.description || frag.commentary)) {
+      // Include latest commentary from agentic actions in the fragment
+      const commentaryActions = agenticStream.actions.filter((a: any) => a.type === 'commentary' || a.type === 'commentary_chunk')
+      const latestCommentary = commentaryActions.length > 0 ? commentaryActions[commentaryActions.length - 1].content : ''
+      const fragWithCommentary = latestCommentary ? { ...frag, commentary: frag?.commentary || latestCommentary } : frag
+      if (fragWithCommentary && (fragWithCommentary.code || fragWithCommentary.files || fragWithCommentary.title || fragWithCommentary.description || fragWithCommentary.commentary)) {
         setMessages(prev => {
-          const nextMessages = withLatestAssistantFragment(prev, frag)
+          const nextMessages = withLatestAssistantFragment(prev, fragWithCommentary)
           messagesRef.current = nextMessages
           return nextMessages
         })
       }
     }
-  }, [useAgentic, agenticStream.isStreaming])
+  }, [useAgentic, agenticStream.isStreaming, agenticStream.actions])
 
   function getTemplateForSubmission(preferredTemplate?: string) {
     if (selectedTemplate !== 'auto') {
@@ -783,7 +792,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       // Strip agent name prefixes like "Planner: ..." or "Frontend: ..."
       chatText = assistantFragment.commentary
         .replace(/^(?:Planner|Architect|Frontend|Backend|Reviewer|Optimizer|Orchestrator):\s*/gmi, '')
-        .split('\n\n')[0] // Take first paragraph only
         .trim()
     }
     const assistantMessage: Message = {

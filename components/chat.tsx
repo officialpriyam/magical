@@ -237,7 +237,6 @@ function LiveStreamingMessage({
   const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set())
   const [expandedReads, setExpandedReads] = useState(false)
   const [expandedWrites, setExpandedWrites] = useState(false)
-  const [expandedSearches, setExpandedSearches] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Live timer
@@ -266,7 +265,6 @@ function LiveStreamingMessage({
   // Group reads and writes
   const fileReadActions = actions.filter(a => a.type === 'file_read')
   const fileWriteActions = actions.filter(a => a.type === 'file_write' || a.type === 'file_edit')
-  const searchActions = actions.filter(a => a.type === 'web_search' || a.type === 'web_fetch')
   const thinkingActions = actions.filter(a => a.type === 'thinking')
 
   // Calculate duration for each action
@@ -311,12 +309,14 @@ function LiveStreamingMessage({
     }
   }
 
-  // Build chronological timeline items (skip commentary — that goes in the body)
+  // Build chronological timeline items (skip commentary, todo, and web_search/web_fetch — search boxes removed per user request)
   const timelineActions = useMemo(() => {
     return actions.filter(a =>
       a.type !== 'commentary' &&
       a.type !== 'commentary_chunk' &&
-      a.type !== 'todo'
+      a.type !== 'todo' &&
+      a.type !== 'web_search' &&
+      a.type !== 'web_fetch'
     )
   }, [actions])
 
@@ -518,46 +518,8 @@ function LiveStreamingMessage({
           </Collapsible>
         )}
 
-        {/* Web search results */}
-        {searchActions.length > 0 && (
-          <div className="space-y-2 pl-5">
-            {searchActions.map((action, i) => {
-              // Parse search results from detail field
-              let results: { title: string; url: string; snippet: string }[] = []
-              try {
-                if (action.detail) results = JSON.parse(action.detail)
-              } catch {}
+        {/* Web search items are intentionally hidden — user requested removal of blue search boxes */}
 
-              return (
-                <motion.div
-                  key={`${action.timestamp}-${i}`}
-                  initial={{ opacity: 0, x: -4 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="rounded-lg border border-[#1EAEDB]/20 bg-[#1EAEDB]/5 p-2.5"
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#1EAEDB] mb-1.5">
-                    <Search className="h-3 w-3" />
-                    <span>Searched: {action.content}</span>
-                  </div>
-                  {results.length > 0 && (
-                    <div className="space-y-1">
-                      {results.slice(0, 3).map((r, j) => (
-                        <div key={j} className="flex items-start gap-2 text-[11px]">
-                          <Globe className="h-3 w-3 shrink-0 text-white/30 mt-0.5" />
-                          <div className="min-w-0">
-                            <div className="text-white/70 truncate">{r.title}</div>
-                            <div className="text-white/35 truncate">{r.url}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )
-            })}
-          </div>
-        )}
       </div>
 
       {/* Streaming commentary text — appears as normal message body with markdown */}
