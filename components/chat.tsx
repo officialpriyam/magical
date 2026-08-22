@@ -484,12 +484,68 @@ const AGENT_LABELS: Record<AgentRole, string> = {
   fixer: 'Fixing issues',
 }
 
+const AGENT_DETAIL_MESSAGES: Record<AgentRole, string[]> = {
+  orchestrator: [
+    'Analyzing request complexity...',
+    'Determining optimal agent allocation...',
+    'Evaluating task dependencies...',
+  ],
+  planner: [
+    'Creating implementation plan...',
+    'Mapping file structure...',
+    'Identifying component hierarchy...',
+  ],
+  architect: [
+    'Designing project architecture...',
+    'Planning data flow and state management...',
+    'Structuring API routes...',
+  ],
+  frontend: [
+    'Reading src/index.css...',
+    'Writing src/components/Header.tsx...',
+    'Building src/pages/Dashboard.tsx...',
+    'Creating src/components/Chart.tsx...',
+    'Writing src/App.tsx...',
+    'Searching for React component patterns...',
+    'Fetching design inspiration from dribbble.com...',
+  ],
+  backend: [
+    'Reading src/index.html...',
+    'Writing app/api/users/route.ts...',
+    'Creating src/lib/database.ts...',
+    'Building app/api/auth/route.ts...',
+    'Writing src/migrations/001.sql...',
+    'Fetching Supabase API docs...',
+    'Searching for REST API best practices...',
+  ],
+  reviewer: [
+    'Reviewing src/components/Header.tsx...',
+    'Checking security patterns...',
+    'Evaluating accessibility...',
+    'Scoring code quality...',
+    'Reading src/pages/Dashboard.tsx...',
+  ],
+  optimizer: [
+    'Analyzing bundle size...',
+    'Optimizing React.memo usage...',
+    'Improving Core Web Vitals...',
+    'Reducing re-renders...',
+    'Fetching Lighthouse audit results...',
+  ],
+  fixer: [
+    'Analyzing error messages...',
+    'Fixing type errors in src/...',
+    'Applying patches...',
+    'Reading error logs...',
+  ],
+}
+
 function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPartial<FragmentSchema> }) {
   const [elapsedTime, setElapsedTime] = useState(0)
   const startTimeRef = useRef(Date.now())
   const [activeStep, setActiveStep] = useState(0)
+  const [detailIdx, setDetailIdx] = useState(0)
 
-  // Agent steps to animate through during loading
   const agentSteps: { role: AgentRole; label: string; description: string; duration: number }[] = [
     { role: 'orchestrator', label: 'Orchestrator', description: 'Analyzing request complexity', duration: 3000 },
     { role: 'planner', label: 'Planner', description: 'Creating implementation plan', duration: 4000 },
@@ -500,13 +556,17 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
     { role: 'optimizer', label: 'Optimizer', description: 'Optimizing performance', duration: 4000 },
   ]
 
-  // Check if we have a completed fragment
   const hasFragment = Boolean(currentFragment?.code || (currentFragment?.files && currentFragment.files.length > 0))
   const commentary = cleanText(currentFragment?.commentary)
+  const files = getFragmentFiles(currentFragment)
 
-  // If fragment is done, show completed state
   const completedStepCount = hasFragment ? agentSteps.length : activeStep
   const progressPercent = hasFragment ? 100 : Math.min(((completedStepCount + 0.5) / agentSteps.length) * 100, 95)
+
+  // Current detail messages for the active agent step
+  const currentStepRole = !hasFragment && activeStep < agentSteps.length ? agentSteps[activeStep].role : null
+  const detailMessages = currentStepRole ? (AGENT_DETAIL_MESSAGES[currentStepRole] || []) : []
+  const currentDetail = detailMessages.length > 0 ? detailMessages[detailIdx % detailMessages.length] : ''
 
   // Elapsed timer
   useEffect(() => {
@@ -516,15 +576,14 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
     return () => clearInterval(interval)
   }, [])
 
-  // Animate through agent steps while loading
+  // Animate through agent steps
   useEffect(() => {
     if (hasFragment) return
-    let stepIdx = 0
     let elapsed = 0
     const interval = setInterval(() => {
       elapsed += 500
-      // Advance to next step based on accumulated time
       let accumulated = 0
+      let stepIdx = 0
       for (let i = 0; i < agentSteps.length; i++) {
         accumulated += agentSteps[i].duration
         if (elapsed < accumulated) {
@@ -537,6 +596,15 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
     }, 500)
     return () => clearInterval(interval)
   }, [hasFragment])
+
+  // Cycle through detail messages for the active step
+  useEffect(() => {
+    if (hasFragment || detailMessages.length === 0) return
+    const interval = setInterval(() => {
+      setDetailIdx(prev => prev + 1)
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [hasFragment, currentStepRole])
 
   return (
     <motion.div
@@ -594,7 +662,6 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
                 transition={{ duration: 0.2 }}
                 className="flex items-center gap-2.5 py-1"
               >
-                {/* Status icon */}
                 <div className="flex h-4 w-4 shrink-0 items-center justify-center">
                   {isCompleted && !isCurrent ? (
                     <Check className="h-3.5 w-3.5 text-emerald-400" />
@@ -603,20 +670,27 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
                   ) : null}
                 </div>
 
-                {/* Agent icon + name + description */}
                 <Icon className="h-3 w-3 shrink-0 text-white/30" />
                 <span className={`text-xs font-medium ${isCompleted && !isCurrent ? 'text-white/40' : isCurrent ? 'text-blue-300' : 'text-white/30'}`}>
                   {step.label}
                 </span>
-                <span className="text-[11px] text-white/25">{step.description}</span>
 
-                {/* Current step spinner */}
-                {isCurrent && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="ml-auto"
+                {/* Show rotating detail message for current step */}
+                {isCurrent && currentDetail ? (
+                  <motion.span
+                    key={currentDetail}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-[11px] text-blue-400/50"
                   >
+                    {currentDetail}
+                  </motion.span>
+                ) : (
+                  <span className="text-[11px] text-white/25">{step.description}</span>
+                )}
+
+                {isCurrent && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="ml-auto">
                     <span className="text-[10px] text-blue-400/60">running</span>
                   </motion.div>
                 )}
@@ -626,8 +700,28 @@ function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPar
         </div>
       </div>
 
-      {/* Live commentary from fragment (when available) */}
-      {commentary && (
+      {/* Live files from fragment (when available) */}
+      {files.length > 0 && !hasFragment && (
+        <div className="border-t border-white/[0.06] px-4 py-2">
+          <div className="space-y-0.5">
+            {files.slice(0, 4).map((file) => (
+              <motion.div
+                key={file.path}
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="flex items-center gap-1.5 text-[11px] text-white/35"
+              >
+                <FileCode2 className="h-3 w-3 shrink-0 text-blue-400/40" />
+                <span className="truncate">{file.path}</span>
+                <span className="ml-auto text-[10px] text-emerald-400/50">done</span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Commentary from completed fragment */}
+      {commentary && hasFragment && (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
@@ -708,16 +802,41 @@ function GenerationStatusCard({
           animate={{ opacity: 1, y: 0 }}
           className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3"
         >
-          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/30">
+          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/30">
             <Sparkles className="h-3 w-3" />
             Steps
           </div>
-          <div className="space-y-2">
-            {commentary.split('\n\n').filter(Boolean).map((paragraph, i) => (
-              <div key={i} className="text-xs leading-relaxed text-white/50">
-                {paragraph}
-              </div>
-            ))}
+          <div className="space-y-3">
+            {commentary.split('\n\n').filter(Boolean).map((paragraph, i) => {
+              // Parse agent step lines (e.g. "Frontend: Building...")
+              const agentMatch = paragraph.match(/^(\w+):\s*([\s\S]+)/)
+              if (agentMatch) {
+                const agentName = agentMatch[1]
+                const agentText = agentMatch[2]
+                const Icon = Object.entries(AGENT_ICONS).find(([k]) => k.toLowerCase() === agentName.toLowerCase())?.[1] || Sparkles
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -4 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <Icon className="h-3 w-3 text-blue-400/60" />
+                      <span className="text-[11px] font-semibold text-blue-300/70">{agentName}</span>
+                    </div>
+                    <p className="pl-4 text-xs leading-relaxed text-white/45">
+                      {agentText.length > 400 ? `${agentText.slice(0, 400)}...` : agentText}
+                    </p>
+                  </motion.div>
+                )
+              }
+              return (
+                <div key={i} className="text-xs leading-relaxed text-white/45">
+                  {paragraph}
+                </div>
+              )
+            })}
           </div>
         </motion.div>
       )}
