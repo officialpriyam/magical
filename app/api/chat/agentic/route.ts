@@ -53,17 +53,30 @@ const PARALLEL_GROUPS: Record<TaskComplexity, AgentRole[][]> = {
 function createSSEStream() {
   let controller: ReadableStreamDefaultController<Uint8Array> | null = null
   let encoder = new TextEncoder()
+  let heartbeatInterval: ReturnType<typeof setInterval> | null = null
 
   const stream = new ReadableStream<Uint8Array>({
     start(c) {
       controller = c
+      // Send SSE comment heartbeat every 15s to keep connection alive
+      heartbeatInterval = setInterval(() => {
+        if (!controller) return
+        try {
+          controller.enqueue(encoder.encode(': heartbeat\n\n'))
+        } catch {}
+      }, 15000)
+    },
+    cancel() {
+      if (heartbeatInterval) clearInterval(heartbeatInterval)
     },
   })
 
   function emit(event: Record<string, any>) {
     if (!controller) return
     try {
-      controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'))
+      // Use proper SSE format: data: <json>\n\n
+      const data = 'data: ' + JSON.stringify(event) + '\n\n'
+      controller.enqueue(encoder.encode(data))
     } catch {
       // Stream may be closed
     }
@@ -90,6 +103,10 @@ function createSSEStream() {
   }
 
   function close() {
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval)
+      heartbeatInterval = null
+    }
     if (controller) {
       try { controller.close() } catch {}
       controller = null
@@ -212,8 +229,9 @@ export async function POST(req: Request) {
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'application/x-ndjson; charset=utf-8',
-      'Cache-Control': 'no-cache',
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
     },
   })

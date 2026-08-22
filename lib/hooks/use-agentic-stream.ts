@@ -122,15 +122,29 @@ export function useAgenticStream() {
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
 
-        for (const line of lines) {
-          const trimmed = line.trim()
+        // SSE format: events separated by double newlines
+        // Each event starts with "data: " followed by JSON
+        // Comments start with ":" (heartbeats)
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() || ''
+
+        for (const part of parts) {
+          const trimmed = part.trim()
           if (!trimmed) continue
 
+          // Skip SSE comments (heartbeats)
+          if (trimmed.startsWith(':')) continue
+
+          // Extract JSON from "data: {...}" lines
+          const dataLines = trimmed.split('\n')
+            .filter(l => l.startsWith('data: '))
+            .map(l => l.slice(6)) // Remove "data: " prefix
+          const jsonStr = dataLines.join('')
+          if (!jsonStr) continue
+
           try {
-            const event = JSON.parse(trimmed)
+            const event = JSON.parse(jsonStr)
 
             if (event.type === 'action') {
               const actionType = event.action_type as ToolAction['type']
