@@ -162,6 +162,11 @@ export async function POST(req: Request) {
     projectsMode: supabaseStatus.projectsMode,
   }
 
+  const { stream, emit, emitAction, emitTodos, emitProgress, emitFragment, emitError, close } = createSSEStream()
+
+  // Emit connected event immediately so the frontend knows the stream is alive
+  emit({ type: 'connected', timestamp: Date.now() })
+
   // Auto web search: detect if the query needs up-to-date information
   const autoSearchQuery = detectAutoSearchQuery(messages)
   let enrichedMessages = [...messages]
@@ -169,6 +174,8 @@ export async function POST(req: Request) {
     try {
       const searchResults = await fetchWebSearch(autoSearchQuery)
       if (searchResults.length > 0) {
+        // Emit web search results to frontend
+        emitAction('web_search', autoSearchQuery, JSON.stringify(searchResults.map(r => ({ title: r.title, url: r.url, snippet: r.snippet }))))
         const searchContext = searchResults
           .map((r, i) => `[${i + 1}] ${r.title}\n    ${r.url}\n    ${r.snippet}`)
           .join('\n\n')
@@ -188,6 +195,10 @@ export async function POST(req: Request) {
   // Auto-fetch URLs from user messages
   const fetchedUrls = await fetchUrlsFromMessages(messages)
   if (fetchedUrls.length > 0) {
+    // Emit web fetch results to frontend
+    for (const fetched of fetchedUrls) {
+      emitAction('web_fetch', fetched.url, fetched.title || '')
+    }
     const urlContext = fetchedUrls
       .map((f) => {
         const header = f.title ? `URL: ${f.url} (Title: ${f.title})` : `URL: ${f.url}`
@@ -203,11 +214,6 @@ export async function POST(req: Request) {
       },
     ]
   }
-
-  const { stream, emit, emitAction, emitTodos, emitProgress, emitFragment, emitError, close } = createSSEStream()
-
-  // Emit connected event immediately so the frontend knows the stream is alive
-  emit({ type: 'connected', timestamp: Date.now() })
 
   // Run the pipeline in background and stream events
   const pipelinePromise = runPipeline({

@@ -105,7 +105,7 @@ export function Chat({
           className={`flex flex-col whitespace-pre-wrap text-sm leading-5 ${
             message.role === 'user'
               ? 'self-end max-w-[85%] rounded-2xl bg-white/[0.07] px-3 py-1.5 text-white shadow-sm sm:px-4 md:px-4'
-              : 'w-full gap-2 text-white/90'
+              : 'w-full gap-2 text-white'
           }`}
           key={index}
         >
@@ -149,7 +149,7 @@ export function Chat({
                   </span>
                 )
               }
-              return <span key={id}>{content.text}</span>
+              return <span key={id} className="text-white/95 leading-relaxed">{renderMarkdownText(content.text)}</span>
             }
             if (content.type === 'image') {
               return (
@@ -518,26 +518,45 @@ function LiveStreamingMessage({
           </Collapsible>
         )}
 
-        {/* Collapsible: Web searches */}
+        {/* Web search results */}
         {searchActions.length > 0 && (
-          <Collapsible open={expandedSearches} onOpenChange={setExpandedSearches}>
-            <CollapsibleTrigger className="flex items-center gap-1.5 py-0.5 text-xs text-white/40 hover:text-white/55 transition">
-              {expandedSearches ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              <span className="text-white/30">⋮</span>
-              <Search className="h-3 w-3 text-blue-400/50" />
-              <span className="font-medium">Explore · {searchActions.length} Search{searchActions.length === 1 ? '' : 'es'}</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="space-y-0.5 pl-5">
-                {searchActions.map((action, i) => (
-                  <div key={`${action.timestamp}-${i}`} className="flex items-center gap-2 py-0.5">
-                    <Globe className="h-3 w-3 shrink-0 text-blue-400/50" />
-                    <span className="truncate text-[11px] text-white/45">{action.content}</span>
+          <div className="space-y-2 pl-5">
+            {searchActions.map((action, i) => {
+              // Parse search results from detail field
+              let results: { title: string; url: string; snippet: string }[] = []
+              try {
+                if (action.detail) results = JSON.parse(action.detail)
+              } catch {}
+
+              return (
+                <motion.div
+                  key={`${action.timestamp}-${i}`}
+                  initial={{ opacity: 0, x: -4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="rounded-lg border border-[#1EAEDB]/20 bg-[#1EAEDB]/5 p-2.5"
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#1EAEDB] mb-1.5">
+                    <Search className="h-3 w-3" />
+                    <span>Searched: {action.content}</span>
                   </div>
-                ))}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+                  {results.length > 0 && (
+                    <div className="space-y-1">
+                      {results.slice(0, 3).map((r, j) => (
+                        <div key={j} className="flex items-start gap-2 text-[11px]">
+                          <Globe className="h-3 w-3 shrink-0 text-white/30 mt-0.5" />
+                          <div className="min-w-0">
+                            <div className="text-white/70 truncate">{r.title}</div>
+                            <div className="text-white/35 truncate">{r.url}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )
+            })}
+          </div>
         )}
       </div>
 
@@ -883,6 +902,119 @@ function GeneratedArtifactCard({
   const migrations = Array.isArray(message.object?.supabase_migrations)
     ? message.object.supabase_migrations
     : []
+  const agentMeta = (message.object as any)?.agent_metadata
+  const description = typeof message.object?.description === 'string' ? message.object.description : ''
+
+  return (
+    <div className="w-full max-w-[28rem]">
+      {/* Description text above the card */}
+      {description && (
+        <p className="mb-2 text-[13px] leading-relaxed text-white/85 pl-1">{description}</p>
+      )}
+
+      {/* Card with project info */}
+      <div
+        onClick={() =>
+          setCurrentPreview({
+            fragment: message.object,
+            result: message.result,
+          })
+        }
+        className="rounded-xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.06] hover:border-white/15 cursor-pointer"
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-white">
+              {message.object?.title || 'Generated project'}
+            </div>
+            <div className="mt-1 text-xs text-white/50">
+              {files.length > 0
+                ? `${files.length} file${files.length === 1 ? '' : 's'} generated`
+                : message.object?.template || 'Artifact ready'}
+            </div>
+          </div>
+        </div>
+
+        {/* File list */}
+        {files.length > 0 && (
+          <div className="mb-3 space-y-1">
+            {files.slice(0, 5).map((file) => (
+              <div key={file.path} className="flex min-w-0 items-center gap-2 text-xs text-white/60">
+                <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/40" />
+                <span className="truncate font-mono">{file.path}</span>
+              </div>
+            ))}
+            {files.length > 5 && (
+              <div className="text-xs text-white/40">+{files.length - 5} more files</div>
+            )}
+          </div>
+        )}
+
+        {/* Migrations */}
+        {migrations.length > 0 && (
+          <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-200">
+            <Database className="h-3.5 w-3.5" />
+            {migrations.length} Supabase migration{migrations.length === 1 ? '' : 's'} ready
+          </div>
+        )}
+
+        {/* Agent metadata */}
+        {agentMeta && (
+          <div className="mb-3 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-white/50 mb-1">
+              <Cpu className="h-3 w-3" />
+              Agentic Generation Info
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-[11px]">
+              <div>
+                <span className="text-white/35">Complexity:</span>
+                <span className="ml-1 text-white/60">{agentMeta.complexity || 'moderate'}</span>
+              </div>
+              <div>
+                <span className="text-white/35">Agents:</span>
+                <span className="ml-1 text-white/60">{(agentMeta.agents_used || []).length}</span>
+              </div>
+              <div>
+                <span className="text-white/35">Time:</span>
+                <span className="ml-1 text-white/60">{agentMeta.total_duration ? `${(agentMeta.total_duration / 1000).toFixed(1)}s` : '—'}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="h-9 rounded-lg border border-white/15 bg-white/[0.04] text-xs font-medium text-white/80 transition hover:bg-white/[0.08]"
+          >
+            Details
+          </button>
+          <button
+            type="button"
+            className="h-9 rounded-lg border border-white/10 bg-white/[0.08] text-xs font-medium text-white/90 transition hover:bg-white/[0.12]"
+          >
+            Preview
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Keep old component for backward compat
+function GeneratedArtifactCardOld({
+  message,
+  setCurrentPreview,
+}: {
+  message: Message
+  setCurrentPreview: (preview: {
+    fragment: DeepPartial<FragmentSchema> | undefined
+    result: ExecutionResult | undefined
+  }) => void
+}) {
+  const files = getFragmentFiles(message.object)
+  const agentMeta = (message.object as any)?.agent_metadata
 
   return (
     <div
@@ -892,42 +1024,22 @@ function GeneratedArtifactCard({
           result: message.result,
         })
       }
-      className="w-full max-w-[24rem] rounded-xl border border-blue-500/70 bg-white/[0.035] p-3 shadow-[0_0_0_1px_rgba(37,99,235,0.18)] transition hover:bg-white/[0.055] hover:cursor-pointer"
+      className="w-full max-w-[24rem] rounded-xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.06] cursor-pointer"
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-white">
+          <div className="text-sm font-semibold text-white">
             {message.object?.title || 'Generated project'}
           </div>
-          <div className="mt-1 truncate text-xs text-white/45">
+          <div className="mt-1 text-xs text-white/50">
             {files.length > 0
               ? `${files.length} file${files.length === 1 ? '' : 's'} generated`
               : message.object?.template || 'Artifact ready'}
           </div>
         </div>
-        <Terminal strokeWidth={2} className="h-4 w-4 shrink-0 text-foreground/50" />
+        <Terminal strokeWidth={2} className="h-4 w-4 shrink-0 text-white/40" />
       </div>
 
-      {files.length > 0 && (
-        <div className="mb-4 space-y-1.5">
-          {files.slice(0, 5).map((file) => (
-            <div key={file.path} className="flex min-w-0 items-center gap-2 text-xs text-white/68">
-              <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/42" />
-              <span className="truncate">{file.path}</span>
-            </div>
-          ))}
-          {files.length > 5 && (
-            <div className="text-xs text-white/42">+{files.length - 5} more files</div>
-          )}
-        </div>
-      )}      {migrations.length > 0 && (
-        <div className="mb-4 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-200">
-          <Database className="h-3.5 w-3.5" />
-          {migrations.length} Supabase migration{migrations.length === 1 ? '' : 's'} ready
-        </div>
-      )}
-
-      {/* Agent Metadata Display */}
       {(message.object as any)?.agent_metadata && (
         <AgentMetadataDisplay metadata={(message.object as any).agent_metadata} />
       )}
