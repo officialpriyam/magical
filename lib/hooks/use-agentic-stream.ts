@@ -5,7 +5,7 @@ import { DeepPartial } from 'ai'
 import { useCallback, useRef, useState } from 'react'
 
 export type ToolAction = {
-  type: 'thinking' | 'file_write' | 'file_edit' | 'file_read' | 'web_search' | 'web_fetch' | 'todo' | 'commentary' | 'status'
+  type: 'thinking' | 'file_write' | 'file_edit' | 'file_read' | 'web_search' | 'web_fetch' | 'todo' | 'commentary' | 'commentary_chunk' | 'status'
   content: string
   detail?: string
   timestamp: number
@@ -133,19 +133,46 @@ export function useAgenticStream() {
             const event = JSON.parse(trimmed)
 
             if (event.type === 'action') {
-              // Tool action: thinking, file_write, web_search, etc.
-              setState(prev => ({
-                ...prev,
-                actions: [
-                  ...prev.actions,
-                  {
-                    type: event.action_type as ToolAction['type'],
-                    content: event.content || '',
-                    detail: event.detail || '',
-                    timestamp: Date.now(),
-                  },
-                ],
-              }))
+              const actionType = event.action_type as ToolAction['type']
+
+              if (actionType === 'commentary_chunk') {
+                // Append to the last commentary action for streaming text effect
+                setState(prev => {
+                  const actions = [...prev.actions]
+                  const lastCommentaryIdx = actions.findLastIndex(
+                    a => a.type === 'commentary' || a.type === 'commentary_chunk'
+                  )
+                  if (lastCommentaryIdx >= 0) {
+                    actions[lastCommentaryIdx] = {
+                      ...actions[lastCommentaryIdx],
+                      content: event.content || '',
+                      timestamp: Date.now(),
+                    }
+                  } else {
+                    actions.push({
+                      type: 'commentary_chunk',
+                      content: event.content || '',
+                      detail: event.detail || '',
+                      timestamp: Date.now(),
+                    })
+                  }
+                  return { ...prev, actions }
+                })
+              } else {
+                // Regular action: thinking, file_write, web_search, etc.
+                setState(prev => ({
+                  ...prev,
+                  actions: [
+                    ...prev.actions,
+                    {
+                      type: actionType,
+                      content: event.content || '',
+                      detail: event.detail || '',
+                      timestamp: Date.now(),
+                    },
+                  ],
+                }))
+              }
             } else if (event.type === 'todos') {
               // Todo list update
               setState(prev => ({

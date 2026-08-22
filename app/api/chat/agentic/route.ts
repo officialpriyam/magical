@@ -304,7 +304,7 @@ async function runPipeline({
           emitFileRead: (path) => emitAction('file_read', `Reading ${path}`),
           emitFileWrite: (path, purpose) => emitAction('file_write', `Writing ${path}`, purpose),
           emitWebSearch: (query) => emitAction('web_search', `Searching ${query}`),
-          emitCommentary: (content) => emitAction('commentary', content),
+          emitCommentary: (content) => emitAction('commentary_chunk', content),
         }
 
         const result = await runAgent({

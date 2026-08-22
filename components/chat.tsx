@@ -233,9 +233,9 @@ function LiveStreamingMessage({
   const fileWriteActions = actions.filter(a => a.type === 'file_write' || a.type === 'file_edit')
   const fileReadActions = actions.filter(a => a.type === 'file_read')
   const searchActions = actions.filter(a => a.type === 'web_search' || a.type === 'web_fetch')
-  const commentaryActions = actions.filter(a => a.type === 'commentary')
+  const commentaryActions = actions.filter(a => a.type === 'commentary' || a.type === 'commentary_chunk')
 
-  // Latest commentary text (this is what streams as the AI response)
+  // Latest commentary text — gets the most recent streaming chunk or final commentary
   const latestCommentary = commentaryActions.length > 0
     ? commentaryActions[commentaryActions.length - 1].content
     : ''

@@ -211,7 +211,8 @@ async function readStreamWithEvents(
   let text = ''
   let buffer = ''
   let lastEmitTime = Date.now()
-  const EMIT_INTERVAL = 2000 // Emit commentary at most every 2s
+  let lastCommentaryLen = 0
+  const EMIT_INTERVAL = 300 // Emit commentary every 300ms for live streaming feel
 
   // Track what we've already emitted to avoid duplicates
   const emittedPaths = new Set<string>()
@@ -224,15 +225,36 @@ async function readStreamWithEvents(
       text += value
       buffer += value
 
-      // Emit commentary from the streaming text periodically
+      // Emit commentary from the streaming text frequently
       const now = Date.now()
-      if (now - lastEmitTime > EMIT_INTERVAL && buffer.length > 50) {
-        // Try to extract a meaningful commentary line
-        const lines = buffer.split('\n').filter(l => l.trim().length > 10)
+      if (now - lastEmitTime > EMIT_INTERVAL && buffer.length > 20) {
+        // For streamText path: emit meaningful lines as commentary chunks
+        const lines = buffer.split('\n').filter(l => l.trim().length > 5)
         const lastMeaningful = lines[lines.length - 1]
         if (lastMeaningful && !lastMeaningful.startsWith('{') && !lastMeaningful.startsWith('"')) {
-          emitter.emitCommentary(lastMeaningful.trim().slice(0, 200))
+          const trimmed = lastMeaningful.trim()
+          // Only emit if we have new content (avoid re-emitting same text)
+          if (trimmed.length > lastCommentaryLen) {
+            emitter.emitCommentary(trimmed.slice(0, 300))
+            lastCommentaryLen = trimmed.length
+          }
         }
+
+        // For streamObject path: try to extract commentary from partial JSON
+        try {
+          const commentaryMatch = buffer.match(/"commentary"\s*:\s*"((?:[^"\\]|\\.)*)/)
+          if (commentaryMatch) {
+            const decoded = commentaryMatch[1]
+              .replace(/\\n/g, '\n')
+              .replace(/\\"/g, '"')
+              .replace(/\\\\/g, '\\')
+            if (decoded.length > lastCommentaryLen && decoded.length > 10) {
+              emitter.emitCommentary(decoded.slice(0, 500))
+              lastCommentaryLen = decoded.length
+            }
+          }
+        } catch { /* ignore parse errors on partial JSON */ }
+
         lastEmitTime = now
         buffer = ''
       }
