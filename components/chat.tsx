@@ -154,40 +154,38 @@ export function Chat({
           )}
         </motion.div>
       ))}
-      {(isLoading || isPreviewLoading || autoFixMessage || (useAgentic && agenticActions.length > 0)) && (
-        <>
-          {/* Live agentic streaming actions — show during AND after streaming */}
-          {useAgentic && agenticActions.length > 0 && (
-            <AgenticLiveActions
-              actions={agenticActions}
-              todos={agenticTodos}
-              isStreaming={agenticStreaming}
-              setCurrentPreview={setCurrentPreview}
-              currentFragment={currentFragment}
-              onStop={onStop}
-            />
-          )}
-          {/* Fallback indicator for non-agentic or before actions stream in */}
-          {useAgentic && isLoading && agenticActions.length === 0 && (
-            <div className="w-full max-w-[36rem] rounded-xl border border-blue-500/20 bg-blue-500/[0.04] px-4 py-3">
-              <div className="flex items-center gap-2.5">
-                <LoaderIcon className="h-4 w-4 animate-spin text-blue-400" />
-                <span className="text-xs font-medium text-blue-300">Starting agentic pipeline...</span>
-              </div>
-            </div>
-          )}
-          {/* Hide GenerationStatusCard when agentic actions are showing (they provide better info) */}
-          {!(useAgentic && agenticActions.length > 0) && (
-            <GenerationStatusCard
-              messages={messages}
-              currentFragment={currentFragment}
-              isLoading={isLoading}
-              isPreviewLoading={isPreviewLoading}
-              autoFixMessage={autoFixMessage}
-              onStop={onStop}
-            />
-          )}
-        </>
+      {/* Live streaming message — appears inline during generation */}
+      {useAgentic && agenticStreaming && agenticActions.length > 0 && (
+        <LiveStreamingMessage
+          actions={agenticActions}
+          todos={agenticTodos}
+          isStreaming={agenticStreaming}
+          onStop={onStop}
+        />
+      )}
+      {/* Fallback indicator for non-agentic or before actions stream in */}
+      {useAgentic && isLoading && agenticActions.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-[36rem]"
+        >
+          <div className="flex items-center gap-2.5 text-white/70">
+            <LoaderIcon className="h-4 w-4 animate-spin text-blue-400" />
+            <span className="text-sm">Thinking...</span>
+          </div>
+        </motion.div>
+      )}
+      {/* Post-generation status — stays visible after streaming ends */}
+      {!agenticStreaming && (
+        <GenerationStatusCard
+          messages={messages}
+          currentFragment={currentFragment}
+          isLoading={isLoading}
+          isPreviewLoading={isPreviewLoading}
+          autoFixMessage={autoFixMessage}
+          onStop={onStop}
+        />
       )}
     </div>
   )
@@ -197,6 +195,245 @@ export function Chat({
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`
   return `${(ms / 1000).toFixed(1)}s`
+}
+
+// ─── Live Streaming Message (inline in chat) ───────────────
+function LiveStreamingMessage({
+  actions,
+  todos,
+  isStreaming,
+  onStop,
+}: {
+  actions: ToolAction[]
+  todos: TodoItem[]
+  isStreaming: boolean
+  onStop?: () => void
+}) {
+  const [elapsed, setElapsed] = useState(0)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['commentary']))
+
+  // Live timer
+  useEffect(() => {
+    if (!isStreaming || actions.length === 0) return
+    const start = actions[0].timestamp
+    const interval = setInterval(() => {
+      setElapsed(Date.now() - start)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [isStreaming, actions.length])
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(section)) next.delete(section)
+      else next.add(section)
+      return next
+    })
+  }
+
+  // Group actions
+  const thinkingActions = actions.filter(a => a.type === 'thinking')
+  const fileWriteActions = actions.filter(a => a.type === 'file_write' || a.type === 'file_edit')
+  const fileReadActions = actions.filter(a => a.type === 'file_read')
+  const searchActions = actions.filter(a => a.type === 'web_search' || a.type === 'web_fetch')
+  const commentaryActions = actions.filter(a => a.type === 'commentary')
+  const statusActions = actions.filter(a => a.type === 'status')
+
+  // Latest commentary (streaming text)
+  const latestCommentary = commentaryActions.length > 0
+    ? commentaryActions[commentaryActions.length - 1].content
+    : ''
+
+  // Latest status
+  const latestStatus = statusActions.length > 0
+    ? statusActions[statusActions.length - 1].content
+    : isStreaming ? 'Working...' : 'Done'
+
+  // Latest thinking
+  const latestThinking = thinkingActions.length > 0
+    ? thinkingActions[thinkingActions.length - 1].content
+    : ''
+
+  const elapsedSec = Math.floor(elapsed / 1000)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-[40rem]"
+    >
+      {/* Agent header with timer */}
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10">
+          <Cpu className="h-3.5 w-3.5 text-blue-400" />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-white/80">AI Agent</span>
+          {isStreaming && (
+            <span className="flex items-center gap-1.5 text-xs text-white/40">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+              Working for {elapsedSec}s
+            </span>
+          )}
+          {!isStreaming && elapsedSec > 0 && (
+            <span className="text-xs text-white/30">Completed in {formatDuration(elapsed)}</span>
+          )}
+        </div>
+        {isStreaming && onStop && (
+          <button
+            type="button"
+            onClick={onStop}
+            className="ml-auto flex h-6 items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 text-[11px] font-medium text-red-300 transition hover:bg-red-500/20"
+          >
+            <Square className="h-2 w-2 fill-current" />
+            Stop
+          </button>
+        )}
+      </div>
+
+      {/* Live content card */}
+      <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
+        {/* Status line */}
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/[0.06]">
+          {isStreaming ? (
+            <LoaderIcon className="h-3.5 w-3.5 animate-spin text-blue-400" />
+          ) : (
+            <Check className="h-3.5 w-3.5 text-emerald-400" />
+          )}
+          <span className="text-xs text-white/60">{latestStatus}</span>
+        </div>
+
+        {/* File reads — compact inline list */}
+        {fileReadActions.length > 0 && (
+          <Collapsible open={expandedSections.has('reads')} onOpenChange={() => toggleSection('reads')}>
+            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02] border-b border-white/[0.04]">
+              {expandedSections.has('reads') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <Eye className="h-3.5 w-3.5 text-blue-400/70" />
+              <span>Read {fileReadActions.length} file{fileReadActions.length === 1 ? '' : 's'}</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-0.5 px-4 py-2">
+                {fileReadActions.map((action, i) => {
+                  const filePath = action.content.replace(/^Reading\s+/i, '').replace(/\.\.\.$/, '').trim()
+                  return (
+                    <div key={`${action.timestamp}-${i}`} className="flex items-center gap-2 py-1">
+                      <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                      <span className="text-[11px] text-white/50">Read</span>
+                      <code className="text-[11px] text-white/70 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{filePath}</code>
+                    </div>
+                  )
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* File writes/edits — with diff indicators */}
+        {fileWriteActions.length > 0 && (
+          <Collapsible open={expandedSections.has('writes')} onOpenChange={() => toggleSection('writes')}>
+            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02] border-b border-white/[0.04]">
+              {expandedSections.has('writes') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <FileEdit className="h-3.5 w-3.5 text-emerald-400/70" />
+              <span>Writing {fileWriteActions.length} file{fileWriteActions.length === 1 ? '' : 's'}</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-0.5 px-4 py-2">
+                {fileWriteActions.map((action, i) => {
+                  const isWrite = action.type === 'file_write'
+                  const filePath = action.content.replace(/^(Writing|Editing)\s+/i, '').replace(/\.\.\.$/, '').trim()
+                  return (
+                    <motion.div
+                      key={`${action.timestamp}-${i}`}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-center gap-2 py-1"
+                    >
+                      <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                      <span className="text-[11px] text-white/50">{isWrite ? 'Edited' : 'Editing'}</span>
+                      <code className="text-[11px] text-white/70 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{filePath}</code>
+                      {action.detail && (
+                        <span className="text-[10px] text-white/30">{action.detail}</span>
+                      )}
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Web searches */}
+        {searchActions.length > 0 && (
+          <Collapsible open={expandedSections.has('searches')} onOpenChange={() => toggleSection('searches')}>
+            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02] border-b border-white/[0.04]">
+              {expandedSections.has('searches') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <Search className="h-3.5 w-3.5 text-[#1EAEDB]/70" />
+              <span>Web Search ({searchActions.length})</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-0.5 px-4 py-2">
+                {searchActions.map((action, i) => (
+                  <div key={`${action.timestamp}-${i}`} className="flex items-center gap-2 py-1">
+                    <Globe className="h-3 w-3 shrink-0 text-[#1EAEDB]/50" />
+                    <span className="truncate text-[11px] text-white/45">{action.content}</span>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Live commentary — streaming text that appears word by word */}
+        {(latestCommentary || latestThinking) && (
+          <div className="px-4 py-3">
+            {latestThinking && (
+              <div className="mb-2 flex items-start gap-2">
+                <Brain className="h-3.5 w-3.5 mt-0.5 shrink-0 text-purple-400/60" />
+                <p className="text-xs leading-relaxed text-white/50">{latestThinking}</p>
+              </div>
+            )}
+            {latestCommentary && (
+              <div className="flex items-start gap-2">
+                <Sparkles className="h-3.5 w-3.5 mt-0.5 shrink-0 text-blue-400/60" />
+                <p className="text-xs leading-relaxed text-white/60">{latestCommentary}</p>
+              </div>
+            )}
+            {isStreaming && (
+              <span className="inline-block h-4 w-[2px] bg-blue-400/60 animate-pulse ml-5 mt-1" />
+            )}
+          </div>
+        )}
+
+        {/* To-dos */}
+        {todos.length > 0 && (
+          <div className="border-t border-white/[0.06] px-4 py-2.5">
+            <div className="flex items-center gap-2 mb-1.5">
+              <ListTodo className="h-3.5 w-3.5 text-white/40" />
+              <span className="text-[11px] font-medium text-white/50">
+                {todos.filter(t => t.completed).length}/{todos.length} tasks
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              {todos.map((todo) => (
+                <div key={todo.id} className="flex items-center gap-2 py-0.5">
+                  {todo.completed ? (
+                    <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                  ) : isStreaming ? (
+                    <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400/50" />
+                  ) : (
+                    <Circle className="h-3 w-3 shrink-0 text-white/20" />
+                  )}
+                  <span className={`text-[11px] ${todo.completed ? 'text-white/35 line-through' : 'text-white/55'}`}>
+                    {todo.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )
 }
 
 function AgenticLiveActions({
@@ -1000,7 +1237,16 @@ function getGenerationStatus({
     }
   }
 
-  if (!isLoading) return null
+  if (!isLoading && !isPreviewLoading && !autoFixMessage) {
+    // After generation: keep showing status if we have a generated fragment
+    if (latestObject?.code || latestObject?.title) {
+      return {
+        title: cleanText(latestObject?.title) || 'Generation complete',
+        detail: cleanText(latestObject?.description) || `Built ${promptTarget}`,
+      }
+    }
+    return null
+  }
 
   const files = getFragmentFiles(latestObject)
 

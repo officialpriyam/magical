@@ -168,6 +168,25 @@ export async function POST(req: Request) {
     }
   }
 
+  // Auto-fetch URLs from user messages
+  const fetchedUrls = await fetchUrlsFromMessages(messages)
+  if (fetchedUrls.length > 0) {
+    const urlContext = fetchedUrls
+      .map((f) => {
+        const header = f.title ? `URL: ${f.url} (Title: ${f.title})` : `URL: ${f.url}`
+        const truncated = f.content.length > 4000 ? f.content.slice(0, 4000) + '...' : f.content
+        return `${header}\n\nContent:\n${truncated}`
+      })
+      .join('\n\n---\n\n')
+    enrichedMessages = [
+      ...enrichedMessages,
+      {
+        role: 'user' as const,
+        content: `The user shared the following URL(s). Use the fetched content below as context:\n\n${urlContext}`,
+      },
+    ]
+  }
+
   const { stream, emitAction, emitTodos, emitProgress, emitFragment, emitError, close } = createSSEStream()
 
   // Run the pipeline in background and stream events
@@ -848,4 +867,50 @@ async function fetchWebSearch(query: string): Promise<{ title: string; url: stri
   } catch {
     return []
   }
+}
+
+// ─── URL auto-fetch ────────────────────────────────────────
+const URL_REGEX = /https?:\/\/[^\s<>")\]]+/gi
+
+function extractUrlsFromMessages(messages: ModelMessage[]): string[] {
+  const urls: string[] = []
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.role !== 'user') continue
+    const content = typeof msg.content === 'string' ? msg.content : ''
+    const found = content.match(URL_REGEX) || []
+    for (const url of found) {
+      const clean = url.replace(/[.,;:!?\)]+$/, '')
+      if (!urls.includes(clean)) urls.push(clean)
+    }
+    break
+  }
+  return urls
+}
+
+async function fetchSingleUrl(url: string): Promise<{ url: string; title: string; content: string } | null> {
+  try {
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000'
+    const res = await fetch(`${baseUrl}/api/web-fetch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data.success) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+async function fetchUrlsFromMessages(messages: ModelMessage[]): Promise<{ url: string; title: string; content: string }[]> {
+  const urls = extractUrlsFromMessages(messages)
+  if (urls.length === 0) return []
+  const results = await Promise.all(urls.slice(0, 3).map(fetchSingleUrl))
+  return results.filter((r): r is NonNullable<typeof r> => r !== null)
 }

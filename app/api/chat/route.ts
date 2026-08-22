@@ -139,6 +139,54 @@ function buildSearchQuery(messages: ModelMessage[]): string | null {
   return null
 }
 
+// ─── URL detection and auto-fetch ──────────────────────────
+const URL_REGEX = /https?:\/\/[^\s<>")\]]+/gi
+
+function extractUrls(messages: ModelMessage[]): string[] {
+  const urls: string[] = []
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.role !== 'user') continue
+    const content = typeof msg.content === 'string' ? msg.content : ''
+    const found = content.match(URL_REGEX) || []
+    for (const url of found) {
+      // Clean trailing punctuation that might be part of sentence structure
+      const clean = url.replace(/[.,;:!?\)]+$/, '')
+      if (!urls.includes(clean)) urls.push(clean)
+    }
+    break // Only check the latest user message
+  }
+  return urls
+}
+
+async function fetchUrlContent(url: string): Promise<{ url: string; title: string; content: string } | null> {
+  try {
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000'
+    const res = await fetch(`${baseUrl}/api/web-fetch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data.success) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+async function fetchUrlContents(messages: ModelMessage[]): Promise<{ url: string; title: string; content: string }[]> {
+  const urls = extractUrls(messages)
+  if (urls.length === 0) return []
+  // Fetch up to 3 URLs in parallel
+  const results = await Promise.all(urls.slice(0, 3).map(fetchUrlContent))
+  return results.filter((r): r is NonNullable<typeof r> => r !== null)
+}
+
 async function readStreamToText(stream: ReadableStream<string>): Promise<string> {
   const reader = stream.getReader()
   let text = ''
@@ -354,6 +402,21 @@ export async function POST(req: Request) {
       messages.length = 0
       messages.push(...cleanedMessages)
     }
+  }
+
+  // Auto-fetch URL content from the user's message
+  const fetchedUrls = await fetchUrlContents(messages)
+  if (fetchedUrls.length > 0) {
+    const urlContext = fetchedUrls
+      .map((f) => {
+        const header = f.title ? `URL: ${f.url} (Title: ${f.title})` : `URL: ${f.url}`
+        // Truncate content to keep context manageable
+        const truncated = f.content.length > 4000 ? f.content.slice(0, 4000) + '...' : f.content
+        return `${header}\n\nContent:\n${truncated}`
+      })
+      .join('\n\n---\n\n')
+
+    finalSystemPrompt += `\n\nThe user shared the following URL(s). Use the fetched content below as context for their question:\n\n${urlContext}`
   }
 
   let lastError: any = null
