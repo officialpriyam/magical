@@ -5,10 +5,12 @@ import { getFragmentFiles } from '@/lib/fragment-files'
 import { AgentMetadataDisplay } from '@/components/agent-status'
 import { AGENT_DISPLAY_NAMES } from '@/lib/agents/prompts'
 import type { AgentRole } from '@/lib/agents/types'
+import type { ToolAction, TodoItem } from '@/lib/hooks/use-agentic-stream'
 import { DeepPartial } from 'ai'
-import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil, Cpu, Activity, Braces, Palette, Server, Shield, Zap, Wrench } from 'lucide-react'
+import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil, Cpu, Activity, Braces, Palette, Server, Shield, Zap, Wrench, ChevronRight, ChevronDown, Circle, FileEdit, Search, Brain, ListTodo, MessageSquare } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 export function Chat({
   messages,
@@ -20,6 +22,9 @@ export function Chat({
   onAcceptPlan,
   setCurrentPreview,
   useAgentic = false,
+  agenticActions = [],
+  agenticTodos = [],
+  agenticStreaming = false,
 }: {
   messages: Message[]
   isLoading: boolean
@@ -33,6 +38,9 @@ export function Chat({
     result: ExecutionResult | undefined
   }) => void
   useAgentic?: boolean
+  agenticActions?: ToolAction[]
+  agenticTodos?: TodoItem[]
+  agenticStreaming?: boolean
 }) {
 
   useEffect(() => {
@@ -40,7 +48,7 @@ export function Chat({
     if (chatContainer) {
       chatContainer.scrollTop = chatContainer.scrollHeight
     }
-  }, [messages, isLoading, isPreviewLoading, currentFragment])
+  }, [messages, isLoading, isPreviewLoading, currentFragment, agenticActions])
 
   return (
     <div
@@ -76,7 +84,7 @@ export function Chat({
                 return (
                   <span key={id} className="block">
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-[#1EAEDB]/30 bg-[#1EAEDB]/10 px-2 py-0.5 text-[11px] text-[#1EAEDB] mb-1">
-                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                      <Search className="h-3 w-3" />
                       Web search
                     </span>
                     <span className="block text-white/90">{searchMatch[1]}</span>
@@ -87,7 +95,7 @@ export function Chat({
                 return (
                   <span key={id} className="block">
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/30 bg-purple-400/10 px-2 py-0.5 text-[11px] text-purple-300 mb-1">
-                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a7 7 0 0 1 7 7c0 2.5-1.5 4.5-3 6-1 1-2 2.5-2 4h-4c0-1.5-1-3-2-4-1.5-1.5-3-3.5-3-6a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg>
+                      <Brain className="h-3 w-3" />
                       Thinking
                     </span>
                     <span className="block text-white/90">{thinkMatch[1]}</span>
@@ -98,7 +106,7 @@ export function Chat({
                 return (
                   <span key={id} className="block">
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-300 mb-1">
-                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                      <FileCode2 className="h-3 w-3" />
                       Canvas
                     </span>
                     <span className="block text-white/90">{canvasMatch[1]}</span>
@@ -129,14 +137,10 @@ export function Chat({
               )
             }
             if (content.type === 'file_op') {
-              return (
-                <FileOperationCard key={id} operation={content.operation} files={content.files} />
-              )
+              return <FileOperationCard key={id} operation={content.operation} files={content.files} />
             }
             if (content.type === 'web_search') {
-              return (
-                <WebSearchCard key={id} query={content.query} results={content.results} />
-              )
+              return <WebSearchCard key={id} query={content.query} results={content.results} />
             }
           })}
           {message.object && (
@@ -149,8 +153,21 @@ export function Chat({
       ))}
       {(isLoading || isPreviewLoading || autoFixMessage) && (
         <>
-          {useAgentic && isLoading && (
-            <AgentProgressIndicator currentFragment={currentFragment} />
+          {/* Live agentic streaming actions */}
+          {useAgentic && agenticStreaming && agenticActions.length > 0 && (
+            <AgenticLiveActions
+              actions={agenticActions}
+              todos={agenticTodos}
+            />
+          )}
+          {/* Fallback indicator for non-agentic or before actions stream in */}
+          {useAgentic && isLoading && agenticActions.length === 0 && (
+            <div className="w-full max-w-[36rem] rounded-xl border border-blue-500/20 bg-blue-500/[0.04] px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <LoaderIcon className="h-4 w-4 animate-spin text-blue-400" />
+                <span className="text-xs font-medium text-blue-300">Starting agentic pipeline...</span>
+              </div>
+            </div>
           )}
           <GenerationStatusCard
             messages={messages}
@@ -165,6 +182,200 @@ export function Chat({
     </div>
   )
 }
+
+// ─── Live Agentic Actions Display ──────────────────────────
+function AgenticLiveActions({
+  actions,
+  todos,
+}: {
+  actions: ToolAction[]
+  todos: TodoItem[]
+}) {
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['actions']))
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to latest action
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [actions.length])
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(section)) next.delete(section)
+      else next.add(section)
+      return next
+    })
+  }
+
+  // Group actions by type
+  const thinkingActions = actions.filter(a => a.type === 'thinking')
+  const fileActions = actions.filter(a => a.type === 'file_write' || a.type === 'file_edit' || a.type === 'file_read')
+  const searchActions = actions.filter(a => a.type === 'web_search' || a.type === 'web_fetch')
+  const commentaryActions = actions.filter(a => a.type === 'commentary')
+  const statusActions = actions.filter(a => a.type === 'status')
+
+  // Latest status line
+  const latestStatus = statusActions.length > 0 ? statusActions[statusActions.length - 1] : null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className="w-full max-w-[36rem] overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]"
+    >
+      {/* Status header */}
+      {latestStatus && (
+        <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-4 py-2.5">
+          <LoaderIcon className="h-3.5 w-3.5 animate-spin text-blue-400" />
+          <span className="text-xs font-medium text-blue-300">{latestStatus.content}</span>
+          <span className="ml-auto text-[11px] text-white/30 tabular-nums">
+            {Math.floor((Date.now() - actions[0]?.timestamp) / 1000)}s
+          </span>
+        </div>
+      )}
+
+      {/* Scrollable content */}
+      <div ref={scrollRef} className="max-h-[300px] overflow-y-auto">
+        {/* Thinking / Reasoning */}
+        {thinkingActions.length > 0 && (
+          <Collapsible open={expandedSections.has('thinking')} onOpenChange={() => toggleSection('thinking')}>
+            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02]">
+              {expandedSections.has('thinking') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <Brain className="h-3.5 w-3.5 text-purple-400/70" />
+              <span>Reasoning</span>
+              <span className="ml-auto text-[10px] text-white/25">{thinkingActions.length}</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-1 px-4 pb-2">
+                {thinkingActions.map((action, i) => (
+                  <motion.div
+                    key={`${action.timestamp}-${i}`}
+                    initial={{ opacity: 0, x: -4 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-[11px] leading-relaxed text-white/40"
+                  >
+                    {action.content}
+                  </motion.div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Commentary */}
+        {commentaryActions.length > 0 && (
+          <div className="border-t border-white/[0.04] px-4 py-2.5">
+            {commentaryActions.map((action, i) => (
+              <motion.div
+                key={`${action.timestamp}-${i}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-xs leading-relaxed text-white/55"
+              >
+                {action.content}
+              </motion.div>
+            ))}
+          </div>
+        )}
+
+        {/* File operations */}
+        {fileActions.length > 0 && (
+          <Collapsible open={expandedSections.has('files')} onOpenChange={() => toggleSection('files')}>
+            <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-white/[0.04] px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02]">
+              {expandedSections.has('files') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <FileCode2 className="h-3.5 w-3.5 text-emerald-400/70" />
+              <span>Files</span>
+              <span className="ml-auto text-[10px] text-white/25">{fileActions.length}</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-0.5 px-4 pb-2">
+                {fileActions.map((action, i) => {
+                  const isWrite = action.type === 'file_write'
+                  const isRead = action.type === 'file_read'
+                  const Icon = isRead ? Eye : isWrite ? FileEdit : Pencil
+                  const iconColor = isRead ? 'text-blue-400/60' : isWrite ? 'text-emerald-400/60' : 'text-amber-400/60'
+
+                  return (
+                    <motion.div
+                      key={`${action.timestamp}-${i}`}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-center gap-1.5 py-0.5"
+                    >
+                      <Icon className={`h-3 w-3 shrink-0 ${iconColor}`} />
+                      <span className="truncate text-[11px] text-white/45">{action.content}</span>
+                      {action.detail && (
+                        <span className="ml-auto shrink-0 text-[10px] text-white/25">{action.detail}</span>
+                      )}
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Web searches */}
+        {searchActions.length > 0 && (
+          <Collapsible open={expandedSections.has('searches')} onOpenChange={() => toggleSection('searches')}>
+            <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-white/[0.04] px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02]">
+              {expandedSections.has('searches') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <Search className="h-3.5 w-3.5 text-[#1EAEDB]/70" />
+              <span>Web Search</span>
+              <span className="ml-auto text-[10px] text-white/25">{searchActions.length}</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-0.5 px-4 pb-2">
+                {searchActions.map((action, i) => (
+                  <motion.div
+                    key={`${action.timestamp}-${i}`}
+                    initial={{ opacity: 0, x: -4 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center gap-1.5 py-0.5"
+                  >
+                    <Globe className="h-3 w-3 shrink-0 text-[#1EAEDB]/50" />
+                    <span className="truncate text-[11px] text-white/45">{action.content}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </div>
+
+      {/* To-dos */}
+      {todos.length > 0 && (
+        <div className="border-t border-white/[0.06] px-4 py-2.5">
+          <div className="flex items-center gap-2 mb-1.5">
+            <ListTodo className="h-3.5 w-3.5 text-white/40" />
+            <span className="text-[11px] font-medium text-white/50">
+              To-dos {todos.filter(t => t.completed).length}/{todos.length}
+            </span>
+          </div>
+          <div className="space-y-1">
+            {todos.map((todo) => (
+              <div key={todo.id} className="flex items-center gap-2 py-0.5">
+                {todo.completed ? (
+                  <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                ) : (
+                  <Circle className="h-3 w-3 shrink-0 text-white/20" />
+                )}
+                <span className={`text-[11px] ${todo.completed ? 'text-white/40 line-through' : 'text-white/55'}`}>
+                  {todo.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
 
 function GeneratedArtifactCard({
   message,
@@ -462,279 +673,6 @@ function WebSearchCard({
   )
 }
 
-const AGENT_ICONS: Record<AgentRole, React.ComponentType<any>> = {
-  orchestrator: Activity,
-  planner: Braces,
-  architect: Server,
-  frontend: Palette,
-  backend: Server,
-  reviewer: Shield,
-  optimizer: Zap,
-  fixer: Wrench,
-}
-
-const AGENT_LABELS: Record<AgentRole, string> = {
-  orchestrator: 'Analyzing request complexity',
-  planner: 'Creating implementation plan',
-  architect: 'Designing project architecture',
-  frontend: 'Building UI components',
-  backend: 'Building API & data layer',
-  reviewer: 'Reviewing code quality',
-  optimizer: 'Optimizing performance',
-  fixer: 'Fixing issues',
-}
-
-const AGENT_DETAIL_MESSAGES: Record<AgentRole, string[]> = {
-  orchestrator: [
-    'Analyzing request complexity...',
-    'Determining optimal agent allocation...',
-    'Evaluating task dependencies...',
-  ],
-  planner: [
-    'Creating implementation plan...',
-    'Mapping file structure...',
-    'Identifying component hierarchy...',
-  ],
-  architect: [
-    'Designing project architecture...',
-    'Planning data flow and state management...',
-    'Structuring API routes...',
-  ],
-  frontend: [
-    'Reading src/index.css...',
-    'Writing src/components/Header.tsx...',
-    'Building src/pages/Dashboard.tsx...',
-    'Creating src/components/Chart.tsx...',
-    'Writing src/App.tsx...',
-    'Searching for React component patterns...',
-    'Fetching design inspiration from dribbble.com...',
-  ],
-  backend: [
-    'Reading src/index.html...',
-    'Writing app/api/users/route.ts...',
-    'Creating src/lib/database.ts...',
-    'Building app/api/auth/route.ts...',
-    'Writing src/migrations/001.sql...',
-    'Fetching Supabase API docs...',
-    'Searching for REST API best practices...',
-  ],
-  reviewer: [
-    'Reviewing src/components/Header.tsx...',
-    'Checking security patterns...',
-    'Evaluating accessibility...',
-    'Scoring code quality...',
-    'Reading src/pages/Dashboard.tsx...',
-  ],
-  optimizer: [
-    'Analyzing bundle size...',
-    'Optimizing React.memo usage...',
-    'Improving Core Web Vitals...',
-    'Reducing re-renders...',
-    'Fetching Lighthouse audit results...',
-  ],
-  fixer: [
-    'Analyzing error messages...',
-    'Fixing type errors in src/...',
-    'Applying patches...',
-    'Reading error logs...',
-  ],
-}
-
-function AgentProgressIndicator({ currentFragment }: { currentFragment?: DeepPartial<FragmentSchema> }) {
-  const [elapsedTime, setElapsedTime] = useState(0)
-  const startTimeRef = useRef(Date.now())
-  const [activeStep, setActiveStep] = useState(0)
-  const [detailIdx, setDetailIdx] = useState(0)
-
-  const agentSteps: { role: AgentRole; label: string; description: string; duration: number }[] = [
-    { role: 'orchestrator', label: 'Orchestrator', description: 'Analyzing request complexity', duration: 3000 },
-    { role: 'planner', label: 'Planner', description: 'Creating implementation plan', duration: 4000 },
-    { role: 'architect', label: 'Architect', description: 'Designing project architecture', duration: 4000 },
-    { role: 'frontend', label: 'Frontend', description: 'Building UI components', duration: 8000 },
-    { role: 'backend', label: 'Backend', description: 'Building API & data layer', duration: 8000 },
-    { role: 'reviewer', label: 'Reviewer', description: 'Reviewing code quality', duration: 5000 },
-    { role: 'optimizer', label: 'Optimizer', description: 'Optimizing performance', duration: 4000 },
-  ]
-
-  const hasFragment = Boolean(currentFragment?.code || (currentFragment?.files && currentFragment.files.length > 0))
-  const commentary = cleanText(currentFragment?.commentary)
-  const files = getFragmentFiles(currentFragment)
-
-  const completedStepCount = hasFragment ? agentSteps.length : activeStep
-  const progressPercent = hasFragment ? 100 : Math.min(((completedStepCount + 0.5) / agentSteps.length) * 100, 95)
-
-  // Current detail messages for the active agent step
-  const currentStepRole = !hasFragment && activeStep < agentSteps.length ? agentSteps[activeStep].role : null
-  const detailMessages = currentStepRole ? (AGENT_DETAIL_MESSAGES[currentStepRole] || []) : []
-  const currentDetail = detailMessages.length > 0 ? detailMessages[detailIdx % detailMessages.length] : ''
-
-  // Elapsed timer
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000))
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Animate through agent steps
-  useEffect(() => {
-    if (hasFragment) return
-    let elapsed = 0
-    const interval = setInterval(() => {
-      elapsed += 500
-      let accumulated = 0
-      let stepIdx = 0
-      for (let i = 0; i < agentSteps.length; i++) {
-        accumulated += agentSteps[i].duration
-        if (elapsed < accumulated) {
-          stepIdx = i
-          break
-        }
-        if (i === agentSteps.length - 1) stepIdx = i
-      }
-      setActiveStep(stepIdx)
-    }, 500)
-    return () => clearInterval(interval)
-  }, [hasFragment])
-
-  // Cycle through detail messages for the active step
-  useEffect(() => {
-    if (hasFragment || detailMessages.length === 0) return
-    const interval = setInterval(() => {
-      setDetailIdx(prev => prev + 1)
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [hasFragment, currentStepRole])
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      className="w-full max-w-[36rem] overflow-hidden rounded-xl border border-blue-500/20 bg-blue-500/[0.04]"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/20">
-            <Cpu className="h-3.5 w-3.5 text-blue-400" />
-          </div>
-          <span className="text-xs font-semibold text-blue-300">
-            {hasFragment ? 'Pipeline complete' : 'Working...'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="inline-flex items-center gap-1 text-blue-400/70">
-            <Activity className="h-3 w-3" />
-            {completedStepCount}/{agentSteps.length} steps
-          </span>
-          <span className="text-white/20">|</span>
-          <span className="text-white/40 tabular-nums">{elapsedTime}s</span>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="h-[2px] w-full bg-white/5">
-        <motion.div
-          className="h-full bg-gradient-to-r from-blue-500 to-cyan-400"
-          initial={{ width: '0%' }}
-          animate={{ width: `${progressPercent}%` }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-        />
-      </div>
-
-      {/* Agent steps list */}
-      <div className="px-4 py-2.5">
-        <div className="space-y-0.5">
-          {agentSteps.map((step, idx) => {
-            const Icon = AGENT_ICONS[step.role]
-            const isCompleted = hasFragment || idx < activeStep
-            const isCurrent = !hasFragment && idx === activeStep
-            const isPending = !hasFragment && idx > activeStep
-
-            if (isPending) return null
-
-            return (
-              <motion.div
-                key={step.role}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex items-center gap-2.5 py-1"
-              >
-                <div className="flex h-4 w-4 shrink-0 items-center justify-center">
-                  {isCompleted && !isCurrent ? (
-                    <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  ) : isCurrent ? (
-                    <LoaderIcon className="h-3.5 w-3.5 animate-spin text-blue-400" />
-                  ) : null}
-                </div>
-
-                <Icon className="h-3 w-3 shrink-0 text-white/30" />
-                <span className={`text-xs font-medium ${isCompleted && !isCurrent ? 'text-white/40' : isCurrent ? 'text-blue-300' : 'text-white/30'}`}>
-                  {step.label}
-                </span>
-
-                {/* Show rotating detail message for current step */}
-                {isCurrent && currentDetail ? (
-                  <motion.span
-                    key={currentDetail}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-[11px] text-blue-400/50"
-                  >
-                    {currentDetail}
-                  </motion.span>
-                ) : (
-                  <span className="text-[11px] text-white/25">{step.description}</span>
-                )}
-
-                {isCurrent && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="ml-auto">
-                    <span className="text-[10px] text-blue-400/60">running</span>
-                  </motion.div>
-                )}
-              </motion.div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Live files from fragment (when available) */}
-      {files.length > 0 && !hasFragment && (
-        <div className="border-t border-white/[0.06] px-4 py-2">
-          <div className="space-y-0.5">
-            {files.slice(0, 4).map((file) => (
-              <motion.div
-                key={file.path}
-                initial={{ opacity: 0, x: -4 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-1.5 text-[11px] text-white/35"
-              >
-                <FileCode2 className="h-3 w-3 shrink-0 text-blue-400/40" />
-                <span className="truncate">{file.path}</span>
-                <span className="ml-auto text-[10px] text-emerald-400/50">done</span>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Commentary from completed fragment */}
-      {commentary && hasFragment && (
-        <motion.div
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="border-t border-white/[0.06] px-4 py-2.5"
-        >
-          <div className="text-[11px] leading-relaxed text-white/35">
-            {commentary.length > 200 ? `${commentary.slice(0, 200)}...` : commentary}
-          </div>
-        </motion.div>
-      )}
-    </motion.div>
-  )
-}
 
 function GenerationStatusCard({
   messages,
@@ -813,7 +751,8 @@ function GenerationStatusCard({
               if (agentMatch) {
                 const agentName = agentMatch[1]
                 const agentText = agentMatch[2]
-                const Icon = Object.entries(AGENT_ICONS).find(([k]) => k.toLowerCase() === agentName.toLowerCase())?.[1] || Sparkles
+                const IconMap: Record<string, React.ComponentType<any>> = { orchestrator: Activity, planner: Braces, architect: Server, frontend: Palette, backend: Server, reviewer: Shield, optimizer: Zap, fixer: Wrench }
+              const Icon = IconMap[agentName.toLowerCase()] || Sparkles
                 return (
                   <motion.div
                     key={i}
@@ -874,7 +813,7 @@ function GenerationStatusCard({
       )}
 
       {/* Title + description (when available) */}
-      {(title || description) && (
+      {(title || description) && !isLoading && (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}

@@ -11,22 +11,15 @@ import { getSupabaseConnectionStatus } from '@/lib/supabase-integration'
 import { Templates } from '@/lib/templates'
 import { toPrompt, PromptContext } from '@/lib/prompt'
 import { fragmentSchema as schema } from '@/lib/schema'
-import {
-  streamText,
-  type LanguageModel,
-  type ModelMessage,
-} from 'ai'
+import { streamText, type LanguageModel, type ModelMessage } from 'ai'
 import {
   AgentRole,
   AgentResult,
-  AgentStatus,
   TaskComplexity,
-  OrchestratorConfig,
 } from '@/lib/agents/types'
 import {
   COMPLEXITY_ANALYSIS_PROMPT,
   AGENT_DISPLAY_NAMES,
-  AGENT_STATUS_MESSAGES,
 } from '@/lib/agents/prompts'
 import { runAgent } from '@/lib/agents/agent-runner'
 
@@ -53,6 +46,86 @@ const PARALLEL_GROUPS: Record<TaskComplexity, AgentRole[][]> = {
   moderate: [['planner'], ['architect'], ['frontend', 'backend'], ['reviewer']],
   complex: [['planner'], ['architect'], ['frontend', 'backend'], ['reviewer'], ['optimizer']],
   enterprise: [['planner'], ['architect'], ['frontend', 'backend'], ['reviewer'], ['optimizer'], ['reviewer']],
+}
+
+const AGENT_TOOL_DESCRIPTIONS: Record<AgentRole, { action_type: string; content: string; detail?: string }[]> = {
+  orchestrator: [
+    { action_type: 'thinking', content: 'Analyzing request complexity...' },
+  ],
+  planner: [
+    { action_type: 'thinking', content: 'Creating implementation plan...' },
+    { action_type: 'todo', content: 'Map file structure and component hierarchy' },
+  ],
+  architect: [
+    { action_type: 'thinking', content: 'Designing project architecture...' },
+    { action_type: 'todo', content: 'Design data flow and state management' },
+  ],
+  frontend: [
+    { action_type: 'todo', content: 'Build UI components' },
+    { action_type: 'file_write', content: 'Writing UI components...' },
+  ],
+  backend: [
+    { action_type: 'todo', content: 'Build API routes and data layer' },
+    { action_type: 'file_write', content: 'Writing API routes...' },
+  ],
+  reviewer: [
+    { action_type: 'thinking', content: 'Reviewing code quality...' },
+  ],
+  optimizer: [
+    { action_type: 'thinking', content: 'Optimizing performance...' },
+  ],
+  fixer: [
+    { action_type: 'thinking', content: 'Fixing issues...' },
+  ],
+}
+
+function createSSEStream() {
+  let controller: ReadableStreamDefaultController<Uint8Array> | null = null
+  let encoder = new TextEncoder()
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(c) {
+      controller = c
+    },
+  })
+
+  function emit(event: Record<string, any>) {
+    if (!controller) return
+    try {
+      controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'))
+    } catch {
+      // Stream may be closed
+    }
+  }
+
+  function emitAction(actionType: string, content: string, detail?: string) {
+    emit({ type: 'action', action_type: actionType, content, detail })
+  }
+
+  function emitTodos(todos: { id: string; text: string; completed: boolean }[]) {
+    emit({ type: 'todos', todos })
+  }
+
+  function emitProgress(completed: number, total: number) {
+    emit({ type: 'progress', completed, total })
+  }
+
+  function emitFragment(data: Record<string, any>) {
+    emit({ type: 'fragment', data })
+  }
+
+  function emitError(message: string) {
+    emit({ type: 'error', message })
+  }
+
+  function close() {
+    if (controller) {
+      try { controller.close() } catch {}
+      controller = null
+    }
+  }
+
+  return { stream, emit, emitAction, emitTodos, emitProgress, emitFragment, emitError, close }
 }
 
 export async function POST(req: Request) {
@@ -101,17 +174,81 @@ export async function POST(req: Request) {
     projectsMode: supabaseStatus.projectsMode,
   }
 
-  const modelParams = { ...config }
-  delete modelParams.model
-  delete modelParams.apiKey
-  delete modelParams.baseURL
+  const { stream, emitAction, emitTodos, emitProgress, emitFragment, emitError, close } = createSSEStream()
 
+  // Run the pipeline in background and stream events
+  const pipelinePromise = runPipeline({
+    messages,
+    model,
+    config,
+    template,
+    supabaseContext,
+    fallbackChain,
+    emitAction,
+    emitTodos,
+    emitProgress,
+    emitFragment,
+    emitError,
+  }).finally(close)
+
+  // Don't await — return the stream immediately
+  void pipelinePromise
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'X-Accel-Buffering': 'no',
+    },
+  })
+}
+
+// ─── Pipeline runner ─────────────────────────────────────────
+async function runPipeline({
+  messages,
+  model,
+  config,
+  template,
+  supabaseContext,
+  fallbackChain,
+  emitAction,
+  emitTodos,
+  emitProgress,
+  emitFragment,
+  emitError,
+}: {
+  messages: ModelMessage[]
+  model: LLMModel
+  config: LLMModelConfig
+  template: Templates
+  supabaseContext: PromptContext['supabase']
+  fallbackChain: any[]
+  emitAction: (type: string, content: string, detail?: string) => void
+  emitTodos: (todos: { id: string; text: string; completed: boolean }[]) => void
+  emitProgress: (completed: number, total: number) => void
+  emitFragment: (data: Record<string, any>) => void
+  emitError: (message: string) => void
+}) {
   try {
     // ── Step 1: Analyze complexity ────────────────────────────
+    emitAction('thinking', 'Analyzing your request to determine the best approach...')
+
     const complexity = await analyzeComplexity(messages, model, config)
     const agentsNeeded = EXECUTION_PLANS[complexity]
+    const totalSteps = agentsNeeded.length
 
     console.log(`[Agentic] Complexity: ${complexity}, Agents: ${agentsNeeded.length}`)
+
+    emitAction('commentary', `Task complexity: ${complexity}. Dispatching ${agentsNeeded.length} agents...`)
+    emitProgress(0, totalSteps)
+
+    // Build initial todo list from agent plan
+    const initialTodos = agentsNeeded.map((role, i) => ({
+      id: `agent-${i}-${role}`,
+      text: AGENT_DISPLAY_NAMES[role],
+      completed: false,
+    }))
+    emitTodos(initialTodos)
 
     // ── Step 2: Run agents ────────────────────────────────────
     const plan = PARALLEL_GROUPS[complexity]
@@ -130,6 +267,8 @@ export async function POST(req: Request) {
       files: [],
     }
 
+    let completedAgents = 0
+
     for (const group of plan) {
       const contextMessages = buildAgentMessages(messages, agentResults, latestFragment)
       const context: Record<string, any> = {
@@ -146,7 +285,16 @@ export async function POST(req: Request) {
       if (latestFragment.files?.length) context.files = latestFragment.files
 
       for (const role of group) {
-        const agentInput = {
+        // Emit agent start action
+        const agentDesc = AGENT_TOOL_DESCRIPTIONS[role] || []
+        for (const desc of agentDesc) {
+          emitAction(desc.action_type, desc.content, desc.detail)
+        }
+
+        emitAction('status', `Running ${AGENT_DISPLAY_NAMES[role]}...`)
+
+        console.log(`[Agentic] Running ${AGENT_DISPLAY_NAMES[role]}...`)
+        const result = await runAgent({
           role,
           systemPrompt: '',
           messages: contextMessages,
@@ -159,12 +307,40 @@ export async function POST(req: Request) {
           },
           context,
           fallbackChain,
-        }
-
-        console.log(`[Agentic] Running ${AGENT_DISPLAY_NAMES[role]}...`)
-        const result = await runAgent(agentInput)
+        })
 
         agentResults.push(result)
+        completedAgents++
+
+        // Emit progress
+        emitProgress(completedAgents, totalSteps)
+
+        // Mark this agent's todo as completed
+        const updatedTodos = agentsNeeded.map((r, i) => ({
+          id: `agent-${i}-${r}`,
+          text: AGENT_DISPLAY_NAMES[r],
+          completed: agentResults.some(ar => ar.role === r && ar.success),
+        }))
+        emitTodos(updatedTodos)
+
+        // Emit agent completion
+        if (result.success) {
+          emitAction('commentary', `${AGENT_DISPLAY_NAMES[role]} completed`)
+
+          // Emit file actions for any files this agent created
+          if (result.fragment) {
+            const fragment = result.fragment as Record<string, any>
+            if (Array.isArray(fragment.files)) {
+              for (const file of fragment.files) {
+                if (file?.path) {
+                  emitAction('file_write', `Writing ${file.path}...`)
+                }
+              }
+            }
+          }
+        } else {
+          emitAction('thinking', `${AGENT_DISPLAY_NAMES[role]} encountered an issue: ${result.errors?.join(', ') || 'unknown error'}`)
+        }
 
         // Merge agent output into the fragment
         if (result.success && result.fragment) {
@@ -221,6 +397,9 @@ export async function POST(req: Request) {
               ...fragment.supabase_migrations,
             ]
           }
+
+          // Stream fragment update after each agent
+          emitFragment(latestFragment)
         }
       }
     }
@@ -244,23 +423,30 @@ export async function POST(req: Request) {
         : `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`,
     }
 
-    return new Response(JSON.stringify(finalFragment), {
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    })
+    emitAction('commentary', `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`)
+
+    // Mark all todos as completed
+    const finalTodos = agentsNeeded.map((r, i) => ({
+      id: `agent-${i}-${r}`,
+      text: AGENT_DISPLAY_NAMES[r],
+      completed: true,
+    }))
+    emitTodos(finalTodos)
+
+    // Emit final fragment
+    emitFragment(finalFragment)
   } catch (error: any) {
     console.error('[Agentic] Pipeline error:', error)
+    emitError(error.message || 'Pipeline failed')
 
     // Fallback: try single-model generation
     try {
       const fallbackFragment = await generateFallback(
         messages, model, config, template, supabaseContext
       )
-      return new Response(JSON.stringify(fallbackFragment), {
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      })
+      emitFragment(fallbackFragment as Record<string, any>)
     } catch (fallbackError) {
       console.error('[Agentic] Fallback also failed:', fallbackError)
-      return handleAPIError(error, { hasOwnApiKey: !!config.apiKey })
     }
   }
 }

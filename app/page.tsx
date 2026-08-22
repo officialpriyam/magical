@@ -23,7 +23,8 @@ import { usePostHog } from 'posthog-js/react';
 import { type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalStorage } from 'usehooks-ts';
-import { StyleSelector, type StylePreset, STYLE_PRESETS } from '@/components/style-selector';
+import { StyleSelector, type StylePreset, STYLE_PRESETS } from '@/components/style-selector'
+import { useAgenticStream, type ToolAction, type TodoItem } from '@/lib/hooks/use-agentic-stream';
 import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -139,6 +140,42 @@ const Preview = dynamic(() => import('@/components/preview').then(mod => ({ defa
   ssr: false,
 });
 
+function TodoBar({ todos }: { todos: { id: string; text: string; completed: boolean }[] }) {
+  const [isOpen, setIsOpen] = useState(true)
+  const completedCount = todos.filter(t => t.completed).length
+
+  return (
+    <div className="mb-2 rounded-xl border border-white/[0.08] bg-white/[0.03]">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-xs"
+      >
+        <svg className="h-3.5 w-3.5 text-white/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <span className="font-medium text-white/60">To-dos</span>
+        <span className="text-white/30">{completedCount}/{todos.length}</span>
+        <svg className={`ml-auto h-3 w-3 text-white/30 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      {isOpen && (
+        <div className="space-y-0.5 border-t border-white/[0.06] px-3 py-2">
+          {todos.map((todo) => (
+            <div key={todo.id} className="flex items-center gap-2 py-0.5">
+              {todo.completed ? (
+                <svg className="h-3 w-3 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+              ) : (
+                <div className="h-3 w-3 shrink-0 rounded-full border border-white/20" />
+              )}
+              <span className={`text-[11px] ${todo.completed ? 'text-white/35 line-through' : 'text-white/50'}`}>
+                {todo.text}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type HomeProps = {
   initialProjectId?: string
 }
@@ -167,6 +204,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [selectedStyle, setSelectedStyle] = useLocalStorage<string | null>('selectedStyle', null)
   const [customStylePrompt, setCustomStylePrompt] = useLocalStorage<string>('customStylePrompt', '')
   const [showStyleSelector, setShowStyleSelector] = useState(false)
+  const agenticStream = useAgenticStream()
   const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'build')
   const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
 
@@ -695,7 +733,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         }
     },
   })
-  const isPromptLoading = isLoading || isPlanLoading
+  const isPromptLoading = isLoading || isPlanLoading || agenticStream.isStreaming
+
+  // Sync agentic stream fragment to existing state
+  useEffect(() => {
+    if (useAgentic && agenticStream.fragment?.code) {
+      setFragment(agenticStream.fragment)
+      setCurrentPreview({ fragment: agenticStream.fragment, result: undefined })
+    }
+  }, [useAgentic, agenticStream.fragment])
 
   function getTemplateForSubmission(preferredTemplate?: string) {
     if (selectedTemplate !== 'auto') {
@@ -1260,8 +1306,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setErrorMessage('')
     setAutoFixMessage('')
 
-    if (isLoading) {
+    if (isLoading || agenticStream.isStreaming) {
       stop()
+      agenticStream.stop()
     }
 
     if (!currentModel) {
@@ -1348,16 +1395,31 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
 
     try {
-      submit({
-      userID: session?.user?.id,
-      teamID: userTeam?.id,
-      projectID: projectForPrompt.id,
-      messages: toAISDKMessages(updatedMessages),
-      template: getTemplateForSubmission(),
-      model: currentModel,
-      config: languageModel,
-      ...(shouldUseMorph && fragment ? { currentFragment: fragment } : {}),
-      })
+      if (useAgentic) {
+        // Use real-time agentic streaming
+        agenticStream.reset()
+        agenticStream.submit({
+          userID: session?.user?.id,
+          teamID: userTeam?.id,
+          projectID: projectForPrompt.id,
+          messages: toAISDKMessages(updatedMessages),
+          template: getTemplateForSubmission(),
+          model: currentModel,
+          config: languageModel,
+          ...(shouldUseMorph && fragment ? { currentFragment: fragment } : {}),
+        })
+      } else {
+        submit({
+          userID: session?.user?.id,
+          teamID: userTeam?.id,
+          projectID: projectForPrompt.id,
+          messages: toAISDKMessages(updatedMessages),
+          template: getTemplateForSubmission(),
+          model: currentModel,
+          config: languageModel,
+          ...(shouldUseMorph && fragment ? { currentFragment: fragment } : {}),
+        })
+      }
     } catch (error) {
       console.error('Prompt submission failed:', error)
       setErrorMessage(error instanceof Error ? error.message : 'Prompt submission failed.')
@@ -2339,15 +2401,22 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     isPreviewLoading={isPreviewLoading}
                     currentFragment={fragment}
                     autoFixMessage={autoFixMessage}
-                    onStop={handleStopGeneration}
+                    onStop={() => { handleStopGeneration(); agenticStream.stop(); }}
                     onAcceptPlan={handleAcceptPlan}
                     setCurrentPreview={setCurrentPreview}
                     useAgentic={useAgentic}
+                    agenticActions={useAgentic ? agenticStream.actions : []}
+                    agenticTodos={useAgentic ? agenticStream.todos : []}
+                    agenticStreaming={useAgentic && agenticStream.isStreaming}
                   />
                 )}
               </div>
 
               <div className="shrink-0 border-t border-white/10 px-2 py-2 sm:px-3 sm:py-3 md:px-4">
+                {/* Collapsible To-Do Bar */}
+                {useAgentic && agenticStream.todos.length > 0 && agenticStream.isStreaming && (
+                  <TodoBar todos={agenticStream.todos} />
+                )}
                 {statusNotices}
                 <div className="flex items-end gap-2">
                   <div className="flex-1 min-w-0">
