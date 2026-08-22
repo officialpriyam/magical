@@ -9,54 +9,68 @@ interface SearchResult {
 }
 
 async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
+  // Use DuckDuckGo lite (HTML) endpoint
   const encoded = encodeURIComponent(query)
-  const url = `https://html.duckduckgo.com/html/?q=${encoded}`
+  const url = `https://lite.duckduckgo.com/lite/?q=${encoded}`
 
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    },
-    signal: AbortSignal.timeout(10000),
-  })
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(10000),
+      redirect: 'follow',
+    })
 
-  if (!response.ok) return []
+    if (!response.ok) return []
 
-  const html = await response.text()
-  const results: SearchResult[] = []
+    const html = await response.text()
+    const results: SearchResult[] = []
 
-  const resultRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi
-
-  let match
-  while ((match = resultRegex.exec(html)) !== null) {
-    const rawUrl = match[1]
-    const title = match[2].replace(/<[^>]*>/g, '').trim()
-    const snippet = match[3].replace(/<[^>]*>/g, '').trim()
-
-    let cleanUrl = rawUrl
-    try {
-      const u = new URL(rawUrl, 'https://duckduckgo.com')
-      cleanUrl = u.searchParams.get('uddg') || rawUrl
-    } catch {
-      cleanUrl = rawUrl
-    }
-
-    if (title && cleanUrl && !cleanUrl.startsWith('//')) {
-      results.push({ title, url: cleanUrl, snippet })
-    }
-  }
-
-  if (results.length === 0) {
-    const simpleRegex = /<a[^>]*rel="nofollow"[^>]*href="([^"]*)"[^>]*class="result__a"[^>]*>([\s\S]*?)<\/a>/gi
-    while ((match = simpleRegex.exec(html)) !== null) {
-      const cleanUrl = match[1]
-      const title = match[2].replace(/<[^>]*>/g, '').trim()
-      if (title && cleanUrl) {
-        results.push({ title, url: cleanUrl, snippet: '' })
+    // Try multiple regex patterns for DuckDuckGo lite HTML
+    // Pattern 1: table-based layout with result links
+    const linkRegex = /<a[^>]*rel="nofollow"[^>]*href="([^"]+)"[^>]*class="result-link"[^>]*>([^<]+)<\/a>/gi
+    let match
+    while ((match = linkRegex.exec(html)) !== null) {
+      const rawUrl = match[1]
+      const title = match[2].trim()
+      if (title && rawUrl) {
+        results.push({ title, url: rawUrl, snippet: '' })
       }
     }
-  }
 
-  return results.slice(0, 5)
+    // Pattern 2: try extracting from href with uddg parameter
+    if (results.length === 0) {
+      const uddgRegex = /href="([^"]*uddg=([^&"]+)[^"]*)"/gi
+      while ((match = uddgRegex.exec(html)) !== null) {
+        try {
+          const decoded = decodeURIComponent(match[2])
+          if (decoded.startsWith('http') && decoded.length > 10) {
+            results.push({ title: decoded.replace(/^https?:\/\/[^/]+\//, '').slice(0, 80), url: decoded, snippet: '' })
+          }
+        } catch {}
+      }
+    }
+
+    // Pattern 3: generic link extraction from result blocks
+    if (results.length === 0) {
+      const genericRegex = /<a[^>]*href="(https?:\/\/[^"]+)"[^>]*>([^<]{10,80})<\/a>/gi
+      const seen = new Set<string>()
+      while ((match = genericRegex.exec(html)) !== null) {
+        const url = match[1]
+        const title = match[2].trim()
+        if (title && url && !seen.has(url) && !url.includes('duckduckgo.com')) {
+          seen.add(url)
+          results.push({ title, url, snippet: '' })
+        }
+      }
+    }
+
+    return results.slice(0, 5)
+  } catch {
+    return []
+  }
 }
 
 async function searchBrave(query: string): Promise<SearchResult[]> {

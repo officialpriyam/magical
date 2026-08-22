@@ -3,69 +3,118 @@ export interface SlashCommand {
   description: string
   icon?: string
   category?: string
+  agent?: string
   handler?: (args: string) => void
 }
 
 export const slashCommands: SlashCommand[] = [
+  // ─── Agent Skills (auto-select based on prompt) ──────────────
   {
-    command: '/edit',
-    description: 'Edit the current code or file',
-    category: 'Code',
-    icon: '✏️'
+    command: '/generate',
+    description: 'Auto-select best agents for your request',
+    icon: '✨',
+    category: 'Agent',
+    agent: 'auto'
+  },
+  {
+    command: '/plan',
+    description: 'Planner agent — analyze and plan the implementation',
+    icon: '📋',
+    category: 'Agent',
+    agent: 'planner'
+  },
+  {
+    command: '/build',
+    description: 'Full build — architect + frontend + backend agents',
+    icon: '🏗️',
+    category: 'Agent',
+    agent: 'build'
+  },
+  {
+    command: '/frontend',
+    description: 'Frontend agent — generate React/UI components',
+    icon: '🎨',
+    category: 'Agent',
+    agent: 'frontend'
+  },
+  {
+    command: '/backend',
+    description: 'Backend agent — generate API routes and database',
+    icon: '⚙️',
+    category: 'Agent',
+    agent: 'backend'
+  },
+  {
+    command: '/review',
+    description: 'Reviewer agent — analyze code quality and security',
+    icon: '🔍',
+    category: 'Agent',
+    agent: 'reviewer'
+  },
+  {
+    command: '/optimize',
+    description: 'Optimizer agent — improve performance and UX',
+    icon: '⚡',
+    category: 'Agent',
+    agent: 'optimizer'
   },
   {
     command: '/fix',
-    description: 'Fix errors or bugs in the code',
-    category: 'Code',
-    icon: '🔧'
+    description: 'Fixer agent — fix errors and bugs',
+    icon: '🔧',
+    category: 'Agent',
+    agent: 'fixer'
   },
   {
-    command: '/apply',
-    description: 'Apply changes or suggestions',
-    category: 'Code',
-    icon: '✅'
+    command: '/search',
+    description: 'Search the web for up-to-date information',
+    icon: '🌐',
+    category: 'Agent',
+    agent: 'search'
+  },
+  {
+    command: '/think',
+    description: 'Deep thinking — analyze before building',
+    icon: '🧠',
+    category: 'Agent',
+    agent: 'think'
+  },
+  // ─── Code Actions ────────────────────────────────────────────
+  {
+    command: '/edit',
+    description: 'Edit the current code or file',
+    icon: '✏️',
+    category: 'Code'
   },
   {
     command: '/explain',
     description: 'Explain the selected code',
-    category: 'Code',
-    icon: '💡'
+    icon: '💡',
+    category: 'Code'
   },
   {
     command: '/refactor',
     description: 'Refactor the selected code',
-    category: 'Code',
-    icon: '♻️'
-  },
-  {
-    command: '/optimize',
-    description: 'Optimize code performance',
-    category: 'Code',
-    icon: '⚡'
+    icon: '♻️',
+    category: 'Code'
   },
   {
     command: '/test',
     description: 'Generate tests for the code',
-    category: 'Testing',
-    icon: '🧪'
+    icon: '🧪',
+    category: 'Testing'
   },
   {
     command: '/document',
     description: 'Generate documentation',
-    category: 'Documentation',
-    icon: '📝'
-  },
-  {
-    command: '/review',
-    description: 'Review code for issues',
-    category: 'Code',
-    icon: '👀'
+    icon: '📝',
+    category: 'Docs'
   },
   {
     command: '/help',
     description: 'Show available commands',
-    category: 'System',
-    icon: '❓'
+    icon: '❓',
+    category: 'System'
   }
 ]
 
@@ -90,4 +139,51 @@ export function extractCommand(input: string): { command: string; args: string }
   const args = parts.slice(1).join(' ')
 
   return { command, args }
+}
+
+// ─── Auto-detect agent skill from prompt content ───────────────
+export function detectAgentFromPrompt(prompt: string): string | null {
+  const lower = prompt.toLowerCase()
+
+  // Fix errors / bugs
+  if (/\b(fix|bug|error|broken|issue|crash|debug|not work|doesn't work)\b/i.test(lower)) {
+    return 'fixer'
+  }
+
+  // Search for information
+  if (/\b(search|find|look up|what is|who is|latest|news|current|google)\b/i.test(lower)) {
+    return 'search'
+  }
+
+  // Review / analyze
+  if (/\b(review|analyze|check|audit|security|vulnerability|lint)\b/i.test(lower)) {
+    return 'reviewer'
+  }
+
+  // Optimize
+  if (/\b(optimize|performance|faster|speed|bundle|lazy|cache|improve)\b/i.test(lower)) {
+    return 'optimizer'
+  }
+
+  // Frontend specific
+  if (/\b(ui|ux|component|button|form|layout|page|landing|hero|navbar|sidebar|design|css|style|tailwind|responsive|animation)\b/i.test(lower)) {
+    return 'frontend'
+  }
+
+  // Backend specific
+  if (/\b(api|endpoint|database|sql|auth|database|server|route|middleware|supabase|postgres)\b/i.test(lower)) {
+    return 'backend'
+  }
+
+  // Planning
+  if (/\b(plan|architect|design|structure|organize|outline|roadmap)\b/i.test(lower)) {
+    return 'planner'
+  }
+
+  // Full build (default for new projects)
+  if (/\b(build|create|make|generate|app|website|project|landing page|dashboard|saas)\b/i.test(lower)) {
+    return 'build'
+  }
+
+  return null
 }

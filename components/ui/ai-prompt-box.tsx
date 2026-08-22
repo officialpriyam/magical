@@ -613,11 +613,26 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
 
   const handleSubmit = () => {
     if (input.trim() || files.length > 0) {
-      let messagePrefix = "";
-      if (showSearch) messagePrefix = "[Search: ";
-      else if (showThink) messagePrefix = "[Think: ";
-      else if (showCanvas) messagePrefix = "[Canvas: ";
-      const formattedInput = messagePrefix ? `${messagePrefix}${input}]` : input;
+      let formattedInput = input;
+
+      // Check if input already has an Agent prefix (from slash command)
+      const hasAgentPrefix = /^\[Agent:\s*\w+\]/.test(input.trim());
+
+      if (!hasAgentPrefix) {
+        // Auto-detect agent from prompt content
+        const { detectAgentFromPrompt } = require('@/lib/slash-commands');
+        const detectedAgent = detectAgentFromPrompt(input);
+        if (detectedAgent) {
+          formattedInput = `[Agent: ${detectedAgent}] ${input}`;
+        } else if (showSearch) {
+          formattedInput = `[Search: ${input}]`;
+        } else if (showThink) {
+          formattedInput = `[Think: ${input}]`;
+        } else if (showCanvas) {
+          formattedInput = `[Canvas: ${input}]`;
+        }
+      }
+
       onSend(formattedInput, files, chatMode);
       setInput("");
       setFiles([]);
@@ -629,7 +644,12 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   };
 
   const handleCommandSelect = (command: SlashCommand) => {
-    setInput(command.command + ' ');
+    if (command.agent) {
+      // Agent command — set agent prefix in input
+      setInput(`[Agent: ${command.agent}] `);
+    } else {
+      setInput(command.command + ' ');
+    }
     setShowSlashCommands(false);
     setMatchingCommands([]);
     setSelectedCommandIndex(0);

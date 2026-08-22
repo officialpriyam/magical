@@ -7,21 +7,49 @@
     "port": null
   },
   "nextjs-developer": {
-    "name": "Next.js developer",
+    "name": "Next.js",
     "lib": ["nextjs@14.2.5", "typescript", "@types/node", "@types/react", "@types/react-dom", "postcss", "tailwindcss", "shadcn"],
     "file": "pages/index.tsx",
     "instructions": "A Next.js 14+ app that reloads automatically. Using the pages router.",
     "port": 3000
   },
+  "react-developer": {
+    "name": "React",
+    "lib": ["react@latest", "react-dom@latest", "typescript", "@types/react", "@types/react-dom", "vite", "@vitejs/plugin-react", "tailwindcss"],
+    "file": "src/App.tsx",
+    "instructions": "A React app with Vite that reloads automatically. Modern React with hooks and functional components.",
+    "port": 5173
+  },
+  "vite-developer": {
+    "name": "Vite React",
+    "lib": ["react@latest", "react-dom@latest", "vite", "@vitejs/plugin-react", "typescript", "tailwindcss"],
+    "file": "src/App.tsx",
+    "instructions": "A Vite-powered React app with TypeScript and Tailwind CSS. Fast development server.",
+    "port": 5173
+  },
+  "html-developer": {
+    "name": "HTML/CSS/JS",
+    "lib": [],
+    "file": "index.html",
+    "instructions": "A pure HTML, CSS, and JavaScript app. No frameworks. Clean and simple.",
+    "port": 3000
+  },
   "vue-developer": {
-    "name": "Vue.js developer",
+    "name": "Vue.js",
     "lib": ["vue@latest", "nuxt@3.13.0", "tailwindcss"],
     "file": "app.vue",
     "instructions": "A Vue.js 3+ app that reloads automatically. Only when asked specifically for a Vue app.",
     "port": 3000
   },
+  "svelte-developer": {
+    "name": "Svelte",
+    "lib": ["svelte", "vite", "@sveltejs/vite-plugin-svelte", "tailwindcss"],
+    "file": "src/App.svelte",
+    "instructions": "A Svelte app with Vite. Lightweight and reactive UI components.",
+    "port": 5173
+  },
   "streamlit-developer": {
-    "name": "Streamlit developer",
+    "name": "Streamlit",
     "lib": [
       "streamlit",
       "pandas",
@@ -36,7 +64,7 @@
     "port": 8501
   },
   "gradio-developer": {
-    "name": "Gradio developer",
+    "name": "Gradio",
     "lib": [
       "gradio",
       "pandas",

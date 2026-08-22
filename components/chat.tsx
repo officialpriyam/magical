@@ -112,9 +112,17 @@ export function Chat({
           {message.content.map((content, id) => {
             if (content.type === 'text') {
               const text = content.text || ''
-              const searchMatch = text.match(/^\[Search:\s*(.*?)\]\s*$/)
-              const thinkMatch = text.match(/^\[Think:\s*(.*?)\]\s*$/)
-              const canvasMatch = text.match(/^\[Canvas:\s*(.*?)\]\s*$/)
+              // Strip style injection metadata from display
+              const cleanedText = text
+                .replace(/\[Style:\s*[^\]]*\]\s*/g, '')
+                .replace(/\[Custom Style\]\s*/g, '')
+                .trim()
+              // If nothing remains after cleaning, skip rendering
+              if (!cleanedText && message.role === 'user') return null
+              const displayText = cleanedText || text
+              const searchMatch = displayText.match(/^\[Search:\s*(.*?)\]\s*$/)
+              const thinkMatch = displayText.match(/^\[Think:\s*(.*?)\]\s*$/)
+              const canvasMatch = displayText.match(/^\[Canvas:\s*(.*?)\]\s*$/)
 
               if (searchMatch) {
                 return (
@@ -149,7 +157,7 @@ export function Chat({
                   </span>
                 )
               }
-              return <span key={id} className="text-white/95 leading-relaxed">{renderMarkdownText(content.text)}</span>
+              return <span key={id} className="text-white/95 leading-relaxed">{renderMarkdownText(displayText)}</span>
             }
             if (content.type === 'image') {
               return (
@@ -364,10 +372,26 @@ function LiveStreamingMessage({
         )}
       </div>
 
-      {/* Scrollable timeline + commentary area */}
+      {/* Streaming commentary text — appears as normal message body with markdown */}
+      <div className="text-[13px] leading-[1.7] text-white/80 mb-2 whitespace-pre-wrap">
+        {latestCommentary
+          ? renderMarkdownText(latestCommentary)
+          : isStreaming && actions.length > 0 ? (
+            <span className="flex items-center gap-2 text-white/40">
+              <span className="inline-block h-4 w-[2px] bg-blue-400/50 animate-pulse" />
+              <span className="text-xs">Thinking...</span>
+            </span>
+          ) : null}
+        {isStreaming && latestCommentary && (
+          <span className="inline-block h-[14px] w-[2px] bg-blue-400/50 animate-pulse -ml-0.5 align-middle" />
+        )}
+      </div>
+
+      {/* Scrollable timeline + commentary area — only show during streaming */}
+      {isStreaming && (
       <div ref={scrollRef} className="pl-8 space-y-1 max-h-[400px] overflow-y-auto overscroll-contain">
         {/* Connecting state — when streaming but no actions yet */}
-        {isStreaming && actions.length === 0 && (
+        {actions.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -592,23 +616,7 @@ function LiveStreamingMessage({
         {/* Web search items are intentionally hidden — user requested removal of blue search boxes */}
 
       </div>
-
-      {/* Streaming commentary text — appears as normal message body with markdown */}
-      <div className="text-[13px] leading-[1.7] text-white/80 pl-8 mt-2 whitespace-pre-wrap">
-        {latestCommentary
-          ? renderMarkdownText(latestCommentary)
-          : isStreaming && actions.length > 0 ? (
-            <span className="flex items-center gap-2 text-white/40">
-              <span className="inline-block h-4 w-[2px] bg-blue-400/50 animate-pulse" />
-              <span className="text-xs">Thinking...</span>
-            </span>
-          ) : !isStreaming && actions.length > 0 ? (
-            <span className="text-xs text-white/25">Done</span>
-          ) : null}
-        {isStreaming && latestCommentary && (
-          <span className="inline-block h-[14px] w-[2px] bg-blue-400/50 animate-pulse -ml-0.5 align-middle" />
-        )}
-      </div>
+      )}
 
       {/* In-message to-dos */}
       {todos.length > 0 && (

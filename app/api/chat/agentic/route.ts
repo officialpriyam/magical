@@ -881,6 +881,29 @@ function shouldAutoSearch(query: string): boolean {
   return false
 }
 
+// ─── Agent detection from message prefix ─────────────────────
+function detectAgentFromMessage(messages: ModelMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.role !== 'user') continue
+    const content = typeof msg.content === 'string' ? msg.content : ''
+    const agentMatch = content.match(/^\[Agent:\s*(\w+)\]/i)
+    if (agentMatch) return agentMatch[1].toLowerCase()
+    break
+  }
+  return null
+}
+
+// Strip agent/search/think/canvas prefixes from message content
+function stripMessagePrefixes(content: string): string {
+  return content
+    .replace(/^\[Agent:\s*\w+\]\s*/i, '')
+    .replace(/^\[Search:\s*[^\]]*\]\s*/i, '')
+    .replace(/^\[Think:\s*[^\]]*\]\s*/i, '')
+    .replace(/^\[Canvas:\s*[^\]]*\]\s*/i, '')
+    .trim()
+}
+
 function detectAutoSearchQuery(messages: ModelMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
@@ -888,12 +911,26 @@ function detectAutoSearchQuery(messages: ModelMessage[]): string | null {
     const content = typeof msg.content === 'string' ? msg.content : ''
     const searchMatch = content.match(/^\[Search:\s*(.+?)\]\s*$/)
     if (searchMatch) return searchMatch[1]
+    // Skip agent prefixes for auto-search detection
+    const agentMatch = content.match(/^\[Agent:\s*\w+\]/)
+    if (agentMatch) {
+      // If agent is 'search', always search
+      const agent = agentMatch[0].match(/\[Agent:\s*(\w+)\]/)?.[1]
+      if (agent === 'search') {
+        const cleaned = content.replace(/^\[Agent:\s*\w+\]\s*/, '').trim()
+        return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
+      }
+    }
     const cleaned = content.replace(/^\[\w+:\s*.+?\]\s*/, '').trim()
     if (!cleaned) continue
     if (!shouldAutoSearch(cleaned)) return null
     return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
   }
   return null
+}
+
+function stripAgentPrefix(text: string): string {
+  return text.replace(/^\[Agent:\s*\w+\]\s*/, '').trim()
 }
 
 async function fetchWebSearch(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
