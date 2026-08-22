@@ -309,14 +309,12 @@ function LiveStreamingMessage({
     }
   }
 
-  // Build chronological timeline items (skip commentary, todo, and web_search/web_fetch — search boxes removed per user request)
+  // Build chronological timeline items (skip commentary and todo)
   const timelineActions = useMemo(() => {
     return actions.filter(a =>
       a.type !== 'commentary' &&
       a.type !== 'commentary_chunk' &&
-      a.type !== 'todo' &&
-      a.type !== 'web_search' &&
-      a.type !== 'web_fetch'
+      a.type !== 'todo'
     )
   }, [actions])
 
@@ -433,7 +431,71 @@ function LiveStreamingMessage({
             )
           }
 
-          // For non-thinking actions, show as a simple timeline item
+          // For web_search actions, show query + clickable result URLs
+          if (action.type === 'web_search') {
+            let results: { title: string; url: string; snippet?: string }[] = []
+            try {
+              results = action.detail ? JSON.parse(action.detail) : []
+            } catch {}
+
+            return (
+              <motion.div
+                key={`${action.timestamp}-${i}`}
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.15 }}
+                className="py-0.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/20">⋮</span>
+                  <Search className="h-3 w-3 text-[#1EAEDB]/70" />
+                  <span className="text-[12px] text-white/50">Searched: <span className="text-[#1EAEDB]/80">{action.content}</span></span>
+                </div>
+                {results.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pl-6 mt-1">
+                    {results.map((r) => (
+                      <a
+                        key={r.url}
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md border border-[#1EAEDB]/15 bg-[#1EAEDB]/[0.06] px-2 py-0.5 text-[11px] text-[#1EAEDB]/80 transition hover:bg-[#1EAEDB]/15 hover:text-[#1EAEDB]"
+                      >
+                        <Globe className="h-2.5 w-2.5 shrink-0" />
+                        <span className="truncate max-w-[180px]">{r.title || r.url}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )
+          }
+
+          // For web_fetch actions, show clickable URL
+          if (action.type === 'web_fetch') {
+            return (
+              <motion.div
+                key={`${action.timestamp}-${i}`}
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex items-center gap-2 py-0.5"
+              >
+                <span className="text-[10px] text-white/20">⋮</span>
+                <Globe className="h-3 w-3 text-[#1EAEDB]/70" />
+                <a
+                  href={action.content}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[12px] text-[#1EAEDB]/80 hover:text-[#1EAEDB] hover:underline truncate max-w-[300px]"
+                >
+                  {action.detail || action.content}
+                </a>
+              </motion.div>
+            )
+          }
+
+          // For non-thinking, non-search actions, show as a simple timeline item
           return (
             <motion.div
               key={`${action.timestamp}-${i}`}
