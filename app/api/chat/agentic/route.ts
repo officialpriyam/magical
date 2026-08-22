@@ -24,7 +24,6 @@ import {
 import { runAgent, type AgentEventEmitter } from '@/lib/agents/agent-runner'
 
 export const maxDuration = 300
-export const runtime = 'edge'
 
 const STREAM_TEXT_PROVIDER_IDS = new Set([
   'orcarouter',
