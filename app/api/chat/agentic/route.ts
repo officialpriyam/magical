@@ -48,36 +48,7 @@ const PARALLEL_GROUPS: Record<TaskComplexity, AgentRole[][]> = {
   enterprise: [['planner'], ['architect'], ['frontend', 'backend'], ['reviewer'], ['optimizer'], ['reviewer']],
 }
 
-const AGENT_TOOL_DESCRIPTIONS: Record<AgentRole, { action_type: string; content: string; detail?: string }[]> = {
-  orchestrator: [
-    { action_type: 'thinking', content: 'Analyzing request complexity...' },
-  ],
-  planner: [
-    { action_type: 'thinking', content: 'Creating implementation plan...' },
-    { action_type: 'todo', content: 'Map file structure and component hierarchy' },
-  ],
-  architect: [
-    { action_type: 'thinking', content: 'Designing project architecture...' },
-    { action_type: 'todo', content: 'Design data flow and state management' },
-  ],
-  frontend: [
-    { action_type: 'todo', content: 'Build UI components' },
-    { action_type: 'file_write', content: 'Writing UI components...' },
-  ],
-  backend: [
-    { action_type: 'todo', content: 'Build API routes and data layer' },
-    { action_type: 'file_write', content: 'Writing API routes...' },
-  ],
-  reviewer: [
-    { action_type: 'thinking', content: 'Reviewing code quality...' },
-  ],
-  optimizer: [
-    { action_type: 'thinking', content: 'Optimizing performance...' },
-  ],
-  fixer: [
-    { action_type: 'thinking', content: 'Fixing issues...' },
-  ],
-}
+// No hardcoded descriptions — real data emitted from agent output
 
 function createSSEStream() {
   let controller: ReadableStreamDefaultController<Uint8Array> | null = null
@@ -242,13 +213,7 @@ async function runPipeline({
     emitAction('commentary', `Task complexity: ${complexity}. Dispatching ${agentsNeeded.length} agents...`)
     emitProgress(0, totalSteps)
 
-    // Build initial todo list from agent plan
-    const initialTodos = agentsNeeded.map((role, i) => ({
-      id: `agent-${i}-${role}`,
-      text: AGENT_DISPLAY_NAMES[role],
-      completed: false,
-    }))
-    emitTodos(initialTodos)
+    // No initial todos — real tasks will be emitted from agent output
 
     // ── Step 2: Run agents ────────────────────────────────────
     const plan = PARALLEL_GROUPS[complexity]
@@ -285,12 +250,8 @@ async function runPipeline({
       if (latestFragment.files?.length) context.files = latestFragment.files
 
       for (const role of group) {
-        // Emit agent start action
-        const agentDesc = AGENT_TOOL_DESCRIPTIONS[role] || []
-        for (const desc of agentDesc) {
-          emitAction(desc.action_type, desc.content, desc.detail)
-        }
-
+        // Emit real thinking action for agent start
+        emitAction('thinking', `${AGENT_DISPLAY_NAMES[role]}: Analyzing and generating...`)
         emitAction('status', `Running ${AGENT_DISPLAY_NAMES[role]}...`)
 
         console.log(`[Agentic] Running ${AGENT_DISPLAY_NAMES[role]}...`)
@@ -315,31 +276,42 @@ async function runPipeline({
         // Emit progress
         emitProgress(completedAgents, totalSteps)
 
-        // Mark this agent's todo as completed
-        const updatedTodos = agentsNeeded.map((r, i) => ({
-          id: `agent-${i}-${r}`,
-          text: AGENT_DISPLAY_NAMES[r],
-          completed: agentResults.some(ar => ar.role === r && ar.success),
-        }))
-        emitTodos(updatedTodos)
-
-        // Emit agent completion
+        // Emit real output from this agent
         if (result.success) {
-          emitAction('commentary', `${AGENT_DISPLAY_NAMES[role]} completed`)
+          // Emit real commentary from the agent
+          const agentCommentary = extractCommentary(result)
+          if (agentCommentary) {
+            emitAction('commentary', agentCommentary)
+          }
 
-          // Emit file actions for any files this agent created
+          // Emit REAL file paths from the agent's fragment
           if (result.fragment) {
             const fragment = result.fragment as Record<string, any>
             if (Array.isArray(fragment.files)) {
               for (const file of fragment.files) {
                 if (file?.path) {
-                  emitAction('file_write', `Writing ${file.path}...`)
+                  emitAction('file_write', file.path, file.purpose || undefined)
                 }
               }
             }
+            // Also emit main file_path if no files array
+            if (fragment.file_path && (!fragment.files || fragment.files.length === 0)) {
+              emitAction('file_write', fragment.file_path)
+            }
           }
+
+          // Extract real todos from planner output
+          if (role === 'planner' && result.output) {
+            const realTodos = extractTodosFromPlan(result.output)
+            if (realTodos.length > 0) {
+              emitTodos(realTodos)
+            }
+          }
+
+          // Emit thinking with real agent summary
+          emitAction('thinking', `${AGENT_DISPLAY_NAMES[role]} completed — ${result.fragment ? 'generated code' : 'analysis done'}${result.duration ? ` in ${(result.duration / 1000).toFixed(1)}s` : ''}`)
         } else {
-          emitAction('thinking', `${AGENT_DISPLAY_NAMES[role]} encountered an issue: ${result.errors?.join(', ') || 'unknown error'}`)
+          emitAction('thinking', `${AGENT_DISPLAY_NAMES[role]} failed: ${result.errors?.join(', ') || 'unknown error'}`)
         }
 
         // Merge agent output into the fragment
@@ -425,13 +397,9 @@ async function runPipeline({
 
     emitAction('commentary', `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`)
 
-    // Mark all todos as completed
-    const finalTodos = agentsNeeded.map((r, i) => ({
-      id: `agent-${i}-${r}`,
-      text: AGENT_DISPLAY_NAMES[r],
-      completed: true,
-    }))
-    emitTodos(finalTodos)
+    // Mark all real todos as completed (from planner output)
+    // Emit a completion action so the UI knows we're done
+    emitAction('thinking', `Pipeline complete — ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s`)
 
     // Emit final fragment
     emitFragment(finalFragment)
@@ -449,6 +417,100 @@ async function runPipeline({
       console.error('[Agentic] Fallback also failed:', fallbackError)
     }
   }
+}
+
+// ─── Extract real commentary from agent result ─────────────
+function extractCommentary(result: AgentResult): string {
+  // Use the agent's actual output/commentary, not hardcoded text
+  const fragment = result.fragment as Record<string, any> | undefined
+  if (fragment?.commentary) {
+    // Clean up and truncate
+    const text = fragment.commentary.replace(/\s+/g, ' ').trim()
+    return text.length > 300 ? `${text.slice(0, 297)}...` : text
+  }
+  // Fallback to output text (first meaningful paragraph)
+  if (result.output) {
+    const firstParagraph = result.output.split('\n').find(l => l.trim().length > 20)
+    if (firstParagraph) {
+      const text = firstParagraph.replace(/\s+/g, ' ').trim()
+      return text.length > 300 ? `${text.slice(0, 297)}...` : text
+    }
+  }
+  return ''
+}
+
+// ─── Extract real todos from planner output ─────────────────
+function extractTodosFromPlan(output: string): { id: string; text: string; completed: boolean }[] {
+  const todos: { id: string; text: string; completed: boolean }[] = []
+
+  try {
+    // Try to parse as JSON first (planner outputs JSON)
+    const jsonMatch = output.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
+    const jsonStr = jsonMatch ? jsonMatch[1] : output
+    const startIdx = jsonStr.indexOf('{')
+    if (startIdx !== -1) {
+      // Find matching closing brace
+      let depth = 0, inStr = false, esc = false
+      for (let i = startIdx; i < jsonStr.length; i++) {
+        const c = jsonStr[i]
+        if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue }
+        if (c === '"') inStr = true
+        else if (c === '{') depth++
+        else if (c === '}') { depth--; if (depth === 0) {
+          const parsed = JSON.parse(jsonStr.slice(startIdx, i + 1))
+          // Extract steps from the plan
+          if (Array.isArray(parsed.steps)) {
+            for (const step of parsed.steps) {
+              if (step.description) {
+                todos.push({
+                  id: `step-${step.step || todos.length}`,
+                  text: step.description,
+                  completed: false,
+                })
+              }
+            }
+          }
+          // Also extract pages/components if present
+          if (parsed.architecture) {
+            if (Array.isArray(parsed.architecture.pages)) {
+              for (const page of parsed.architecture.pages) {
+                todos.push({
+                  id: `page-${page}`,
+                  text: `Create page: ${page}`,
+                  completed: false,
+                })
+              }
+            }
+            if (Array.isArray(parsed.architecture.components)) {
+              for (const comp of parsed.architecture.components) {
+                todos.push({
+                  id: `comp-${comp}`,
+                  text: `Build component: ${comp}`,
+                  completed: false,
+                })
+              }
+            }
+          }
+          break
+        }}
+      }
+    }
+  } catch {
+    // If JSON parsing fails, extract lines that look like tasks
+    const lines = output.split('\n')
+    for (const line of lines) {
+      const trimmed = line.replace(/^[-*\d.]+\s*/, '').trim()
+      if (trimmed.length > 10 && trimmed.length < 200 && (trimmed.includes('Create') || trimmed.includes('Build') || trimmed.includes('Add') || trimmed.includes('Implement') || trimmed.includes('Set up') || trimmed.includes('Configure'))) {
+        todos.push({
+          id: `task-${todos.length}`,
+          text: trimmed,
+          completed: false,
+        })
+      }
+    }
+  }
+
+  return todos.slice(0, 15) // Limit to 15 todos
 }
 
 // ─── Analyze complexity ─────────────────────────────────────

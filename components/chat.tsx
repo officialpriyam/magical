@@ -151,13 +151,17 @@ export function Chat({
           )}
         </motion.div>
       ))}
-      {(isLoading || isPreviewLoading || autoFixMessage) && (
+      {(isLoading || isPreviewLoading || autoFixMessage || (useAgentic && agenticActions.length > 0)) && (
         <>
-          {/* Live agentic streaming actions */}
-          {useAgentic && agenticStreaming && agenticActions.length > 0 && (
+          {/* Live agentic streaming actions — show during AND after streaming */}
+          {useAgentic && agenticActions.length > 0 && (
             <AgenticLiveActions
               actions={agenticActions}
               todos={agenticTodos}
+              isStreaming={agenticStreaming}
+              setCurrentPreview={setCurrentPreview}
+              currentFragment={currentFragment}
+              onStop={onStop}
             />
           )}
           {/* Fallback indicator for non-agentic or before actions stream in */}
@@ -169,14 +173,17 @@ export function Chat({
               </div>
             </div>
           )}
-          <GenerationStatusCard
-            messages={messages}
-            currentFragment={currentFragment}
-            isLoading={isLoading}
-            isPreviewLoading={isPreviewLoading}
-            autoFixMessage={autoFixMessage}
-            onStop={onStop}
-          />
+          {/* Hide GenerationStatusCard when agentic actions are showing (they provide better info) */}
+          {!(useAgentic && agenticActions.length > 0) && (
+            <GenerationStatusCard
+              messages={messages}
+              currentFragment={currentFragment}
+              isLoading={isLoading}
+              isPreviewLoading={isPreviewLoading}
+              autoFixMessage={autoFixMessage}
+              onStop={onStop}
+            />
+          )}
         </>
       )}
     </div>
@@ -184,15 +191,32 @@ export function Chat({
 }
 
 // ─── Live Agentic Actions Display ──────────────────────────
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
 function AgenticLiveActions({
   actions,
   todos,
+  isStreaming,
+  setCurrentPreview,
+  currentFragment,
+  onStop,
 }: {
   actions: ToolAction[]
   todos: TodoItem[]
+  isStreaming: boolean
+  setCurrentPreview: (preview: {
+    fragment: DeepPartial<FragmentSchema> | undefined
+    result: ExecutionResult | undefined
+  }) => void
+  currentFragment?: DeepPartial<FragmentSchema>
+  onStop?: () => void
 }) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['actions']))
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [, setTick] = useState(0)
 
   // Auto-scroll to latest action
   useEffect(() => {
@@ -201,6 +225,12 @@ function AgenticLiveActions({
     }
   }, [actions.length])
 
+  // Tick every second to update live duration of current action
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
       const next = new Set(prev)
@@ -208,6 +238,22 @@ function AgenticLiveActions({
       else next.add(section)
       return next
     })
+  }
+
+  // Calculate duration for each action (time until next action, or time until now)
+  const now = Date.now()
+  function getActionDuration(index: number, filteredActions: ToolAction[]): number {
+    const action = filteredActions[index]
+    if (!action) return 0
+    // Find this action's index in the full actions array
+    const globalIdx = actions.indexOf(action)
+    if (globalIdx === -1) return 0
+    // Duration is time until next action in the full array, or time until now
+    if (globalIdx < actions.length - 1) {
+      return actions[globalIdx + 1].timestamp - action.timestamp
+    }
+    // Last action — still running, show live elapsed time
+    return now - action.timestamp
   }
 
   // Group actions by type
@@ -220,23 +266,43 @@ function AgenticLiveActions({
   // Latest status line
   const latestStatus = statusActions.length > 0 ? statusActions[statusActions.length - 1] : null
 
+  // Count completed vs total todos
+  const completedTodos = todos.filter(t => t.completed).length
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      className="w-full max-w-[36rem] overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]"
+      className="w-full overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]"
     >
       {/* Status header */}
-      {latestStatus && (
-        <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-4 py-2.5">
+      <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-4 py-2.5">
+        {isStreaming ? (
           <LoaderIcon className="h-3.5 w-3.5 animate-spin text-blue-400" />
-          <span className="text-xs font-medium text-blue-300">{latestStatus.content}</span>
-          <span className="ml-auto text-[11px] text-white/30 tabular-nums">
-            {Math.floor((Date.now() - actions[0]?.timestamp) / 1000)}s
-          </span>
-        </div>
-      )}
+        ) : (
+          <Check className="h-3.5 w-3.5 text-emerald-400" />
+        )}
+        <span className="text-xs font-medium text-white/70">
+          {isStreaming
+            ? (latestStatus?.content || 'Working...')
+            : `Completed — ${actions.length} actions`
+          }
+        </span>
+        <span className="ml-auto text-[11px] text-white/30 tabular-nums">
+          {Math.floor((Date.now() - actions[0]?.timestamp) / 1000)}s
+        </span>
+        {onStop && isStreaming && (
+          <button
+            type="button"
+            onClick={onStop}
+            className="flex h-5 items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 text-[10px] font-medium text-red-300 transition hover:bg-red-500/20"
+          >
+            <Square className="h-2 w-2 fill-current" />
+            Stop
+          </button>
+        )}
+      </div>
 
       {/* Scrollable content */}
       <div ref={scrollRef} className="max-h-[300px] overflow-y-auto">
@@ -251,16 +317,20 @@ function AgenticLiveActions({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-1 px-4 pb-2">
-                {thinkingActions.map((action, i) => (
-                  <motion.div
-                    key={`${action.timestamp}-${i}`}
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="text-[11px] leading-relaxed text-white/40"
-                  >
-                    {action.content}
-                  </motion.div>
-                ))}
+                {thinkingActions.map((action, i) => {
+                  const duration = getActionDuration(i, thinkingActions)
+                  return (
+                    <motion.div
+                      key={`${action.timestamp}-${i}`}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-start gap-2 text-[11px] leading-relaxed text-white/40"
+                    >
+                      <span className="flex-1">{action.content}</span>
+                      <span className="shrink-0 tabular-nums text-[10px] text-white/20">{formatDuration(duration)}</span>
+                    </motion.div>
+                  )
+                })}
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -269,16 +339,20 @@ function AgenticLiveActions({
         {/* Commentary */}
         {commentaryActions.length > 0 && (
           <div className="border-t border-white/[0.04] px-4 py-2.5">
-            {commentaryActions.map((action, i) => (
-              <motion.div
-                key={`${action.timestamp}-${i}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-xs leading-relaxed text-white/55"
-              >
-                {action.content}
-              </motion.div>
-            ))}
+            {commentaryActions.map((action, i) => {
+              const duration = getActionDuration(i, commentaryActions)
+              return (
+                <motion.div
+                  key={`${action.timestamp}-${i}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-start justify-between gap-2 text-xs leading-relaxed text-white/55"
+                >
+                  <span className="flex-1">{action.content}</span>
+                  <span className="shrink-0 tabular-nums text-[10px] text-white/20">{formatDuration(duration)}</span>
+                </motion.div>
+              )
+            })}
           </div>
         )}
 
@@ -298,19 +372,31 @@ function AgenticLiveActions({
                   const isRead = action.type === 'file_read'
                   const Icon = isRead ? Eye : isWrite ? FileEdit : Pencil
                   const iconColor = isRead ? 'text-blue-400/60' : isWrite ? 'text-emerald-400/60' : 'text-amber-400/60'
+                  const duration = getActionDuration(i, fileActions)
+                  // Extract just the file path from content like "Writing src/App.tsx..."
+                  const filePath = action.content.replace(/^(Writing|Reading|Editing)\s+/i, '').replace(/\.\.\.$/, '').trim()
 
                   return (
                     <motion.div
                       key={`${action.timestamp}-${i}`}
                       initial={{ opacity: 0, x: -4 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="flex items-center gap-1.5 py-0.5"
+                      className="group flex items-center gap-1.5 py-0.5"
                     >
                       <Icon className={`h-3 w-3 shrink-0 ${iconColor}`} />
-                      <span className="truncate text-[11px] text-white/45">{action.content}</span>
-                      {action.detail && (
-                        <span className="ml-auto shrink-0 text-[10px] text-white/25">{action.detail}</span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Open file in preview/IDE by setting the fragment
+                          if (currentFragment) {
+                            setCurrentPreview({ fragment: currentFragment, result: undefined })
+                          }
+                        }}
+                        className="truncate text-[11px] text-white/45 transition hover:text-white/70 hover:underline"
+                      >
+                        {filePath}
+                      </button>
+                      <span className="shrink-0 tabular-nums text-[10px] text-white/20">{formatDuration(duration)}</span>
                     </motion.div>
                   )
                 })}
@@ -330,37 +416,46 @@ function AgenticLiveActions({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-0.5 px-4 pb-2">
-                {searchActions.map((action, i) => (
-                  <motion.div
-                    key={`${action.timestamp}-${i}`}
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center gap-1.5 py-0.5"
-                  >
-                    <Globe className="h-3 w-3 shrink-0 text-[#1EAEDB]/50" />
-                    <span className="truncate text-[11px] text-white/45">{action.content}</span>
-                  </motion.div>
-                ))}
+                {searchActions.map((action, i) => {
+                  const duration = getActionDuration(i, searchActions)
+                  return (
+                    <motion.div
+                      key={`${action.timestamp}-${i}`}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-center gap-1.5 py-0.5"
+                    >
+                      <Globe className="h-3 w-3 shrink-0 text-[#1EAEDB]/50" />
+                      <span className="truncate text-[11px] text-white/45">{action.content}</span>
+                      <span className="shrink-0 tabular-nums text-[10px] text-white/20">{formatDuration(duration)}</span>
+                    </motion.div>
+                  )
+                })}
               </div>
             </CollapsibleContent>
           </Collapsible>
         )}
       </div>
 
-      {/* To-dos */}
+      {/* To-dos — real tasks from planner output */}
       {todos.length > 0 && (
         <div className="border-t border-white/[0.06] px-4 py-2.5">
           <div className="flex items-center gap-2 mb-1.5">
             <ListTodo className="h-3.5 w-3.5 text-white/40" />
             <span className="text-[11px] font-medium text-white/50">
-              To-dos {todos.filter(t => t.completed).length}/{todos.length}
+              To-dos {completedTodos}/{todos.length}
             </span>
+            {completedTodos === todos.length && (
+              <Check className="h-3 w-3 text-emerald-400" />
+            )}
           </div>
           <div className="space-y-1">
             {todos.map((todo) => (
               <div key={todo.id} className="flex items-center gap-2 py-0.5">
                 {todo.completed ? (
                   <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                ) : isStreaming ? (
+                  <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400/50" />
                 ) : (
                   <Circle className="h-3 w-3 shrink-0 text-white/20" />
                 )}
