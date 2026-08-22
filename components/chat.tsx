@@ -8,9 +8,42 @@ import type { AgentRole } from '@/lib/agents/types'
 import type { ToolAction, TodoItem } from '@/lib/hooks/use-agentic-stream'
 import { DeepPartial } from 'ai'
 import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil, Cpu, Activity, Braces, Palette, Server, Shield, Zap, Wrench, ChevronRight, ChevronDown, Circle, FileEdit, Search, Brain, ListTodo, MessageSquare } from 'lucide-react'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+
+/** Simple markdown renderer for bold/italic in streaming commentary */
+function renderMarkdownText(text: string): React.ReactNode[] {
+  if (!text) return []
+  const parts: React.ReactNode[] = []
+  // Split on **bold**, *italic*, and `code` patterns
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  let key = 0
+
+  while ((match = regex.exec(text)) !== null) {
+    // Add text before match
+    if (match.index > lastIndex) {
+      parts.push(<span key={key++}>{text.slice(lastIndex, match.index)}</span>)
+    }
+    const token = match[1]
+    if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(<strong key={key++} className="font-semibold text-white/95">{token.slice(2, -2)}</strong>)
+    } else if (token.startsWith('*') && token.endsWith('*')) {
+      parts.push(<em key={key++} className="italic text-white/70">{token.slice(1, -1)}</em>)
+    } else if (token.startsWith('`') && token.endsWith('`')) {
+      parts.push(
+        <code key={key++} className="rounded bg-white/[0.08] px-1.5 py-0.5 font-mono text-[12px] text-blue-300/80">{token.slice(1, -1)}</code>
+      )
+    }
+    lastIndex = match.index + token.length
+  }
+  if (lastIndex < text.length) {
+    parts.push(<span key={key++}>{text.slice(lastIndex)}</span>)
+  }
+  return parts
+}
 
 export function Chat({
   messages,
@@ -177,8 +210,8 @@ export function Chat({
           </div>
         </motion.div>
       )}
-      {/* Post-generation status — only during loading, not after artifact is shown */}
-      {!agenticStreaming && !currentFragment?.code && (
+      {/* Status card — during loading or after with commentary/files to show */}
+      {!agenticStreaming && (
         <GenerationStatusCard
           messages={messages}
           currentFragment={currentFragment}
@@ -198,7 +231,7 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-// ─── Live Streaming Message (looks like normal assistant msg) ─
+// ─── Live Streaming Message (matches Claude Code / OpenThorn style) ─
 function LiveStreamingMessage({
   actions,
   todos,
@@ -211,7 +244,11 @@ function LiveStreamingMessage({
   onStop?: () => void
 }) {
   const [elapsed, setElapsed] = useState(0)
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
+  const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set())
+  const [expandedReads, setExpandedReads] = useState(false)
+  const [expandedWrites, setExpandedWrites] = useState(false)
+  const [expandedSearches, setExpandedSearches] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   // Live timer
   useEffect(() => {
@@ -221,44 +258,91 @@ function LiveStreamingMessage({
     return () => clearInterval(interval)
   }, [isStreaming, actions.length])
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev)
-      if (next.has(section)) next.delete(section)
-      else next.add(section)
-      return next
-    })
-  }
+  // Auto-scroll to latest
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [actions.length, actions[actions.length - 1]?.content])
 
-  // Group actions chronologically
-  const fileWriteActions = actions.filter(a => a.type === 'file_write' || a.type === 'file_edit')
-  const fileReadActions = actions.filter(a => a.type === 'file_read')
-  const searchActions = actions.filter(a => a.type === 'web_search' || a.type === 'web_fetch')
+  const elapsedSec = Math.floor(elapsed / 1000)
+
+  // Latest commentary text for streaming body
   const commentaryActions = actions.filter(a => a.type === 'commentary' || a.type === 'commentary_chunk')
-
-  // Latest commentary text — gets the most recent streaming chunk or final commentary
   const latestCommentary = commentaryActions.length > 0
     ? commentaryActions[commentaryActions.length - 1].content
     : ''
 
-  const elapsedSec = Math.floor(elapsed / 1000)
-  const hasFileOps = fileReadActions.length > 0 || fileWriteActions.length > 0 || searchActions.length > 0
+  // Group reads and writes
+  const fileReadActions = actions.filter(a => a.type === 'file_read')
+  const fileWriteActions = actions.filter(a => a.type === 'file_write' || a.type === 'file_edit')
+  const searchActions = actions.filter(a => a.type === 'web_search' || a.type === 'web_fetch')
+  const thinkingActions = actions.filter(a => a.type === 'thinking')
+
+  // Calculate duration for each action
+  function getActionDuration(index: number, filteredActions: ToolAction[]): number {
+    const action = filteredActions[index]
+    if (!action) return 0
+    const globalIdx = actions.indexOf(action)
+    if (globalIdx === -1) return 0
+    if (globalIdx < actions.length - 1) {
+      return actions[globalIdx + 1].timestamp - action.timestamp
+    }
+    return Date.now() - action.timestamp
+  }
+
+  // Format a human-readable label from action content
+  function getActionLabel(action: ToolAction): string {
+    if (action.type === 'thinking') return action.content.slice(0, 80)
+    if (action.type === 'file_read') {
+      const path = action.content.replace(/^Reading\s+/i, '').replace(/\.\.\.$/, '').trim()
+      return `Read ${path}`
+    }
+    if (action.type === 'file_write' || action.type === 'file_edit') {
+      const path = action.content.replace(/^(Writing|Editing)\s+/i, '').replace(/\.\.\.$/, '').trim()
+      const isEdit = action.type === 'file_edit'
+      return `${isEdit ? 'Edited' : 'Writing'} ${path}`
+    }
+    if (action.type === 'web_search') return `Explore · ${action.content}`
+    if (action.type === 'web_fetch') return `Fetched ${action.content}`
+    return action.content
+  }
+
+  // Get icon for action type
+  function getActionIcon(type: ToolAction['type']) {
+    switch (type) {
+      case 'thinking': return { icon: Brain, color: 'text-purple-400/60' }
+      case 'file_read': return { icon: Eye, color: 'text-emerald-400/60' }
+      case 'file_write': case 'file_edit': return { icon: FileEdit, color: 'text-emerald-400/60' }
+      case 'web_search': case 'web_fetch': return { icon: Search, color: 'text-blue-400/60' }
+      case 'status': return { icon: Activity, color: 'text-blue-400/60' }
+      case 'commentary': case 'commentary_chunk': return { icon: MessageSquare, color: 'text-white/30' }
+      default: return { icon: Circle, color: 'text-white/30' }
+    }
+  }
+
+  // Build chronological timeline items (skip commentary — that goes in the body)
+  const timelineActions = useMemo(() => {
+    return actions.filter(a =>
+      a.type !== 'commentary' &&
+      a.type !== 'commentary_chunk'
+    )
+  }, [actions])
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col w-full gap-2 text-white/90"
+      className="flex flex-col w-full gap-0 text-white/90 max-w-[42rem]"
     >
-      {/* Agent name + working timer — just like a normal message header */}
-      <div className="flex items-center gap-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-[10px] font-bold text-white">
+      {/* Agent header — matches screenshot: B Blink / Working for 28s */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-[11px] font-bold text-white shadow-lg shadow-blue-500/20">
           A
         </div>
-        <span className="text-sm font-semibold text-white/80">AI</span>
+        <span className="text-[13px] font-semibold text-white/85">AI</span>
         {isStreaming && (
           <span className="flex items-center gap-1.5 text-xs text-white/40">
-            <LoaderIcon className="h-3 w-3 animate-spin text-blue-400" />
             Working for {elapsedSec}s
             <ChevronDown className="h-3 w-3" />
           </span>
@@ -270,112 +354,200 @@ function LiveStreamingMessage({
           <button
             type="button"
             onClick={onStop}
-            className="ml-auto flex h-5 items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 text-[10px] font-medium text-red-300 transition hover:bg-red-500/20"
+            className="ml-auto flex h-6 items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 text-[11px] font-medium text-red-300 transition hover:bg-red-500/20"
           >
-            <Square className="h-1.5 w-1.5 fill-current" />
+            <Square className="h-2 w-2 fill-current" />
             Stop
           </button>
         )}
       </div>
 
-      {/* Streaming commentary text — appears as normal message body */}
-      <div className="text-sm leading-6 text-white/85 pl-8">
-        {latestCommentary || (isStreaming && actions.length > 0 ? (
-          <span className="flex items-center gap-2 text-white/50">
-            <span className="inline-block h-4 w-[2px] bg-blue-400/60 animate-pulse" />
-          </span>
-        ) : null)}
-        {isStreaming && latestCommentary && (
-          <span className="inline-block h-4 w-[2px] bg-blue-400/60 animate-pulse -ml-0.5 align-middle" />
+      {/* Scrollable timeline + commentary area */}
+      <div ref={scrollRef} className="pl-8 space-y-1 max-h-[400px] overflow-y-auto overscroll-contain">
+        {/* Chronological timeline of actions */}
+        {timelineActions.map((action, i) => {
+          const { icon: ActionIcon, color } = getActionIcon(action.type)
+          const duration = getActionDuration(i, timelineActions)
+          const label = getActionLabel(action)
+          const isThinking = action.type === 'thinking'
+          const isLatest = i === timelineActions.length - 1
+          const thoughtIdx = thinkingActions.indexOf(action)
+          const isExpanded = expandedThoughts.has(thoughtIdx)
+
+          // For thinking actions, show as expandable "Thought for Xs"
+          if (isThinking) {
+            return (
+              <motion.div
+                key={`${action.timestamp}-${i}`}
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpandedThoughts(prev => {
+                      const next = new Set(prev)
+                      if (next.has(thoughtIdx)) next.delete(thoughtIdx)
+                      else next.add(thoughtIdx)
+                      return next
+                    })
+                  }}
+                  className="flex items-center gap-1.5 py-0.5 text-xs text-white/40 hover:text-white/55 transition"
+                >
+                  {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  <span className="text-white/30">⋮</span>
+                  <Brain className="h-3 w-3 text-purple-400/50" />
+                  <span className="font-medium">Thought for {formatDuration(duration)}</span>
+                </button>
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden pl-6"
+                    >
+                      <div className="py-1 text-xs leading-relaxed text-white/40 whitespace-pre-wrap">
+                        {action.content}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )
+          }
+
+          // For non-thinking actions, show as a simple timeline item
+          return (
+            <motion.div
+              key={`${action.timestamp}-${i}`}
+              initial={{ opacity: 0, x: -4 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center gap-2 py-0.5"
+            >
+              <span className="text-[10px] text-white/20">⋮</span>
+              {isLatest && isStreaming ? (
+                <LoaderIcon className="h-3 w-3 animate-spin text-blue-400/60" />
+              ) : (
+                <ActionIcon className={`h-3 w-3 ${color}`} />
+              )}
+              <span className="text-[12px] text-white/50 truncate">{label}</span>
+            </motion.div>
+          )
+        })}
+
+        {/* Collapsible: File reads */}
+        {fileReadActions.length > 0 && (
+          <Collapsible open={expandedReads} onOpenChange={setExpandedReads}>
+            <CollapsibleTrigger className="flex items-center gap-1.5 py-0.5 text-xs text-white/40 hover:text-white/55 transition">
+              {expandedReads ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <span className="text-white/30">⋮</span>
+              <Eye className="h-3 w-3 text-blue-400/50" />
+              <span className="font-medium">Explore · {fileReadActions.length} File{fileReadActions.length === 1 ? '' : 's'}</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-0.5 pl-5">
+                {fileReadActions.map((action, i) => {
+                  const path = action.content.replace(/^Reading\s+/i, '').replace(/\.\.\.$/, '').trim()
+                  return (
+                    <motion.div
+                      key={`${action.timestamp}-${i}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: i * 0.03 }}
+                      className="flex items-center gap-2 py-0.5"
+                    >
+                      <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                      <span className="text-[11px] text-white/35">Read</span>
+                      <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Collapsible: File writes/edits */}
+        {fileWriteActions.length > 0 && (
+          <Collapsible open={expandedWrites} onOpenChange={setExpandedWrites}>
+            <CollapsibleTrigger className="flex items-center gap-1.5 py-0.5 text-xs text-white/40 hover:text-white/55 transition">
+              {expandedWrites ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <span className="text-white/30">⋮</span>
+              <FileEdit className="h-3 w-3 text-emerald-400/50" />
+              <span className="font-medium">Writing {fileWriteActions.length} file{fileWriteActions.length === 1 ? '' : 's'}</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-0.5 pl-5">
+                {fileWriteActions.map((action, i) => {
+                  const isEdit = action.type === 'file_edit'
+                  const path = action.content.replace(/^(Writing|Editing)\s+/i, '').replace(/\.\.\.$/, '').trim()
+                  return (
+                    <motion.div
+                      key={`${action.timestamp}-${i}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: i * 0.03 }}
+                      className="flex items-center gap-2 py-0.5"
+                    >
+                      <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                      <span className="text-[11px] text-white/35">{isEdit ? 'Edited' : 'Writing'}</span>
+                      <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Collapsible: Web searches */}
+        {searchActions.length > 0 && (
+          <Collapsible open={expandedSearches} onOpenChange={setExpandedSearches}>
+            <CollapsibleTrigger className="flex items-center gap-1.5 py-0.5 text-xs text-white/40 hover:text-white/55 transition">
+              {expandedSearches ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              <span className="text-white/30">⋮</span>
+              <Search className="h-3 w-3 text-blue-400/50" />
+              <span className="font-medium">Explore · {searchActions.length} Search{searchActions.length === 1 ? '' : 'es'}</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-0.5 pl-5">
+                {searchActions.map((action, i) => (
+                  <div key={`${action.timestamp}-${i}`} className="flex items-center gap-2 py-0.5">
+                    <Globe className="h-3 w-3 shrink-0 text-blue-400/50" />
+                    <span className="truncate text-[11px] text-white/45">{action.content}</span>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
       </div>
 
-      {/* File operations — collapsible sections within the message */}
-      {hasFileOps && (
-        <div className="pl-8 space-y-1">
-          {/* File reads */}
-          {fileReadActions.length > 0 && (
-            <Collapsible open={expandedSections.has('reads')} onOpenChange={() => toggleSection('reads')}>
-              <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.05] transition">
-                {expandedSections.has('reads') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                <Eye className="h-3.5 w-3.5 text-blue-400/70" />
-                <span>Read {fileReadActions.length} file{fileReadActions.length === 1 ? '' : 's'}</span>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="space-y-0.5 pl-5 py-1">
-                  {fileReadActions.map((action, i) => {
-                    const filePath = action.content.replace(/^Reading\s+/i, '').replace(/\.\.\.$/, '').trim()
-                    return (
-                      <motion.div
-                        key={`${action.timestamp}-${i}`}
-                        initial={{ opacity: 0, x: -4 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.03 }}
-                        className="flex items-center gap-2 py-0.5"
-                      >
-                        <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                        <span className="text-[11px] text-white/40">Read</span>
-                        <code className="text-[11px] text-white/65 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{filePath}</code>
-                      </motion.div>
-                    )
-                  })}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+      {/* Streaming commentary text — appears as normal message body with markdown */}
+      <div className="text-[13px] leading-[1.7] text-white/80 pl-8 mt-2 whitespace-pre-wrap">
+        {latestCommentary
+          ? renderMarkdownText(latestCommentary)
+          : isStreaming && actions.length > 0 ? (
+            <span className="flex items-center gap-2 text-white/40">
+              <span className="inline-block h-4 w-[2px] bg-blue-400/50 animate-pulse" />
+              <span className="text-xs">Thinking...</span>
+            </span>
+          ) : null}
+        {isStreaming && latestCommentary && (
+          <span className="inline-block h-[14px] w-[2px] bg-blue-400/50 animate-pulse -ml-0.5 align-middle" />
+        )}
+      </div>
 
-          {/* File writes/edits */}
-          {fileWriteActions.length > 0 && (
-            <Collapsible open={expandedSections.has('writes')} onOpenChange={() => toggleSection('writes')}>
-              <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.05] transition">
-                {expandedSections.has('writes') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                <FileEdit className="h-3.5 w-3.5 text-emerald-400/70" />
-                <span>Writing {fileWriteActions.length} file{fileWriteActions.length === 1 ? '' : 's'}</span>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="space-y-0.5 pl-5 py-1">
-                  {fileWriteActions.map((action, i) => {
-                    const isWrite = action.type === 'file_write'
-                    const filePath = action.content.replace(/^(Writing|Editing)\s+/i, '').replace(/\.\.\.$/, '').trim()
-                    return (
-                      <motion.div
-                        key={`${action.timestamp}-${i}`}
-                        initial={{ opacity: 0, x: -4 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.03 }}
-                        className="flex items-center gap-2 py-0.5"
-                      >
-                        <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                        <span className="text-[11px] text-white/40">{isWrite ? 'Edited' : 'Editing'}</span>
-                        <code className="text-[11px] text-white/65 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{filePath}</code>
-                      </motion.div>
-                    )
-                  })}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-
-          {/* Web searches */}
-          {searchActions.length > 0 && (
-            <Collapsible open={expandedSections.has('searches')} onOpenChange={() => toggleSection('searches')}>
-              <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.05] transition">
-                {expandedSections.has('searches') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                <Search className="h-3.5 w-3.5 text-[#1EAEDB]/70" />
-                <span>Web Search ({searchActions.length})</span>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="space-y-0.5 pl-5 py-1">
-                  {searchActions.map((action, i) => (
-                    <div key={`${action.timestamp}-${i}`} className="flex items-center gap-2 py-0.5">
-                      <Globe className="h-3 w-3 shrink-0 text-[#1EAEDB]/50" />
-                      <span className="truncate text-[11px] text-white/45">{action.content}</span>
-                    </div>
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+      {/* In-message to-dos */}
+      {todos.length > 0 && (
+        <div className="pl-8 mt-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-white/35 mb-1">
+            <ListTodo className="h-3 w-3" />
+            <span className="font-medium">To-dos {todos.filter(t => t.completed).length}/{todos.length}</span>
+          </div>
         </div>
       )}
     </motion.div>
@@ -1006,7 +1178,8 @@ function GenerationStatusCard({
   const migrations = Array.isArray(currentFragment?.supabase_migrations)
     ? currentFragment.supabase_migrations
     : []
-  const commentary = cleanText(currentFragment?.commentary) || ''
+  // Prefer description (user-friendly) over commentary (internal planning text)
+  const commentary = cleanText(currentFragment?.description) || cleanText(currentFragment?.commentary) || ''
   const title = cleanText(currentFragment?.title)
   const description = cleanText(currentFragment?.description)
 

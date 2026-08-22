@@ -814,38 +814,28 @@ function fillDefaults(data: Record<string, any>) {
   }
 }
 
-// ─── Auto web search detection ─────────────────────────────
-const WEB_SEARCH_SIGNALS = [
-  /\b(current|latest|newest|recent|today|yesterday|this week|this month|this year|right now|now)\b/i,
-  /\b(version|release|update|changelog|breaking change)\s+(\d|v)/i,
-  /\b(what is|what are|who is|who are|how much|how many|when did|when was|where is)\b/i,
-  /\b(news|announcement|release|launch|outage|incident|status)\b/i,
-  /\b(price|pricing|cost|subscription|plan|free tier|rate limit|quota)\b/i,
-  /\b(documentation|docs|api|endpoint|sdk|library|framework|package)\b.*\b(latest|current|new|version|install)\b/i,
-  /\b(202[4-9]|203[0-9])\b/,
-  /\b(compare|vs|versus|alternative|better than|replaced by)\b/i,
-  /\b(weather|stock|price|exchange rate|live|real.?time)\b/i,
-]
-
-const SEARCH_SKIP_PATTERNS = [
-  /\b(build|create|generate|make|code|write|implement|design|style)\b/i,
-  /^\[Search:/,
-  /^\[Think:/,
-  /^\[Canvas:/,
-]
+// ─── Auto web search detection (conservative) ─────────────
+function shouldAutoSearch(query: string): boolean {
+  if (/^\[Search:/i.test(query)) return true
+  if (/https?:\/\//.test(query)) return true
+  const isQuestion = /^\b(what is|what are|who is|who are|when did|when was|where is|how do I find|tell me about)\b/i.test(query)
+  const hasTimeRef = /\b(current|latest|today|yesterday|this week|right now|news|outage|down)\b/i.test(query)
+  if (isQuestion && hasTimeRef) return true
+  if (/\b(what is the price|how much does|is .* down|is .* available)\b/i.test(query)) return true
+  return false
+}
 
 function detectAutoSearchQuery(messages: ModelMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
     if (msg.role !== 'user') continue
     const content = typeof msg.content === 'string' ? msg.content : ''
+    const searchMatch = content.match(/^\[Search:\s*(.+?)\]\s*$/)
+    if (searchMatch) return searchMatch[1]
     const cleaned = content.replace(/^\[\w+:\s*.+?\]\s*/, '').trim()
     if (!cleaned) continue
-    if (SEARCH_SKIP_PATTERNS.some(p => p.test(cleaned))) return null
-    if (WEB_SEARCH_SIGNALS.some(p => p.test(cleaned))) {
-      return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
-    }
-    break
+    if (!shouldAutoSearch(cleaned)) return null
+    return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
   }
   return null
 }

@@ -1,7 +1,7 @@
 import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowUp, Check, Paperclip, Square, X, StopCircle, Mic, BrainCog, FolderCog, Server, Shuffle, Settings2, Palette } from "lucide-react";
+import { ArrowUp, Check, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCog, Server, Shuffle, Settings2, Palette } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ChatSettings } from '../chat-settings'
@@ -527,6 +527,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
   const [isRecording, setIsRecording] = React.useState(false);
+  const [showSearch, setShowSearch] = React.useState(false);
   const [showThink, setShowThink] = React.useState(false);
   const [showCanvas, setShowCanvas] = React.useState(false);
   const uploadInputRef = React.useRef<HTMLInputElement>(null);
@@ -536,8 +537,12 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const [selectedCommandIndex, setSelectedCommandIndex] = React.useState(0);
 
   const handleToggleChange = (value: string) => {
-    if (value === "think") {
+    if (value === "search") {
+      setShowSearch((prev) => !prev);
+      setShowThink(false);
+    } else if (value === "think") {
       setShowThink((prev) => !prev);
+      setShowSearch(false);
     }
   };
 
@@ -609,7 +614,8 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const handleSubmit = () => {
     if (input.trim() || files.length > 0) {
       let messagePrefix = "";
-      if (showThink) messagePrefix = "[Think: ";
+      if (showSearch) messagePrefix = "[Search: ";
+      else if (showThink) messagePrefix = "[Think: ";
       else if (showCanvas) messagePrefix = "[Canvas: ";
       const formattedInput = messagePrefix ? `${messagePrefix}${input}]` : input;
       onSend(formattedInput, files, chatMode);
@@ -758,7 +764,9 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
         >
           <PromptInputTextarea
             placeholder={
-              showThink
+              showSearch
+                ? "Search the web..."
+                : showThink
                 ? "Think deeply..."
                 : showCanvas
                 ? "Create on canvas..."
@@ -818,6 +826,42 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
             </PromptInputAction>
 
             <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => handleToggleChange("search")}
+                className={cn(
+                  "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                  showSearch
+                    ? "bg-[#1EAEDB]/15 border-[#1EAEDB] text-[#1EAEDB]"
+                    : "bg-transparent border-transparent text-muted-foreground hover:text-primary"
+                )}
+              >
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                  <motion.div
+                    animate={{ rotate: showSearch ? 360 : 0, scale: showSearch ? 1.1 : 1 }}
+                    whileHover={{ rotate: showSearch ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
+                    transition={{ type: "spring", stiffness: 260, damping: 25 }}
+                  >
+                    <Globe className={cn("w-4 h-4", showSearch ? "text-[#1EAEDB]" : "text-inherit")} />
+                  </motion.div>
+                </div>
+                <AnimatePresence>
+                  {showSearch && (
+                    <motion.span
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: "auto", opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-xs overflow-hidden whitespace-nowrap text-[#1EAEDB] flex-shrink-0"
+                    >
+                      Search
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </button>
+
+              <CustomDivider />
+
               <button
                 type="button"
                 onClick={() => handleToggleChange("think")}

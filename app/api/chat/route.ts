@@ -77,58 +77,33 @@ function extractSearchQuery(messages: ModelMessage[]): string | null {
   return null
 }
 
-// Patterns that suggest the query needs up-to-date web information
-const WEB_SEARCH_SIGNALS = [
-  // Current date/time references
-  /\b(current|latest|newest|recent|today|yesterday|this week|this month|this year|right now|now)\b/i,
-  // Future/current versions
-  /\b(version|release|update|changelog|breaking change)\s+(\d|v)/i,
-  // Explicit info-seeking
-  /\b(what is|what are|who is|who are|how much|how many|when did|when was|where is)\b/i,
-  // News/events
-  /\b(news|announcement|release|launch|outage|incident|status)\b/i,
-  // Pricing/availability
-  /\b(price|pricing|cost|subscription|plan|free tier|rate limit|quota)\b/i,
-  // Documentation/APIs that change
-  /\b(documentation|docs|api|endpoint|sdk|library|framework|package)\b.*\b(latest|current|new|version|install)\b/i,
-  // Specific time references
-  /\b(202[4-9]|203[0-9])\b/,
-  // Comparison with latest
-  /\b(compare|vs|versus|alternative|better than|replaced by)\b/i,
-  // Real-time data
-  /\b(weather|stock|price|exchange rate|live|real.?time)\b/i,
-]
-
-const SEARCH_SKIP_PATTERNS = [
-  // Code generation requests don't need search
-  /\b(build|create|generate|make|code|write|implement|design|style)\b/i,
-  // Already has explicit search prefix
-  /^\[Search:/,
-  /^\[Think:/,
-  /^\[Canvas:/,
-]
-
+// Only auto-search when there's a URL or very explicit current-info need
+// Keep this conservative — users can always use the manual search toggle
 function shouldAutoSearch(query: string): boolean {
-  // Skip if it's a code generation request (these don't need web info)
-  if (SEARCH_SKIP_PATTERNS.some(p => p.test(query))) {
-    return false
-  }
-  // Trigger if any web search signal is found
-  return WEB_SEARCH_SIGNALS.some(p => p.test(query))
+  // Explicit [Search: ...] prefix — always search
+  if (/^\[Search:/i.test(query)) return true
+  // Has a URL — fetch it
+  if (/https?:\/\//.test(query)) return true
+  // Very explicit current-info queries (not code requests)
+  // Must be a question pattern AND contain time-sensitive words
+  const isQuestion = /^\b(what is|what are|who is|who are|when did|when was|where is|how do I find|tell me about)\b/i.test(query)
+  const hasTimeRef = /\b(current|latest|today|yesterday|this week|right now|news|outage|down)\b/i.test(query)
+  if (isQuestion && hasTimeRef) return true
+  // Explicit pricing/status checks
+  if (/\b(what is the price|how much does|is .* down|is .* available)\b/i.test(query)) return true
+  return false
 }
 
 function buildSearchQuery(messages: ModelMessage[]): string | null {
-  // First check for explicit [Search: ...] prefix
-  const explicitQuery = extractSearchQuery(messages)
-  if (explicitQuery) return explicitQuery
-
-  // Then try auto-detection on the latest user message
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
     if (msg.role !== 'user') continue
     const content = typeof msg.content === 'string' ? msg.content : ''
     if (!content.trim()) continue
-    // Strip any existing prefixes
+    // Check explicit [Search: ...] prefix
+    const searchMatch = content.match(/^\[Search:\s*(.+?)\]\s*$/)
+    if (searchMatch) return searchMatch[1]
+    // Check auto-detection
     const cleaned = content.replace(/^\[\w+:\s*.+?\]\s*/, '').trim()
     if (!cleaned) continue
     if (shouldAutoSearch(cleaned)) {

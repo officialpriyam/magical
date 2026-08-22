@@ -143,17 +143,23 @@ const Preview = dynamic(() => import('@/components/preview').then(mod => ({ defa
 function TodoBar({ todos }: { todos: { id: string; text: string; completed: boolean }[] }) {
   const [isOpen, setIsOpen] = useState(true)
   const completedCount = todos.filter(t => t.completed).length
+  const allDone = completedCount === todos.length && todos.length > 0
 
   return (
-    <div className="mb-2 rounded-xl border border-white/[0.08] bg-white/[0.03]">
+    <div className={`mb-2 rounded-xl border transition-colors duration-300 ${allDone ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-white/[0.08] bg-white/[0.03]'}`}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="flex w-full items-center gap-2 px-3 py-2 text-xs"
       >
-        <svg className="h-3.5 w-3.5 text-white/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        {allDone ? (
+          <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+        ) : (
+          <svg className="h-3.5 w-3.5 text-white/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        )}
         <span className="font-medium text-white/60">To-dos</span>
-        <span className="text-white/30">{completedCount}/{todos.length}</span>
+        <span className={allDone ? 'text-emerald-400/80' : 'text-white/30'}>{completedCount}/{todos.length}</span>
+        {allDone && <svg className="h-3 w-3 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
         <svg className={`ml-auto h-3 w-3 text-white/30 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       {isOpen && (
@@ -205,7 +211,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [customStylePrompt, setCustomStylePrompt] = useLocalStorage<string>('customStylePrompt', '')
   const [showStyleSelector, setShowStyleSelector] = useState(false)
   const agenticStream = useAgenticStream()
-  const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'build')
+  const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'plan')
   const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
 
   const posthog = usePostHog()
@@ -735,11 +741,17 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   })
   const isPromptLoading = isLoading || isPlanLoading || agenticStream.isStreaming
 
-  // Sync agentic stream fragment to existing state
+  // Sync agentic stream fragment to existing state + update message object
   useEffect(() => {
     if (useAgentic && agenticStream.fragment?.code) {
       setFragment(agenticStream.fragment)
       setCurrentPreview({ fragment: agenticStream.fragment, result: undefined })
+      // Also update the assistant message so GeneratedArtifactCard shows
+      setMessages(prev => {
+        const nextMessages = withLatestAssistantFragment(prev, agenticStream.fragment)
+        messagesRef.current = nextMessages
+        return nextMessages
+      })
     }
   }, [useAgentic, agenticStream.fragment])
 
@@ -764,10 +776,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     assistantFragment: DeepPartial<FragmentSchema>,
     executionResult?: ExecutionResult,
   ) {
+    // Use description as the conversational chat response
+    // commentary is internal planning text, not for the user
+    const chatText = assistantFragment.description || assistantFragment.commentary || ''
     const assistantMessage: Message = {
       role: 'assistant',
       content: [
-        { type: 'text', text: assistantFragment.commentary || '' },
+        { type: 'text', text: chatText },
         { type: 'code', text: assistantFragment.code || '' },
       ],
       object: assistantFragment,
@@ -2413,8 +2428,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               </div>
 
               <div className="shrink-0 border-t border-white/10 px-2 py-2 sm:px-3 sm:py-3 md:px-4">
-                {/* Collapsible To-Do Bar */}
-                {useAgentic && agenticStream.todos.length > 0 && agenticStream.isStreaming && (
+                {/* Collapsible To-Do Bar — shows during and after generation */}
+                {useAgentic && agenticStream.todos.length > 0 && (
                   <TodoBar todos={agenticStream.todos} />
                 )}
                 {statusNotices}
