@@ -587,34 +587,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setIsRateLimited(isRateLimit);
       setErrorMessage(displayMessage);
 
-      const pendingId = pendingNavigateRef.current
-      if (pendingId) {
-        pendingNavigateRef.current = null
-        try {
-          sessionStorage.removeItem('isLandingPagePrompt')
-          sessionStorage.removeItem('landingPageProjectId')
-        } catch {}
-        router.replace(`/chat/${pendingId}`)
-      }
+      // Don't navigate here — handleSendPrompt already pushed to /chat/:id
     },
     onFinish: async ({ object: fragment, error }: { object: DeepPartial<FragmentSchema> | undefined, error: any }) => {
       if (error) {
         setAutoFixMessage('')
         setIsPreviewLoading(false)
         setErrorMessage(error instanceof Error ? error.message : 'AI generation failed.')
-        const pendingId = pendingNavigateRef.current
-        if (pendingId && supabase && currentProjectRef.current) {
-          pendingNavigateRef.current = null
-          try {
-            sessionStorage.removeItem('isLandingPagePrompt')
-            sessionStorage.removeItem('landingPageProjectId')
-          } catch {}
-          const last = messagesRef.current[messagesRef.current.length - 1]
-          if (last) {
-            void saveMessage(supabase, currentProjectRef.current.id, last, messagesRef.current.length - 1)
-          }
-          router.replace(`/chat/${pendingId}`)
-        }
+        pendingNavigateRef.current = null
+        try {
+          sessionStorage.removeItem('isLandingPagePrompt')
+          sessionStorage.removeItem('landingPageProjectId')
+        } catch {}
         return
       }
 
@@ -724,19 +708,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         setCurrentTab('fragment');
         setIsPreviewLoading(false);
 
-        const pendingId = pendingNavigateRef.current
-        if (pendingId && supabase && currentProjectRef.current) {
-          pendingNavigateRef.current = null
-          try {
-            sessionStorage.removeItem('isLandingPagePrompt')
-            sessionStorage.removeItem('landingPageProjectId')
-          } catch {}
-          const last = messagesRef.current[messagesRef.current.length - 1]
-          if (last) {
-            await saveMessage(supabase, currentProjectRef.current.id, last, messagesRef.current.length - 1)
-          }
-          router.replace(`/chat/${pendingId}`)
-        }
+        // Save message but don't navigate — already on the correct page
+        pendingNavigateRef.current = null
+        try {
+          sessionStorage.removeItem('isLandingPagePrompt')
+          sessionStorage.removeItem('landingPageProjectId')
+        } catch {}
     },
   })
   const isPromptLoading = isLoading || isPlanLoading || agenticStream.isStreaming
@@ -2429,8 +2406,44 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             <>
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-1 sm:px-3 sm:py-2 md:px-3 md:py-2">
                 {isLoadingProject ? (
-                  <div className="flex h-full items-center justify-center">
-                    <div className="text-sm text-white/55">Loading project...</div>
+                  <div className="flex h-full flex-col items-center justify-center gap-4">
+                    {/* Animated Magical logo */}
+                    <div className="relative h-16 w-16">
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-600/20 animate-ping" style={{ animationDuration: '2s' }} />
+                      <div className="absolute inset-1 rounded-full bg-gradient-to-br from-blue-500/30 to-purple-600/30 animate-pulse" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <svg className="h-8 w-8 text-blue-400 animate-spin" style={{ animationDuration: '3s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                        </svg>
+                      </div>
+                    </div>
+                    {/* Animated steps */}
+                    <div className="flex flex-col items-center gap-2">
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="text-sm font-medium text-white/70"
+                      >
+                        Setting up environment
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="text-xs text-white/35"
+                      >
+                        Enhancing your prompt with AI
+                      </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.8 }}
+                        className="text-xs text-white/35"
+                      >
+                        Preparing workspace
+                      </motion.div>
+                    </div>
                   </div>
                 ) : (
                   <Chat

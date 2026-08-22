@@ -328,10 +328,14 @@ function LiveStreamingMessage({
     >
       {/* Agent header — matches screenshot: B Blink / Working for 28s */}
       <div className="flex items-center gap-2 mb-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-[11px] font-bold text-white shadow-lg shadow-blue-500/20">
-          A
+        {/* Animated Magical icon */}
+        <div className="relative flex h-7 w-7 items-center justify-center">
+          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/30 to-purple-600/30 animate-pulse" />
+          <svg className="relative h-4 w-4 text-blue-400 animate-spin" style={{ animationDuration: '3s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+          </svg>
         </div>
-        <span className="text-[13px] font-semibold text-white/85">AI</span>
+        <span className="text-[13px] font-semibold text-white/85">Magical</span>
         {isStreaming && (
           <span className="flex items-center gap-1.5 text-xs text-white/40">
             Working for {elapsedSec}s
@@ -376,8 +380,14 @@ function LiveStreamingMessage({
           const thoughtIdx = thinkingActions.indexOf(action)
           const isExpanded = expandedThoughts.has(thoughtIdx)
 
-          // For thinking actions, show as expandable "Thought for Xs"
+          // For thinking actions, show as expandable with actual thinking text
           if (isThinking) {
+            // Extract meaningful content from thinking action
+            const thinkingText = action.content
+              .replace(/^[\w]+:\s*/i, '') // Remove agent name prefix
+              .trim()
+            const hasThinkingContent = thinkingText.length > 10
+
             return (
               <motion.div
                 key={`${action.timestamp}-${i}`}
@@ -398,9 +408,12 @@ function LiveStreamingMessage({
                   className="flex items-center gap-1.5 py-0.5 text-xs text-white/40 hover:text-white/55 transition"
                 >
                   {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                  <span className="text-white/30">⋮</span>
                   <Brain className="h-3 w-3 text-purple-400/50" />
                   <span className="font-medium">Thought for {formatDuration(duration)}</span>
+                  {/* Show preview of thinking text when collapsed */}
+                  {!isExpanded && hasThinkingContent && (
+                    <span className="text-white/25 truncate max-w-[200px]">— {thinkingText.slice(0, 60)}{thinkingText.length > 60 ? '...' : ''}</span>
+                  )}
                 </button>
                 <AnimatePresence>
                   {isExpanded && (
@@ -410,8 +423,8 @@ function LiveStreamingMessage({
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden pl-6"
                     >
-                      <div className="py-1 text-xs leading-relaxed text-white/40 whitespace-pre-wrap">
-                        {action.content}
+                      <div className="py-1 text-xs leading-relaxed text-white/50 whitespace-pre-wrap rounded-lg bg-white/[0.03] px-3 py-2 border border-white/[0.05]">
+                        {renderMarkdownText(thinkingText)}
                       </div>
                     </motion.div>
                   )}
