@@ -430,11 +430,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   // Determine which API to use based on morph toggle, agentic toggle, and existing fragment
   const shouldUseMorph = useMorphApply && fragment && fragment.code && fragment.file_path
+  // useObject always uses the standard route (returns single JSON)
+  // Agentic streaming is handled separately by agenticStream.submit()
   const apiEndpoint = shouldUseMorph
     ? '/api/chat/morph-chat'
-    : useAgentic
-      ? '/api/chat/agentic'
-      : '/api/chat'
+    : '/api/chat'
 
   useEffect(() => {
     const projectId = activeProjectId
