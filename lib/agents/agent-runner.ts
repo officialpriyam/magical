@@ -209,10 +209,17 @@ async function readStreamWithEvents(
 
   const reader = stream.getReader()
   let text = ''
-  let buffer = ''
   let lastEmitTime = Date.now()
-  let lastCommentaryLen = 0
-  const EMIT_INTERVAL = 300 // Emit commentary every 300ms for live streaming feel
+  let lastCommentaryEmitLen = 0
+  const EMIT_INTERVAL = 250 // Emit commentary every 250ms for live streaming feel
+
+  // Track commentary extraction state across chunks
+  // For streamObject: track position inside the "commentary" JSON field
+  let commentaryStartIdx = -1 // Index in `text` where commentary value starts
+  let commentaryFieldFound = false
+
+  // For streamText: track last emitted line
+  let lastEmittedLine = ''
 
   // Track what we've already emitted to avoid duplicates
   const emittedPaths = new Set<string>()
@@ -223,70 +230,111 @@ async function readStreamWithEvents(
       const { done, value } = await reader.read()
       if (done) break
       text += value
-      buffer += value
 
-      // Emit commentary from the streaming text frequently
       const now = Date.now()
-      if (now - lastEmitTime > EMIT_INTERVAL && buffer.length > 20) {
-        // For streamText path: emit meaningful lines as commentary chunks
-        const lines = buffer.split('\n').filter(l => l.trim().length > 5)
-        const lastMeaningful = lines[lines.length - 1]
-        if (lastMeaningful && !lastMeaningful.startsWith('{') && !lastMeaningful.startsWith('"')) {
-          const trimmed = lastMeaningful.trim()
-          // Only emit if we have new content (avoid re-emitting same text)
-          if (trimmed.length > lastCommentaryLen) {
-            emitter.emitCommentary(trimmed.slice(0, 300))
-            lastCommentaryLen = trimmed.length
+      if (now - lastEmitTime > EMIT_INTERVAL && text.length > 10) {
+        // ── streamObject path: extract commentary from JSON field ──
+        if (!commentaryFieldFound) {
+          // Look for the start of the "commentary" field in the accumulated text
+          const fieldMatch = text.match(/"commentary"\s*:\s*"/)
+          if (fieldMatch) {
+            commentaryFieldFound = true
+            commentaryStartIdx = text.indexOf('"commentary"') + fieldMatch[0].length
           }
         }
 
-        // For streamObject path: try to extract commentary from partial JSON
-        try {
-          const commentaryMatch = buffer.match(/"commentary"\s*:\s*"((?:[^"\\]|\\.)*)/)
-          if (commentaryMatch) {
-            const decoded = commentaryMatch[1]
-              .replace(/\\n/g, '\n')
-              .replace(/\\"/g, '"')
-              .replace(/\\\\/g, '\\')
-            if (decoded.length > lastCommentaryLen && decoded.length > 10) {
-              emitter.emitCommentary(decoded.slice(0, 500))
-              lastCommentaryLen = decoded.length
+        if (commentaryFieldFound && commentaryStartIdx >= 0) {
+          // Extract commentary text from after the opening quote to the current position
+          const raw = text.slice(commentaryStartIdx)
+          // Find the closing quote (accounting for escapes)
+          let endIdx = -1
+          let escaped = false
+          for (let i = 0; i < raw.length; i++) {
+            if (escaped) { escaped = false; continue }
+            if (raw[i] === '\\') { escaped = true; continue }
+            if (raw[i] === '"') { endIdx = i; break }
+          }
+          const commentaryText = endIdx >= 0 ? raw.slice(0, endIdx) : raw
+          // Decode JSON escapes
+          const decoded = commentaryText
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\')
+            .trim()
+
+          if (decoded.length > lastCommentaryEmitLen && decoded.length > 5) {
+            emitter.emitCommentary(decoded.slice(0, 600))
+            lastCommentaryEmitLen = decoded.length
+          }
+
+          // If we found the closing quote, stop looking
+          if (endIdx >= 0) {
+            commentaryFieldFound = false
+          }
+        }
+
+        // ── streamText path: emit meaningful lines as commentary chunks ──
+        if (!commentaryFieldFound && lastCommentaryEmitLen === 0) {
+          const lines = text.split('\n').filter(l => l.trim().length > 10)
+          const lastLine = lines[lines.length - 1]
+          if (lastLine && !lastLine.startsWith('{') && !lastLine.startsWith('"') && lastLine !== lastEmittedLine) {
+            const trimmed = lastLine.trim()
+            emitter.emitCommentary(trimmed.slice(0, 400))
+            lastEmittedLine = lastLine
+          }
+        }
+
+        // ── Detect file paths from JSON output ──
+        // Look for "path": "..." patterns in the accumulated text
+        const pathMatches = text.matchAll(/"path"\s*:\s*"([\w\/\._\-]+\.[\w]+)"/g)
+        for (const match of pathMatches) {
+          const filePath = match[1]
+          // Determine if read or write based on surrounding context
+          const matchIdx = match.index ?? 0
+          const before = text.slice(Math.max(0, matchIdx - 80), matchIdx).toLowerCase()
+          if (before.includes('read') || before.includes('existing') || before.includes('current')) {
+            if (!emittedPaths.has(`read:${filePath}`)) {
+              emittedPaths.add(`read:${filePath}`)
+              emitter.emitFileRead(filePath)
+            }
+          } else {
+            if (!emittedPaths.has(`write:${filePath}`)) {
+              emittedPaths.add(`write:${filePath}`)
+              emitter.emitFileWrite(filePath)
             }
           }
-        } catch { /* ignore parse errors on partial JSON */ }
+        }
+
+        // Also detect natural language file patterns
+        const readFilePatterns = text.matchAll(/(?:reading|read|loaded|opened)\s+([\w\/\._\-]+\.[\w]+)/gi)
+        for (const match of readFilePatterns) {
+          const path = match[1]
+          if (!emittedPaths.has(`read:${path}`)) {
+            emittedPaths.add(`read:${path}`)
+            emitter.emitFileRead(path)
+          }
+        }
+
+        const writeFilePatterns = text.matchAll(/(?:writing|write|created?|creating)\s+([\w\/\._\-]+\.[\w]+)/gi)
+        for (const match of writeFilePatterns) {
+          const path = match[1]
+          if (!emittedPaths.has(`write:${path}`)) {
+            emittedPaths.add(`write:${path}`)
+            emitter.emitFileWrite(path)
+          }
+        }
+
+        // ── Detect web search patterns ──
+        const searchPatterns = text.matchAll(/(?:search(?:ing)?|fetch(?:ing)?|looking up)\s+(?:for\s+)?([\w\s\.\/\-]{5,60})/gi)
+        for (const match of searchPatterns) {
+          const query = match[1].trim()
+          if (!emittedSearches.has(query)) {
+            emittedSearches.add(query)
+            emitter.emitWebSearch(query)
+          }
+        }
 
         lastEmitTime = now
-        buffer = ''
-      }
-
-      // Detect file read patterns in the streaming text
-      const readFilePatterns = buffer.matchAll(/(?:reading|read)\s+([\w\/\._\-]+\.[\w]+)/gi)
-      for (const match of readFilePatterns) {
-        const path = match[1]
-        if (!emittedPaths.has(`read:${path}`)) {
-          emittedPaths.add(`read:${path}`)
-          emitter.emitFileRead(path)
-        }
-      }
-
-      // Detect file write patterns
-      const writeFilePatterns = buffer.matchAll(/(?:writing|write|created?|creating)\s+([\w\/\._\-]+\.[\w]+)/gi)
-      for (const match of writeFilePatterns) {
-        const path = match[1]
-        if (!emittedPaths.has(`write:${path}`)) {
-          emittedPaths.add(`write:${path}`)
-          emitter.emitFileWrite(path)
-        }
-      }
-
-      // Detect web search patterns
-      const searchPatterns = buffer.matchAll(/(?:search(?:ing)?|fetch(?:ing)?|looking up)\s+(?:for\s+)?([\w\s\.\/\-]{5,60})/gi)
-      for (const match of searchPatterns) {
-        const query = match[1].trim()
-        if (!emittedSearches.has(query)) {
-          emittedSearches.add(query)
-          emitter.emitWebSearch(query)
-        }
       }
     }
   } finally {

@@ -292,18 +292,30 @@ async function runPipeline({
       if (latestFragment.files?.length) context.files = latestFragment.files
 
       for (const role of group) {
-        // Emit real thinking action for agent start
-        emitAction('thinking', `${AGENT_DISPLAY_NAMES[role]}: Analyzing and generating...`)
-        emitAction('status', `Running ${AGENT_DISPLAY_NAMES[role]}...`)
+        const agentName = AGENT_DISPLAY_NAMES[role]
 
-        console.log(`[Agentic] Running ${AGENT_DISPLAY_NAMES[role]}...`)
+        // Emit real thinking action for agent start
+        emitAction('thinking', `${agentName}: Analyzing and generating...`)
+        emitAction('status', `Running ${agentName}...`)
+
+        // Emit file reads from context (existing project files the agent sees)
+        if (latestFragment.files && latestFragment.files.length > 0) {
+          emitAction('commentary', `Read ${latestFragment.files.length} file${latestFragment.files.length === 1 ? '' : 's'}`)
+          for (const file of latestFragment.files.slice(0, 8)) {
+            if (file?.path) {
+              emitAction('file_read', file.path)
+            }
+          }
+        }
+
+        console.log(`[Agentic] Running ${agentName}...`)
 
         // Create event emitter for live streaming
         const agentEmitter: AgentEventEmitter = {
           emitThinking: (content) => emitAction('thinking', content),
-          emitFileRead: (path) => emitAction('file_read', `Reading ${path}`),
-          emitFileWrite: (path, purpose) => emitAction('file_write', `Writing ${path}`, purpose),
-          emitWebSearch: (query) => emitAction('web_search', `Searching ${query}`),
+          emitFileRead: (path) => emitAction('file_read', path),
+          emitFileWrite: (path, purpose) => emitAction('file_write', path, purpose),
+          emitWebSearch: (query) => emitAction('web_search', query),
           emitCommentary: (content) => emitAction('commentary_chunk', content),
         }
 
@@ -351,6 +363,9 @@ async function runPipeline({
               emitAction('file_write', fragment.file_path)
             }
           }
+
+          // Emit a commentary summary of what this agent did
+          emitAction('commentary', `${agentName} completed — ${result.fragment ? `generated ${((result.fragment as any).files || []).length || 1} file(s)` : 'analysis done'}${result.duration ? ` in ${(result.duration / 1000).toFixed(1)}s` : ''}`)
 
           // Extract real todos from planner output
           if (role === 'planner' && result.output) {
