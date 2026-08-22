@@ -197,7 +197,7 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-// ─── Live Streaming Message (inline in chat) ───────────────
+// ─── Live Streaming Message (looks like normal assistant msg) ─
 function LiveStreamingMessage({
   actions,
   todos,
@@ -210,15 +210,13 @@ function LiveStreamingMessage({
   onStop?: () => void
 }) {
   const [elapsed, setElapsed] = useState(0)
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['commentary']))
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
   // Live timer
   useEffect(() => {
     if (!isStreaming || actions.length === 0) return
     const start = actions[0].timestamp
-    const interval = setInterval(() => {
-      setElapsed(Date.now() - start)
-    }, 1000)
+    const interval = setInterval(() => setElapsed(Date.now() - start), 1000)
     return () => clearInterval(interval)
   }, [isStreaming, actions.length])
 
@@ -231,207 +229,154 @@ function LiveStreamingMessage({
     })
   }
 
-  // Group actions
-  const thinkingActions = actions.filter(a => a.type === 'thinking')
+  // Group actions chronologically
   const fileWriteActions = actions.filter(a => a.type === 'file_write' || a.type === 'file_edit')
   const fileReadActions = actions.filter(a => a.type === 'file_read')
   const searchActions = actions.filter(a => a.type === 'web_search' || a.type === 'web_fetch')
   const commentaryActions = actions.filter(a => a.type === 'commentary')
-  const statusActions = actions.filter(a => a.type === 'status')
 
-  // Latest commentary (streaming text)
+  // Latest commentary text (this is what streams as the AI response)
   const latestCommentary = commentaryActions.length > 0
     ? commentaryActions[commentaryActions.length - 1].content
     : ''
 
-  // Latest status
-  const latestStatus = statusActions.length > 0
-    ? statusActions[statusActions.length - 1].content
-    : isStreaming ? 'Working...' : 'Done'
-
-  // Latest thinking
-  const latestThinking = thinkingActions.length > 0
-    ? thinkingActions[thinkingActions.length - 1].content
-    : ''
-
   const elapsedSec = Math.floor(elapsed / 1000)
+  const hasFileOps = fileReadActions.length > 0 || fileWriteActions.length > 0 || searchActions.length > 0
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-[40rem]"
+      className="flex flex-col w-full gap-2 text-white/90"
     >
-      {/* Agent header with timer */}
-      <div className="flex items-center gap-2.5 mb-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10">
-          <Cpu className="h-3.5 w-3.5 text-blue-400" />
+      {/* Agent name + working timer — just like a normal message header */}
+      <div className="flex items-center gap-2">
+        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-[10px] font-bold text-white">
+          A
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-white/80">AI Agent</span>
-          {isStreaming && (
-            <span className="flex items-center gap-1.5 text-xs text-white/40">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-              Working for {elapsedSec}s
-            </span>
-          )}
-          {!isStreaming && elapsedSec > 0 && (
-            <span className="text-xs text-white/30">Completed in {formatDuration(elapsed)}</span>
-          )}
-        </div>
+        <span className="text-sm font-semibold text-white/80">AI</span>
+        {isStreaming && (
+          <span className="flex items-center gap-1.5 text-xs text-white/40">
+            <LoaderIcon className="h-3 w-3 animate-spin text-blue-400" />
+            Working for {elapsedSec}s
+            <ChevronDown className="h-3 w-3" />
+          </span>
+        )}
+        {!isStreaming && elapsedSec > 0 && (
+          <span className="text-xs text-white/30">Done in {formatDuration(elapsed)}</span>
+        )}
         {isStreaming && onStop && (
           <button
             type="button"
             onClick={onStop}
-            className="ml-auto flex h-6 items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 text-[11px] font-medium text-red-300 transition hover:bg-red-500/20"
+            className="ml-auto flex h-5 items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 text-[10px] font-medium text-red-300 transition hover:bg-red-500/20"
           >
-            <Square className="h-2 w-2 fill-current" />
+            <Square className="h-1.5 w-1.5 fill-current" />
             Stop
           </button>
         )}
       </div>
 
-      {/* Live content card */}
-      <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
-        {/* Status line */}
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/[0.06]">
-          {isStreaming ? (
-            <LoaderIcon className="h-3.5 w-3.5 animate-spin text-blue-400" />
-          ) : (
-            <Check className="h-3.5 w-3.5 text-emerald-400" />
-          )}
-          <span className="text-xs text-white/60">{latestStatus}</span>
-        </div>
-
-        {/* File reads — compact inline list */}
-        {fileReadActions.length > 0 && (
-          <Collapsible open={expandedSections.has('reads')} onOpenChange={() => toggleSection('reads')}>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02] border-b border-white/[0.04]">
-              {expandedSections.has('reads') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              <Eye className="h-3.5 w-3.5 text-blue-400/70" />
-              <span>Read {fileReadActions.length} file{fileReadActions.length === 1 ? '' : 's'}</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="space-y-0.5 px-4 py-2">
-                {fileReadActions.map((action, i) => {
-                  const filePath = action.content.replace(/^Reading\s+/i, '').replace(/\.\.\.$/, '').trim()
-                  return (
-                    <div key={`${action.timestamp}-${i}`} className="flex items-center gap-2 py-1">
-                      <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                      <span className="text-[11px] text-white/50">Read</span>
-                      <code className="text-[11px] text-white/70 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{filePath}</code>
-                    </div>
-                  )
-                })}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-
-        {/* File writes/edits — with diff indicators */}
-        {fileWriteActions.length > 0 && (
-          <Collapsible open={expandedSections.has('writes')} onOpenChange={() => toggleSection('writes')}>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02] border-b border-white/[0.04]">
-              {expandedSections.has('writes') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              <FileEdit className="h-3.5 w-3.5 text-emerald-400/70" />
-              <span>Writing {fileWriteActions.length} file{fileWriteActions.length === 1 ? '' : 's'}</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="space-y-0.5 px-4 py-2">
-                {fileWriteActions.map((action, i) => {
-                  const isWrite = action.type === 'file_write'
-                  const filePath = action.content.replace(/^(Writing|Editing)\s+/i, '').replace(/\.\.\.$/, '').trim()
-                  return (
-                    <motion.div
-                      key={`${action.timestamp}-${i}`}
-                      initial={{ opacity: 0, x: -4 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="flex items-center gap-2 py-1"
-                    >
-                      <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                      <span className="text-[11px] text-white/50">{isWrite ? 'Edited' : 'Editing'}</span>
-                      <code className="text-[11px] text-white/70 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{filePath}</code>
-                      {action.detail && (
-                        <span className="text-[10px] text-white/30">{action.detail}</span>
-                      )}
-                    </motion.div>
-                  )
-                })}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-
-        {/* Web searches */}
-        {searchActions.length > 0 && (
-          <Collapsible open={expandedSections.has('searches')} onOpenChange={() => toggleSection('searches')}>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02] border-b border-white/[0.04]">
-              {expandedSections.has('searches') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              <Search className="h-3.5 w-3.5 text-[#1EAEDB]/70" />
-              <span>Web Search ({searchActions.length})</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="space-y-0.5 px-4 py-2">
-                {searchActions.map((action, i) => (
-                  <div key={`${action.timestamp}-${i}`} className="flex items-center gap-2 py-1">
-                    <Globe className="h-3 w-3 shrink-0 text-[#1EAEDB]/50" />
-                    <span className="truncate text-[11px] text-white/45">{action.content}</span>
-                  </div>
-                ))}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-
-        {/* Live commentary — streaming text that appears word by word */}
-        {(latestCommentary || latestThinking) && (
-          <div className="px-4 py-3">
-            {latestThinking && (
-              <div className="mb-2 flex items-start gap-2">
-                <Brain className="h-3.5 w-3.5 mt-0.5 shrink-0 text-purple-400/60" />
-                <p className="text-xs leading-relaxed text-white/50">{latestThinking}</p>
-              </div>
-            )}
-            {latestCommentary && (
-              <div className="flex items-start gap-2">
-                <Sparkles className="h-3.5 w-3.5 mt-0.5 shrink-0 text-blue-400/60" />
-                <p className="text-xs leading-relaxed text-white/60">{latestCommentary}</p>
-              </div>
-            )}
-            {isStreaming && (
-              <span className="inline-block h-4 w-[2px] bg-blue-400/60 animate-pulse ml-5 mt-1" />
-            )}
-          </div>
-        )}
-
-        {/* To-dos */}
-        {todos.length > 0 && (
-          <div className="border-t border-white/[0.06] px-4 py-2.5">
-            <div className="flex items-center gap-2 mb-1.5">
-              <ListTodo className="h-3.5 w-3.5 text-white/40" />
-              <span className="text-[11px] font-medium text-white/50">
-                {todos.filter(t => t.completed).length}/{todos.length} tasks
-              </span>
-            </div>
-            <div className="space-y-0.5">
-              {todos.map((todo) => (
-                <div key={todo.id} className="flex items-center gap-2 py-0.5">
-                  {todo.completed ? (
-                    <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                  ) : isStreaming ? (
-                    <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400/50" />
-                  ) : (
-                    <Circle className="h-3 w-3 shrink-0 text-white/20" />
-                  )}
-                  <span className={`text-[11px] ${todo.completed ? 'text-white/35 line-through' : 'text-white/55'}`}>
-                    {todo.text}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* Streaming commentary text — appears as normal message body */}
+      <div className="text-sm leading-6 text-white/85 pl-8">
+        {latestCommentary || (isStreaming && actions.length > 0 ? (
+          <span className="flex items-center gap-2 text-white/50">
+            <span className="inline-block h-4 w-[2px] bg-blue-400/60 animate-pulse" />
+          </span>
+        ) : null)}
+        {isStreaming && latestCommentary && (
+          <span className="inline-block h-4 w-[2px] bg-blue-400/60 animate-pulse -ml-0.5 align-middle" />
         )}
       </div>
+
+      {/* File operations — collapsible sections within the message */}
+      {hasFileOps && (
+        <div className="pl-8 space-y-1">
+          {/* File reads */}
+          {fileReadActions.length > 0 && (
+            <Collapsible open={expandedSections.has('reads')} onOpenChange={() => toggleSection('reads')}>
+              <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.05] transition">
+                {expandedSections.has('reads') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                <Eye className="h-3.5 w-3.5 text-blue-400/70" />
+                <span>Read {fileReadActions.length} file{fileReadActions.length === 1 ? '' : 's'}</span>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-0.5 pl-5 py-1">
+                  {fileReadActions.map((action, i) => {
+                    const filePath = action.content.replace(/^Reading\s+/i, '').replace(/\.\.\.$/, '').trim()
+                    return (
+                      <motion.div
+                        key={`${action.timestamp}-${i}`}
+                        initial={{ opacity: 0, x: -4 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="flex items-center gap-2 py-0.5"
+                      >
+                        <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                        <span className="text-[11px] text-white/40">Read</span>
+                        <code className="text-[11px] text-white/65 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{filePath}</code>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* File writes/edits */}
+          {fileWriteActions.length > 0 && (
+            <Collapsible open={expandedSections.has('writes')} onOpenChange={() => toggleSection('writes')}>
+              <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.05] transition">
+                {expandedSections.has('writes') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                <FileEdit className="h-3.5 w-3.5 text-emerald-400/70" />
+                <span>Writing {fileWriteActions.length} file{fileWriteActions.length === 1 ? '' : 's'}</span>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-0.5 pl-5 py-1">
+                  {fileWriteActions.map((action, i) => {
+                    const isWrite = action.type === 'file_write'
+                    const filePath = action.content.replace(/^(Writing|Editing)\s+/i, '').replace(/\.\.\.$/, '').trim()
+                    return (
+                      <motion.div
+                        key={`${action.timestamp}-${i}`}
+                        initial={{ opacity: 0, x: -4 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        className="flex items-center gap-2 py-0.5"
+                      >
+                        <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                        <span className="text-[11px] text-white/40">{isWrite ? 'Edited' : 'Editing'}</span>
+                        <code className="text-[11px] text-white/65 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{filePath}</code>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Web searches */}
+          {searchActions.length > 0 && (
+            <Collapsible open={expandedSections.has('searches')} onOpenChange={() => toggleSection('searches')}>
+              <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.05] transition">
+                {expandedSections.has('searches') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                <Search className="h-3.5 w-3.5 text-[#1EAEDB]/70" />
+                <span>Web Search ({searchActions.length})</span>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-0.5 pl-5 py-1">
+                  {searchActions.map((action, i) => (
+                    <div key={`${action.timestamp}-${i}`} className="flex items-center gap-2 py-0.5">
+                      <Globe className="h-3 w-3 shrink-0 text-[#1EAEDB]/50" />
+                      <span className="truncate text-[11px] text-white/45">{action.content}</span>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+        </div>
+      )}
     </motion.div>
   )
 }
