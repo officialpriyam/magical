@@ -187,8 +187,8 @@ export function Chat({
           )}
         </motion.div>
       ))}
-      {/* Live streaming message — appears inline during generation */}
-      {useAgentic && agenticStreaming && agenticActions.length > 0 && (
+      {/* Live streaming message — shows during AND after generation */}
+      {useAgentic && (agenticStreaming || agenticActions.length > 0) && (
         <LiveStreamingMessage
           key="live-stream"
           actions={agenticActions}
@@ -197,21 +197,8 @@ export function Chat({
           onStop={onStop}
         />
       )}
-      {/* Fallback indicator for non-agentic or before actions stream in */}
-      {useAgentic && isLoading && agenticActions.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-[36rem]"
-        >
-          <div className="flex items-center gap-2.5 text-white/70">
-            <LoaderIcon className="h-4 w-4 animate-spin text-blue-400" />
-            <span className="text-sm">Thinking...</span>
-          </div>
-        </motion.div>
-      )}
-      {/* Status card — during loading or after with commentary/files to show */}
-      {!agenticStreaming && (
+      {/* Status card — only show when NOT using agentic mode */}
+      {!useAgentic && (
         <GenerationStatusCard
           messages={messages}
           currentFragment={currentFragment}
@@ -325,7 +312,8 @@ function LiveStreamingMessage({
   const timelineActions = useMemo(() => {
     return actions.filter(a =>
       a.type !== 'commentary' &&
-      a.type !== 'commentary_chunk'
+      a.type !== 'commentary_chunk' &&
+      a.type !== 'todo'
     )
   }, [actions])
 
@@ -364,6 +352,17 @@ function LiveStreamingMessage({
 
       {/* Scrollable timeline + commentary area */}
       <div ref={scrollRef} className="pl-8 space-y-1 max-h-[400px] overflow-y-auto overscroll-contain">
+        {/* Connecting state — when streaming but no actions yet */}
+        {isStreaming && actions.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center gap-2 py-1"
+          >
+            <LoaderIcon className="h-3 w-3 animate-spin text-blue-400" />
+            <span className="text-[12px] text-white/40">Connecting...</span>
+          </motion.div>
+        )}
         {/* Chronological timeline of actions */}
         {timelineActions.map((action, i) => {
           const { icon: ActionIcon, color } = getActionIcon(action.type)
@@ -535,6 +534,8 @@ function LiveStreamingMessage({
               <span className="inline-block h-4 w-[2px] bg-blue-400/50 animate-pulse" />
               <span className="text-xs">Thinking...</span>
             </span>
+          ) : !isStreaming && actions.length > 0 ? (
+            <span className="text-xs text-white/25">Done</span>
           ) : null}
         {isStreaming && latestCommentary && (
           <span className="inline-block h-[14px] w-[2px] bg-blue-400/50 animate-pulse -ml-0.5 align-middle" />

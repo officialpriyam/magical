@@ -187,7 +187,10 @@ export async function POST(req: Request) {
     ]
   }
 
-  const { stream, emitAction, emitTodos, emitProgress, emitFragment, emitError, close } = createSSEStream()
+  const { stream, emit, emitAction, emitTodos, emitProgress, emitFragment, emitError, close } = createSSEStream()
+
+  // Emit connected event immediately so the frontend knows the stream is alive
+  emit({ type: 'connected', timestamp: Date.now() })
 
   // Run the pipeline in background and stream events
   const pipelinePromise = runPipeline({
