@@ -77,24 +77,6 @@
     font-family: var(--font-sans, sans-serif);
   }
 
-  html[data-performance-mode="low"] *,
-  html[data-performance-mode="low"] *::before,
-  html[data-performance-mode="low"] *::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 1ms !important;
-  }
-
-  html[data-performance-mode="low"] body {
-    background-attachment: scroll;
-  }
-
-  html[data-performance-mode="low"] .animate-spin,
-  html[data-performance-mode="low"] .animate-pulse,
-  html[data-performance-mode="low"] .animate-bounce {
-    animation: none !important;
-  }
 }
 
 @layer components {

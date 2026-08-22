@@ -46,14 +46,17 @@ export function Chat({
   useEffect(() => {
     const chatContainer = document.getElementById('chat-container')
     if (chatContainer) {
-      chatContainer.scrollTop = chatContainer.scrollHeight
+      // Use requestAnimationFrame to ensure DOM has updated before scrolling
+      requestAnimationFrame(() => {
+        chatContainer.scrollTop = chatContainer.scrollHeight
+      })
     }
   }, [messages, isLoading, isPreviewLoading, currentFragment, agenticActions])
 
   return (
     <div
       id="chat-container"
-      className="flex h-full max-h-full flex-col gap-2 overflow-y-auto px-0 pb-4 pt-1 sm:gap-3 sm:px-1 md:gap-3 md:px-1"
+      className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-0 pb-4 pt-1 sm:gap-3 sm:px-1 md:gap-3 md:px-1"
     >
       {messages.length === 0 && !isLoading && !isPreviewLoading && (
         <div className="flex h-full items-center justify-center text-sm text-white/45">

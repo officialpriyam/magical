@@ -2389,7 +2389,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             </div>
           ) : (
             <>
-              <div className="min-h-0 flex-1 overflow-hidden px-2 py-1 sm:px-3 sm:py-2 md:px-3 md:py-2">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-1 sm:px-3 sm:py-2 md:px-3 md:py-2">
                 {isLoadingProject ? (
                   <div className="flex h-full items-center justify-center">
                     <div className="text-sm text-white/55">Loading project...</div>

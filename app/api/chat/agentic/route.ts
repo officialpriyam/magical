@@ -145,11 +145,34 @@ export async function POST(req: Request) {
     projectsMode: supabaseStatus.projectsMode,
   }
 
+  // Auto web search: detect if the query needs up-to-date information
+  const autoSearchQuery = detectAutoSearchQuery(messages)
+  let enrichedMessages = [...messages]
+  if (autoSearchQuery) {
+    try {
+      const searchResults = await fetchWebSearch(autoSearchQuery)
+      if (searchResults.length > 0) {
+        const searchContext = searchResults
+          .map((r, i) => `[${i + 1}] ${r.title}\n    ${r.url}\n    ${r.snippet}`)
+          .join('\n\n')
+        enrichedMessages = [
+          ...messages,
+          {
+            role: 'user' as const,
+            content: `Web search results for "${autoSearchQuery}":\n\n${searchContext}\n\nUse these search results as reference when answering the user's question.`,
+          },
+        ]
+      }
+    } catch {
+      // Web search failed, continue without it
+    }
+  }
+
   const { stream, emitAction, emitTodos, emitProgress, emitFragment, emitError, close } = createSSEStream()
 
   // Run the pipeline in background and stream events
   const pipelinePromise = runPipeline({
-    messages,
+    messages: enrichedMessages,
     model,
     config,
     template,
@@ -769,5 +792,60 @@ function fillDefaults(data: Record<string, any>) {
     code: typeof data.code === 'string' ? data.code : '',
     files: Array.isArray(data.files) ? data.files : undefined,
     supabase_migrations: Array.isArray(data.supabase_migrations) ? data.supabase_migrations : undefined,
+  }
+}
+
+// ─── Auto web search detection ─────────────────────────────
+const WEB_SEARCH_SIGNALS = [
+  /\b(current|latest|newest|recent|today|yesterday|this week|this month|this year|right now|now)\b/i,
+  /\b(version|release|update|changelog|breaking change)\s+(\d|v)/i,
+  /\b(what is|what are|who is|who are|how much|how many|when did|when was|where is)\b/i,
+  /\b(news|announcement|release|launch|outage|incident|status)\b/i,
+  /\b(price|pricing|cost|subscription|plan|free tier|rate limit|quota)\b/i,
+  /\b(documentation|docs|api|endpoint|sdk|library|framework|package)\b.*\b(latest|current|new|version|install)\b/i,
+  /\b(202[4-9]|203[0-9])\b/,
+  /\b(compare|vs|versus|alternative|better than|replaced by)\b/i,
+  /\b(weather|stock|price|exchange rate|live|real.?time)\b/i,
+]
+
+const SEARCH_SKIP_PATTERNS = [
+  /\b(build|create|generate|make|code|write|implement|design|style)\b/i,
+  /^\[Search:/,
+  /^\[Think:/,
+  /^\[Canvas:/,
+]
+
+function detectAutoSearchQuery(messages: ModelMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.role !== 'user') continue
+    const content = typeof msg.content === 'string' ? msg.content : ''
+    const cleaned = content.replace(/^\[\w+:\s*.+?\]\s*/, '').trim()
+    if (!cleaned) continue
+    if (SEARCH_SKIP_PATTERNS.some(p => p.test(cleaned))) return null
+    if (WEB_SEARCH_SIGNALS.some(p => p.test(cleaned))) {
+      return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
+    }
+    break
+  }
+  return null
+}
+
+async function fetchWebSearch(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
+  try {
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000'
+    const res = await fetch(`${baseUrl}/api/web-search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.results || []
+  } catch {
+    return []
   }
 }
