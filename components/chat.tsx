@@ -197,11 +197,11 @@ export function Chat({
           onStop={onStop}
         />
       )}
-      {/* Status card — shows during non-agentic loading, OR as fallback when agentic finishes with no actions */}
+      {/* Status card — only during loading, NOT after generation (artifact card handles that) */}
       {(
         !useAgentic ||
         (!agenticStreaming && agenticActions.length === 0)
-      ) && (
+      ) && !messages.some(m => m.role === 'assistant' && m.object) && (
         <GenerationStatusCard
           messages={messages}
           currentFragment={currentFragment}
@@ -579,10 +579,28 @@ function LiveStreamingMessage({
 
       {/* In-message to-dos */}
       {todos.length > 0 && (
-        <div className="pl-8 mt-2">
-          <div className="flex items-center gap-1.5 text-[11px] text-white/35 mb-1">
-            <ListTodo className="h-3 w-3" />
-            <span className="font-medium">To-dos {todos.filter(t => t.completed).length}/{todos.length}</span>
+        <div className="pl-8 mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-white/50 mb-1.5">
+            <ListTodo className="h-3.5 w-3.5 text-white/40" />
+            <span className="font-medium">To-dos</span>
+            <span className="text-white/30">{todos.filter(t => t.completed).length}/{todos.length}</span>
+            {todos.every(t => t.completed) && <Check className="h-3 w-3 text-emerald-400" />}
+          </div>
+          <div className="space-y-1">
+            {todos.map((todo) => (
+              <div key={todo.id} className="flex items-center gap-2 py-0.5">
+                {todo.completed ? (
+                  <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                ) : isStreaming ? (
+                  <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400/50" />
+                ) : (
+                  <div className="h-3 w-3 shrink-0 rounded-full border border-white/20" />
+                )}
+                <span className={`text-[11px] ${todo.completed ? 'text-white/35 line-through' : 'text-white/55'}`}>
+                  {todo.text}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -1486,14 +1504,7 @@ function getGenerationStatus({
   }
 
   if (!isLoading && !isPreviewLoading && !autoFixMessage) {
-    // After generation: keep showing status if we have a generated fragment
-    const fragmentFiles = getFragmentFiles(latestObject)
-    if (latestObject?.code || latestObject?.title || fragmentFiles.length > 0) {
-      return {
-        title: cleanText(latestObject?.title) || 'Generation complete',
-        detail: cleanText(latestObject?.description) || (fragmentFiles.length > 0 ? `Generated ${fragmentFiles.length} file${fragmentFiles.length === 1 ? '' : 's'}` : `Built ${promptTarget}`),
-      }
-    }
+    // After generation: don't show status card — artifact card handles it
     return null
   }
 

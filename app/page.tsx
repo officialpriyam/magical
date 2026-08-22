@@ -272,7 +272,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const { session, loading: authLoading } = useAuth(setAuthDialogCallback, setAuthViewCallback)
   const { userTeam } = useUserTeam()
   const currentProjectId = currentProject?.id
-  const agenticStream = useAgenticStream(currentProjectId || undefined)
+  const agenticStream = useAgenticStream(currentProjectId || projectIdFromUrl || initialProjectId || undefined)
   const currentProjectGitHubWorkspace = useMemo(
     () => getProjectGitHubWorkspace(currentProject),
     [currentProject],
@@ -777,8 +777,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     executionResult?: ExecutionResult,
   ) {
     // Use description as the conversational chat response
-    // commentary is internal planning text, not for the user
-    const chatText = assistantFragment.description || assistantFragment.commentary || ''
+    // commentary is internal planning text — clean it up if used as fallback
+    let chatText = assistantFragment.description || ''
+    if (!chatText && assistantFragment.commentary) {
+      // Strip agent name prefixes like "Planner: ..." or "Frontend: ..."
+      chatText = assistantFragment.commentary
+        .replace(/^(?:Planner|Architect|Frontend|Backend|Reviewer|Optimizer|Orchestrator):\s*/gmi, '')
+        .split('\n\n')[0] // Take first paragraph only
+        .trim()
+    }
     const assistantMessage: Message = {
       role: 'assistant',
       content: [
@@ -1017,7 +1024,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         return
       }
 
-      setIsLoadingProject(true)
+      // Don't set isLoadingProject here — loadInitialProject already handles it
       invalidateCache(new RegExp(`^project-messages:[^:]+:${currentProjectId}$`))
       const projectMessages = await getProjectMessages(supabase, currentProjectId)
 

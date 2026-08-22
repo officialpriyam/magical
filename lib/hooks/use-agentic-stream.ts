@@ -93,7 +93,7 @@ function persistState(key: string | undefined, state: AgenticStreamState) {
   try {
     // Only persist when stream is done and has meaningful data
     if (state.isStreaming) return
-    if (state.actions.length === 0 && !state.fragment?.code && !state.fragment?.title) return
+    if (state.actions.length === 0 && state.todos.length === 0 && !state.fragment?.code && !state.fragment?.title) return
     localStorage.setItem(STREAM_STORAGE_PREFIX + key, JSON.stringify({
       actions: state.actions,
       todos: state.todos,
