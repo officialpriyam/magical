@@ -86,6 +86,75 @@ async function searchBrave(query: string): Promise<SearchResult[]> {
   }))
 }
 
+async function searchExa(query: string): Promise<SearchResult[]> {
+  const apiKey = process.env.EXA_API_KEY
+  if (!apiKey) return []
+
+  try {
+    const response = await fetch('https://api.exa.ai/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        query,
+        type: 'neural',
+        numResults: 5,
+        contents: { text: { maxCharacters: 200 } },
+      }),
+      signal: AbortSignal.timeout(10000),
+    })
+
+    if (!response.ok) return []
+
+    const data = await response.json()
+    const results = data.results || []
+
+    return results.slice(0, 5).map((r: any) => ({
+      title: r.title || '',
+      url: r.url || '',
+      snippet: r.text || '',
+    }))
+  } catch {
+    return []
+  }
+}
+
+async function fetchExaUrl(url: string): Promise<{ url: string; title: string; content: string } | null> {
+  const apiKey = process.env.EXA_API_KEY
+  if (!apiKey) return null
+
+  try {
+    const response = await fetch('https://api.exa.ai/contents', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        urls: [url],
+        text: { maxCharacters: 5000 },
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+
+    if (!response.ok) return null
+
+    const data = await response.json()
+    const result = (data.results || [])[0]
+    if (!result) return null
+
+    return {
+      url: result.url || url,
+      title: result.title || '',
+      content: result.text || '',
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const query = searchParams.get('q')
@@ -94,7 +163,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Query parameter "q" is required' }, { status: 400 })
   }
 
-  let results = await searchBrave(query.trim())
+  // Try providers in order: Exa → Brave → DuckDuckGo
+  let results = await searchExa(query.trim())
+
+  if (results.length === 0) {
+    results = await searchBrave(query.trim())
+  }
 
   if (results.length === 0) {
     results = await searchDuckDuckGo(query.trim())
@@ -110,7 +184,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'query is required' }, { status: 400 })
   }
 
-  let results = await searchBrave(query.trim())
+  // Try providers in order: Exa → Brave → DuckDuckGo
+  let results = await searchExa(query.trim())
+
+  if (results.length === 0) {
+    results = await searchBrave(query.trim())
+  }
 
   if (results.length === 0) {
     results = await searchDuckDuckGo(query.trim())

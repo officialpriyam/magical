@@ -1055,16 +1055,29 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       if (isLandingPagePromptRef.current) {
         isLandingPagePromptRef.current = false
         const lastMsg = projectMessages[projectMessages.length - 1]
-        if (lastMsg && lastMsg.role === 'user') {
-          submit({
-            userID: session?.user?.id,
-            teamID: userTeam?.id,
-            projectID: currentProjectId,
-            messages: toAISDKMessages(projectMessages),
-            template: getTemplateForSubmission(),
-            model: currentModel,
-            config: languageModel,
-          })
+        if (lastMsg && lastMsg.role === 'user' && currentModel) {
+          if (useAgentic) {
+            agenticStream.reset()
+            agenticStream.submit({
+              userID: session?.user?.id,
+              teamID: userTeam?.id,
+              projectID: currentProjectId,
+              messages: toAISDKMessages(projectMessages),
+              template: getTemplateForSubmission(),
+              model: currentModel,
+              config: languageModel,
+            })
+          } else {
+            submit({
+              userID: session?.user?.id,
+              teamID: userTeam?.id,
+              projectID: currentProjectId,
+              messages: toAISDKMessages(projectMessages),
+              template: getTemplateForSubmission(),
+              model: currentModel,
+              config: languageModel,
+            })
+          }
         }
       } else {
         try {
@@ -1074,16 +1087,29 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             sessionStorage.removeItem('isLandingPagePrompt')
             sessionStorage.removeItem('landingPageProjectId')
             const lastMsg = projectMessages[projectMessages.length - 1]
-            if (lastMsg && lastMsg.role === 'user') {
-              submit({
-                userID: session?.user?.id,
-                teamID: userTeam?.id,
-                projectID: currentProjectId,
-                messages: toAISDKMessages(projectMessages),
-                template: getTemplateForSubmission(),
-                model: currentModel,
-                config: languageModel,
-              })
+            if (lastMsg && lastMsg.role === 'user' && currentModel) {
+              if (useAgentic) {
+                agenticStream.reset()
+                agenticStream.submit({
+                  userID: session?.user?.id,
+                  teamID: userTeam?.id,
+                  projectID: currentProjectId,
+                  messages: toAISDKMessages(projectMessages),
+                  template: getTemplateForSubmission(),
+                  model: currentModel,
+                  config: languageModel,
+                })
+              } else {
+                submit({
+                  userID: session?.user?.id,
+                  teamID: userTeam?.id,
+                  projectID: currentProjectId,
+                  messages: toAISDKMessages(projectMessages),
+                  template: getTemplateForSubmission(),
+                  model: currentModel,
+                  config: languageModel,
+                })
+              }
             }
           }
         } catch {}
@@ -1103,7 +1129,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       isMounted = false
     }
-  }, [currentProject, currentProjectId, projectMessagesRefreshKey, restoreProjectWorkspace, supabase, warmProjectSandbox])
+  }, [currentProject, currentProjectId, projectMessagesRefreshKey, restoreProjectWorkspace, supabase, warmProjectSandbox, useAgentic, agenticStream, currentModel, session, userTeam, languageModel])
 
   useEffect(() => {
     async function saveMessagesToDb() {

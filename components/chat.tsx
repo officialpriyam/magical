@@ -179,14 +179,23 @@ export function Chat({
               return <WebSearchCard key={id} query={content.query} results={content.results} />
             }
           })}
-          {message.object && (
-            <GeneratedArtifactCard
-              message={message}
-              setCurrentPreview={setCurrentPreview}
-            />
-          )}
         </motion.div>
       ))}
+
+      {/* Artifact card — rendered below the Magical message */}
+      {(() => {
+        const lastAssistantWithObject = [...messages].reverse().find(m => m.role === 'assistant' && m.object)
+        if (!lastAssistantWithObject) return null
+        // Only show if we have agentic streaming done or no streaming at all
+        if (useAgentic && agenticStreaming) return null
+        return (
+          <GeneratedArtifactCard
+            message={lastAssistantWithObject}
+            setCurrentPreview={setCurrentPreview}
+          />
+        )
+      })()}
+
       {/* Live streaming message — shows during AND after generation when actions exist */}
       {useAgentic && (agenticStreaming || agenticActions.length > 0) && (
         <LiveStreamingMessage

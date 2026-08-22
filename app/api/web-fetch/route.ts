@@ -10,6 +10,41 @@ interface FetchResult {
   error?: string
 }
 
+async function fetchWithExa(url: string): Promise<FetchResult | null> {
+  const apiKey = process.env.EXA_API_KEY
+  if (!apiKey) return null
+
+  try {
+    const response = await fetch('https://api.exa.ai/contents', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        urls: [url],
+        text: { maxCharacters: 8000 },
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+
+    if (!response.ok) return null
+
+    const data = await response.json()
+    const result = (data.results || [])[0]
+    if (!result) return null
+
+    return {
+      url: result.url || url,
+      title: result.title || '',
+      content: result.text || '',
+      success: true,
+    }
+  } catch {
+    return null
+  }
+}
+
 async function fetchUrlContent(url: string): Promise<FetchResult> {
   try {
     const response = await fetch(url, {
@@ -97,6 +132,12 @@ export async function POST(req: Request) {
     }
   } catch {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+  }
+
+  // Try Exa first for better content extraction, fall back to direct fetch
+  const exaResult = await fetchWithExa(url)
+  if (exaResult && exaResult.success && exaResult.content.length > 100) {
+    return NextResponse.json(exaResult)
   }
 
   const result = await fetchUrlContent(url)
