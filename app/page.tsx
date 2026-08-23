@@ -2620,6 +2620,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               </div>
 
               <div className="shrink-0 border-t border-white/10 px-2 py-2 sm:px-3 sm:py-3 md:px-4">
+                {/* Collapsible To-Do Bar — shows during and after generation */}
+                {useAgentic && agenticStream.todos.length > 0 && (
+                  <TodoBar todos={agenticStream.todos} />
+                )}
                 {statusNotices}
                 <div className="flex items-end gap-2">
                   <div className="flex-1 min-w-0">
