@@ -936,10 +936,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             setCurrentPreview({ fragment: finalFrag, result: executionResult })
             console.log('[Agentic] Sandbox deployed:', 'url' in executionResult ? executionResult.url : executionResult.sbxId)
           } else {
-            console.warn('[Agentic] Sandbox deploy failed:', response.status)
+            const errorData = await response.json().catch(() => ({ error: `Sandbox deploy failed (HTTP ${response.status})` }))
+            console.warn('[Agentic] Sandbox deploy failed:', response.status, errorData)
+            setErrorMessage(errorData.error || `Sandbox deploy failed (HTTP ${response.status})`)
           }
         } catch (err) {
           console.warn('[Agentic] Sandbox deploy error:', err)
+          setErrorMessage(err instanceof Error ? err.message : 'Sandbox deploy failed')
         } finally {
           setIsPreviewLoading(false)
         }
@@ -1335,7 +1338,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         return
       }
 
-      const saveSignature = `${currentProjectId}:${sequenceNumber}:${lastMessage.role}:${Boolean(lastMessage.object)}:${Boolean(lastMessage.result)}`
+      const saveSignature = `${currentProjectId}:${sequenceNumber}:${lastMessage.role}:${Boolean(lastMessage.object)}:${Boolean(lastMessage.result)}:${(lastMessage.agenticActions || []).length}:${(lastMessage.agenticTodos || []).length}`
 
       if (lastSavedMessageSignatureRef.current === saveSignature) {
         return
@@ -2920,6 +2923,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 onSave={handleSaveFile}
                 onRedeploy={handleRedeploy}
                 executeCode={handleExecuteCode}
+                isSupabaseConnected={!!(currentProject?.metadata as any)?.supabaseProject}
               />
             </motion.div>
           )}

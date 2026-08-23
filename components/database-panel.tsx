@@ -36,32 +36,36 @@ export function DatabasePanel({ projectId, isSupabaseConnected }: { projectId?: 
 
   return (
     <div className="flex flex-col h-full bg-[#111315]">
-      {/* Tabs bar */}
+      {/* Tabs bar — only show tabs when connected */}
       <div className="flex items-center gap-0 overflow-x-auto border-b border-white/[0.06] bg-white/[0.02] px-1">
         <div className="flex items-center gap-1 px-3 py-2">
           <Database className="h-4 w-4 text-blue-400" />
           <span className="text-xs font-semibold text-white/70">Database</span>
         </div>
-        <div className="h-5 w-px bg-white/[0.08] mx-1" />
-        {DB_TABS.map((tab) => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition",
-                activeTab === tab.id
-                  ? "text-white border-b-2 border-blue-500 -mb-px"
-                  : "text-white/45 hover:text-white/70"
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {tab.label}
-            </button>
-          )
-        })}
+        {isSupabaseConnected && (
+          <>
+            <div className="h-5 w-px bg-white/[0.08] mx-1" />
+            {DB_TABS.map((tab) => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition",
+                    activeTab === tab.id
+                      ? "text-white border-b-2 border-blue-500 -mb-px"
+                      : "text-white/45 hover:text-white/70"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </>
+        )}
       </div>
 
       {/* Content */}

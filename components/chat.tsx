@@ -205,8 +205,8 @@ export function Chat({
               return <WebSearchCard key={id} query={content.query} results={content.results} />
             }
           })}
-          {/* Persisted agentic timeline — render inline with each assistant message */}
-          {message.role === 'assistant' && message.agenticActions && message.agenticActions.length > 0 && !agenticStreaming && (
+          {/* Persisted agentic timeline — always render inline with each assistant message */}
+          {message.role === 'assistant' && message.agenticActions && message.agenticActions.length > 0 && (
             <LiveStreamingMessage
               key={`persisted-${index}`}
               actions={message.agenticActions}

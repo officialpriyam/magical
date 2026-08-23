@@ -52,6 +52,7 @@ export function Preview({
   onSave,
   onRedeploy,
   executeCode,
+  isSupabaseConnected = false,
 }: {
   teamID: string | undefined
   accessToken: string | undefined
@@ -72,6 +73,7 @@ export function Preview({
   onSave?: (path: string, content: string) => Promise<void>
   onRedeploy?: () => Promise<void>
   executeCode?: (code: string) => Promise<any>
+  isSupabaseConnected?: boolean
 }) {
   const [sandboxFiles, setSandboxFiles] = useState(result?.files || [])
   const [isGitHubSaveOpen, setIsGitHubSaveOpen] = useState(false)
@@ -291,7 +293,7 @@ export function Preview({
                 </ErrorBoundary>
               </div>
             </TabsContent>              <TabsContent value="database" className="h-full m-0 p-0">
-              <DatabasePanel projectId={projectId} isSupabaseConnected={!!projectId} />
+              <DatabasePanel projectId={projectId} isSupabaseConnected={isSupabaseConnected} />
             </TabsContent>
           </div>
       </Tabs>
