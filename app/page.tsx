@@ -2253,20 +2253,37 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-2 px-4 py-2 text-[13px] text-white/50"
+      className="mx-2 md:mx-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2"
     >
-      <div className="flex gap-1">
-        {messageQueue.slice(0, 3).map((_, i) => (
-          <div key={i} className="h-1.5 w-1.5 rounded-full bg-blue-400/50" />
-        ))}
+      <div className="flex items-center gap-2 mb-1.5">
+        <div className="flex gap-1">
+          {messageQueue.slice(0, 3).map((_, i) => (
+            <div key={i} className="h-1.5 w-1.5 rounded-full bg-blue-400/50" />
+          ))}
+        </div>
+        <span className="text-[12px] text-white/40">{messageQueue.length} queued</span>
+        <button
+          onClick={() => { setMessageQueue([]); messageQueueRef.current = [] }}
+          className="ml-auto text-[11px] text-white/30 hover:text-red-400 transition"
+        >
+          Clear all
+        </button>
       </div>
-      <span>{messageQueue.length} message{messageQueue.length === 1 ? '' : 's'} queued — will send after current response</span>
-      <button
-        onClick={() => { setMessageQueue([]); messageQueueRef.current = [] }}
-        className="ml-auto text-[12px] text-white/30 hover:text-white/50 transition"
-      >
-        Clear
-      </button>
+      {messageQueue.map((q, i) => (
+        <div key={i} className="flex items-center gap-2 py-1 border-t border-white/[0.04]">
+          <span className="text-[12px] text-white/50 truncate flex-1">{q.message}</span>
+          <button
+            onClick={() => {
+              const next = messageQueue.filter((_, idx) => idx !== i)
+              setMessageQueue(next)
+              messageQueueRef.current = next
+            }}
+            className="text-[11px] text-white/25 hover:text-red-400 transition shrink-0"
+          >
+            ×
+          </button>
+        </div>
+      ))}
     </motion.div>
   ) : null
   const statusNotices = (

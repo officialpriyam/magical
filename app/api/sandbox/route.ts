@@ -36,15 +36,6 @@ import {
   writeDaytonaProjectFiles,
 } from '@/lib/daytona-sandbox'
 import {
-  createCloudflareSandbox,
-  getCloudflareSandbox,
-  getCloudflareSandboxUrl,
-  hasCloudflareSandboxConfig,
-  installAndStartCloudflareProject,
-  listCloudflareSandboxFiles,
-  writeCloudflareProjectFiles,
-} from '@/lib/cloudflare-sandbox'
-import {
   createModalSandbox,
   getModalSandbox,
   getModalSandboxUrl,
@@ -214,16 +205,6 @@ export async function POST(req: Request) {
             env: supabaseRuntimeEnv,
             timeoutMs: sandboxTimeout,
           })
-        } else if (selectedProvider === 'cloudflare') {
-          sbx = await createCloudflareSandbox({
-            template: fragment.template as TemplateId,
-            userId: userID,
-            teamId: teamID,
-            projectId: projectID,
-            port: resolvedPort,
-            env: supabaseRuntimeEnv,
-            timeoutMs: sandboxTimeout,
-          })
         } else {
           sbx = await createE2BSandbox(fragment.template, {
             metadata: {
@@ -276,11 +257,6 @@ export async function POST(req: Request) {
       } else if (selectedProvider === 'daytona') {
         await Promise.all([
           writeDaytonaProjectFiles(sbx as any, generatedFiles, fragment.template as TemplateId),
-          storageSave,
-        ])
-      } else if (selectedProvider === 'cloudflare') {
-        await Promise.all([
-          writeCloudflareProjectFiles(sbx as any, generatedFiles, fragment.template as TemplateId),
           storageSave,
         ])
       } else {
@@ -406,30 +382,6 @@ export async function POST(req: Request) {
         )
       }
 
-      if (selectedProvider === 'cloudflare') {
-        const cloudflareSandbox = sbx as any
-
-        await installAndStartCloudflareProject({
-          sandbox: cloudflareSandbox,
-          fragment,
-          env: supabaseRuntimeEnv,
-        })
-
-        const files = await listCloudflareSandboxFiles(cloudflareSandbox)
-        const url = getCloudflareSandboxUrl(cloudflareSandbox, resolvedPort)
-
-        return new Response(
-          JSON.stringify({
-            sbxId: encodeSandboxId('cloudflare', cloudflareSandbox.workerName),
-            sandboxProvider: selectedProvider,
-            template: fragment.template,
-            url,
-            files,
-          } as ExecutionResultWeb),
-          { headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-
       const installCommand = cleanCommand(fragment.install_dependencies_command)
 
       if (installCommand) {
@@ -466,8 +418,6 @@ export async function POST(req: Request) {
             await (sbx as ModalSandbox | null)?.terminate()
           } else if (selectedProvider === 'daytona') {
             await (sbx as any)?.delete()
-          } else if (selectedProvider === 'cloudflare') {
-            // Cloudflare Workers are auto-cleaned
           } else {
             await (sbx as Sandbox | null)?.kill()
           }
@@ -529,9 +479,6 @@ async function connectReusableSandbox(
     if (sandboxRef.provider === 'daytona') {
       return await getDaytonaSandbox(sandboxRef.id)
     }
-    if (sandboxRef.provider === 'cloudflare') {
-      return await getCloudflareSandbox(sandboxRef.id)
-    }
     return await Sandbox.connect(sandboxRef.id)
   } catch (error) {
     console.warn('Could not reuse warm sandbox; creating a new one:', error)
@@ -561,10 +508,6 @@ function resolveSandboxProviderForFragment(
     available.push('daytona')
   }
 
-  if (isProviderAvailableForFragment('cloudflare', fragment)) {
-    available.push('cloudflare')
-  }
-
   return chooseSandboxProvider({ mode, available })
 }
 
@@ -579,10 +522,6 @@ function isProviderAvailableForFragment(provider: SandboxProvider, fragment: Fra
 
   if (provider === 'daytona') {
     return hasDaytonaSandboxConfig()
-  }
-
-  if (provider === 'cloudflare') {
-    return hasCloudflareSandboxConfig()
   }
 
   return fragment.template !== 'code-interpreter-v1' && hasVercelSandboxConfig()
@@ -605,18 +544,14 @@ function getNoSandboxProviderMessage(
   }
 
   if (mode === 'e2b') {
-    return 'E2B is not configured. Set E2B_API_KEY or choose Modal, Vercel, Daytona, or Cloudflare.'
+    return 'E2B is not configured. Set E2B_API_KEY or choose Modal, Vercel, or Daytona.'
   }
 
   if (mode === 'daytona') {
     return 'Daytona is not configured. Set DAYTONA_API_KEY.'
   }
 
-  if (mode === 'cloudflare') {
-    return 'Cloudflare is not configured. Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.'
-  }
-
-  return 'No sandbox provider is configured. Set E2B_API_KEY, MODAL_TOKEN_ID/SECRET, DAYTONA_API_KEY, CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID, or configure Vercel Sandbox.'
+  return 'No sandbox provider is configured. Set E2B_API_KEY, MODAL_TOKEN_ID/SECRET, or configure Vercel Sandbox.'
 }
 
 function cleanCommand(value: unknown) {

@@ -773,7 +773,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
           isRecording && "border-red-500/70",
           className
         )}
-        disabled={isLoading || isRecording}
+        disabled={isRecording}
         ref={ref || promptBoxRef}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
