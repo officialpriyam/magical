@@ -241,8 +241,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         {isOpen ? (
           <div className="flex flex-col h-full">
-            {/* Workspace Selector */}
+            {/* Logo + Workspace Selector */}
             <div className="px-3 py-2 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2 mb-2">
+                <Link href="/">
+                  <img src="/icon.png" alt="Magical AI" className="h-7 w-7 object-contain" />
+                </Link>
+                <span className="text-sm font-semibold text-white/80">Magical AI</span>
+              </div>
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <WorkspaceDropdown

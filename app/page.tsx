@@ -2352,7 +2352,16 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         >
           {!isDashboardMode && (
             <div className="flex h-[56px] shrink-0 items-center justify-between gap-1 border-b border-white/10 px-2 py-2 md:h-[64px] md:gap-3 md:px-4">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 flex items-center gap-2">
+                {/* Home button */}
+                <button
+                  type="button"
+                  onClick={() => router.push('/')}
+                  className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white"
+                  title="Dashboard"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </button>
                 {/* Project dropdown (like Lovable) */}
                 <ProjectDropdownMenu
                   projectTitle={projectHeaderTitle}
@@ -2362,6 +2371,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   onNewChat={handleStartNewChat}
                   onBackToDashboard={() => router.push('/')}
                 />
+                {/* Mode indicator */}
+                <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px]">
+                  <div className={`h-2 w-2 rounded-full ${isPromptLoading ? 'animate-pulse ' : ''}${chatMode === 'plan' ? 'bg-purple-400' : 'bg-emerald-400'}`} />
+                  <span className="text-white/50 uppercase font-medium tracking-wider">{chatMode === 'plan' ? 'Plan' : 'Build'}</span>
+                  {isPromptLoading && (
+                    <motion.div
+                      className="h-1 w-1 rounded-full bg-white/40"
+                      animate={{ opacity: [0.2, 1, 0.2] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                    />
+                  )}
+                </div>
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
