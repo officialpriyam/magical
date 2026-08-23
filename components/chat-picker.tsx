@@ -71,12 +71,26 @@ export function ChatPicker({
               {Object.entries(templates).map(([templateId, template]) => (
                 <SelectItem key={templateId} value={templateId}>
                   <div className="flex items-center space-x-2">
-                    <Image
-                      className="flex"
+                    <img
+                      className="flex shrink-0"
                       src={`/thirdparty/templates/${templateId}.svg`}
                       alt={templateId}
                       width={14}
                       height={14}
+                      onError={(e) => {
+                        // Fallback: show first letter of template name
+                        const target = e.target as HTMLImageElement;
+                        if (target.style) {
+                          target.style.display = 'none';
+                          const next = target.nextElementSibling;
+                          if (!next || !next.classList.contains('template-fallback')) {
+                            const span = document.createElement('span');
+                            span.className = 'template-fallback flex items-center justify-center w-3.5 h-3.5 rounded bg-white/10 text-[10px] font-bold text-white/70';
+                            span.textContent = template.name.charAt(0);
+                            target.parentNode?.insertBefore(span, target.nextSibling);
+                          }
+                        }
+                      }}
                     />
                     <span>{template.name}</span>
                   </div>
