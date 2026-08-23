@@ -1,69 +1,62 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-.freebuff
-.temp
-.next.history_machine
-.vercel
-.env.local
-.env.production
-/node_modules
-/.pnp
+# Dependencies
+node_modules/
+.pnp
 .pnp.js
-.yarn/install-state.gz
 
-# testing
-/coverage
+# Testing
+coverage/
 
-# demo files (temporary for testing)
-.env.local
+# Next.js
+.next/
+out/
 
-# next.js
-/.next/
-/out/
+# Production
+build/
 
-.env
-
-.mcp.json 
-
-.temp
-
-# production
-/build
-
-# misc
+# Misc
 .DS_Store
 *.pem
 
-# debug
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# local env files
-.env*.local
+# Env files
+.env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-.env
-.vscode
-mcp.json
-CLAUDE.md
-# Workspace documentation (keep these files)
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# Apps workspace - ignore build artifacts only
-apps/*/node_modules/
-apps/*/build/
-apps/*/dist/
-apps/*/.next/
-apps/*/out/
-apps/*/.env
-apps/*/.env.local
-.env*
+# Playwright
+playwright-report/
+
+# Turbopack
+.turbo/
+
+# Upstash
+.upstash/
+
+# Misc temp files
+public/new-logo.png

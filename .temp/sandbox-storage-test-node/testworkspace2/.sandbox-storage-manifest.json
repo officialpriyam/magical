@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "provider": "sandbox-storage",
+  "storageId": "testworkspace2",
+  "ownerUserId": "u1",
+  "projectId": "p1",
+  "fileCount": 1,
+  "createdAt": "2026-08-06T12:15:09.548Z",
+  "updatedAt": "2026-08-06T12:15:09.617Z"
+}

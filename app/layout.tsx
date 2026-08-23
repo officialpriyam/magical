@@ -33,11 +33,12 @@ export const metadata: Metadata = {
     'Magical AI is an AI software engineer with live code execution, file uploads, and real-time chat. Developed by priyx.',
   icons: {
     icon: [
-      { rel: 'icon', type: 'image/png', sizes: '512x512', url: '/icon.png?v=3' },
-      { rel: 'icon', type: 'image/x-icon', url: '/favicon.ico?v=3' },
+      { rel: 'icon', type: 'image/png', sizes: '16x16', url: '/favicon-16x16.png' },
+      { rel: 'icon', type: 'image/png', sizes: '32x32', url: '/favicon-32x32.png' },
+      { rel: 'icon', type: 'image/png', sizes: '192x192', url: '/icon-192.png' },
+      { rel: 'icon', type: 'image/png', sizes: '512x512', url: '/icon-512.png' },
     ],
-    shortcut: ['/favicon.ico?v=3'],
-    apple: [{ url: '/icon.png?v=3' }],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
   openGraph: {
     title: 'Magical AI',

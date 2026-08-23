@@ -2484,24 +2484,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   )}
                   <span className="hidden sm:inline">{shouldShowPreviewPanel ? 'Close' : 'IDE'}</span>
                 </button>
-                {/* Database tab button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!shouldShowPreviewPanel) {
-                      setIsPreviewPanelOpen(true)
-                    }
-                    setCurrentTab('database')
-                  }}
-                  className={cn(
-                    "inline-flex h-8 items-center justify-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition",
-                    "border-white/10 bg-white/[0.04] text-white/65 hover:bg-white/[0.08] hover:text-white"
-                  )}
-                  title="Database (Supabase)"
-                >
-                  <Database className="h-4 w-4" />
-                  <span className="hidden sm:inline">Database</span>
-                </button>
               </div>
             </div>
           )}
@@ -2644,7 +2626,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                               void handleChatSelected(project.id)
                             }
                           }}
-                          className="group min-h-32 cursor-pointer overflow-hidden rounded-lg border border-white/10 bg-white/[0.055] text-left transition hover:border-white/20 hover:bg-white/[0.09]"
+                          className="group min-h-32 cursor-pointer overflow-hidden rounded-2xl border border-white/[0.06] bg-gradient-to-br from-white/[0.06] to-white/[0.02] text-left transition hover:border-white/15 hover:from-white/[0.08] hover:to-white/[0.03] shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]"
                         >
                           <div className="relative aspect-[16/9] overflow-hidden border-b border-white/10 bg-[#0b0d0b]">
                             {shouldLoadPreviewFrame ? (
@@ -2713,7 +2695,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                         </div>
                       )
                     }) : (
-                      <div className="rounded-lg border border-white/10 bg-white/[0.055] p-5 text-sm text-white/70 md:col-span-2 xl:col-span-3">
+                      <div className="clay-card p-5 text-sm text-white/70 md:col-span-2 xl:col-span-3">
                         {projectShelfView === 'github'
                           ? 'No projects are connected to GitHub yet.'
                           : 'Your Magical AI projects will appear here after your first chat.'}
