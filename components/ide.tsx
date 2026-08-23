@@ -19,6 +19,7 @@ interface IDEProps {
   githubSaveRequired?: boolean
   githubWorkspaceConnected?: boolean
   onSaveBlocked?: () => void
+  fragmentFiles?: { path: string; content: string; purpose?: string }[]
 }
 
 export function IDE({
@@ -29,6 +30,7 @@ export function IDE({
   githubSaveRequired = false,
   githubWorkspaceConnected = false,
   onSaveBlocked,
+  fragmentFiles = [],
 }: IDEProps = {}) {
   const noOpDialog = useCallback(() => {}, [])
   const noOpView = useCallback(() => {}, [])
@@ -46,12 +48,6 @@ export function IDE({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [storageSlow, setStorageSlow] = useState(false)
   const [storageStatus, setStorageStatus] = useState<StorageStatus>('idle')
-  // Try to load files from fragment code when sandbox-storage fails
-  const fragmentFiles = useMemo(() => {
-    if (!sandboxId && !projectId) return []
-    // This will be populated by the parent if sandbox-storage fails
-    return []
-  }, [sandboxId, projectId])
   const isSandboxMode = !!sandboxId
   const isGitHubSaveBlocked = githubSaveRequired && !githubWorkspaceConnected
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -280,6 +276,23 @@ export function IDE({
       fetchFiles()
     }
   }, [session, isSandboxMode, fetchFiles])
+
+  // When sandbox-storage is unavailable and we have fragment files, load them
+  useEffect(() => {
+    if (storageStatus === 'error' && files.length === 0 && fragmentFiles.length > 0) {
+      const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
+        name: f.path.split('/').pop() || f.path,
+        path: f.path,
+        content: f.content,
+        type: 'file' as const,
+        isDirectory: false,
+      }))
+      setFiles(fsNodes)
+      setStorageStatus('ok')
+      setLoadError(null)
+      console.log(`[IDE] Loaded ${fragmentFiles.length} files from fragment (sandbox-storage unavailable)`)
+    }
+  }, [storageStatus, files.length, fragmentFiles])
 
   useEffect(() => {
     return () => {

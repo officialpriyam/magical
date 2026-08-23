@@ -1,6 +1,7 @@
 import { FragmentCode } from './fragment-code'
 import { FragmentPreview } from './fragment-preview'
 import { FragmentTerminal } from './fragment-terminal'
+import { DatabasePanel } from './database-panel'
 import { GitHubSave, type GitHubWorkspace } from './github-save'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -14,14 +15,14 @@ import { FragmentSchema } from '@/lib/schema'
 import { ExecutionResult } from '@/lib/types'
 import { getFragmentFiles } from '@/lib/fragment-files'
 import { DeepPartial } from 'ai'
-import { ChevronsRight, LoaderCircle, Terminal, Code, Folder, RotateCcw } from 'lucide-react'
+import { ChevronsRight, LoaderCircle, Terminal, Code, Folder, RotateCcw, Database } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react'
 import ErrorBoundary from '@/components/error-boundary'
 
-export type PreviewTab = 'code' | 'fragment' | 'terminal' | 'ide'
+export type PreviewTab = 'code' | 'fragment' | 'terminal' | 'ide' | 'database'
 
-const PREVIEW_TABS: PreviewTab[] = ['code', 'fragment', 'terminal', 'ide']
+const PREVIEW_TABS: PreviewTab[] = ['code', 'fragment', 'terminal', 'ide', 'database']
 const IDE = dynamic(() => import('./ide').then((mod) => mod.IDE), {
   ssr: false,
   loading: () => (
@@ -169,6 +170,13 @@ export function Preview({
                 <Folder className="h-3 w-3" />
                 IDE
               </TabsTrigger>
+              <TabsTrigger
+                className="font-normal text-xs py-1 px-2 gap-1 flex items-center"
+                value="database"
+              >
+                <Database className="h-3 w-3" />
+                Database
+              </TabsTrigger>
             </TabsList>
           </div>
           <div className="flex items-center justify-end gap-2">
@@ -278,9 +286,13 @@ export function Preview({
                     githubSaveRequired={githubSaveRequired}
                     githubWorkspaceConnected={isGitHubWorkspaceConnected}
                     onSaveBlocked={handleOpenRequiredGitHubSave}
+                    fragmentFiles={fragmentFiles}
                   />
                 </ErrorBoundary>
               </div>
+            </TabsContent>
+            <TabsContent value="database" className="h-full m-0 p-0">
+              <DatabasePanel projectId={projectId} isSupabaseConnected={true} />
             </TabsContent>
           </div>
       </Tabs>

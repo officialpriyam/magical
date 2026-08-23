@@ -13,11 +13,18 @@ import { streamText, type LanguageModel, type ModelMessage } from 'ai'
 
 export const maxDuration = 300
 
+type PlanQuestion = {
+  question: string
+  options: string[]
+  allowCustomInput: boolean
+}
+
 type PlanPayload = {
   plan: string
   question?: string
   options?: string[]
   allowCustomInput?: boolean
+  questions?: PlanQuestion[]
 }
 
 function cleanString(value: unknown) {
@@ -43,11 +50,23 @@ function normalizePlanPayload(value: unknown, fallbackText: string): PlanPayload
         .slice(0, 4)
     : []
 
+  // Parse questions array (dynamic, 0-N questions)
+  const questions: PlanQuestion[] = Array.isArray(payload.questions)
+    ? payload.questions
+        .filter((q: any) => q && typeof q.question === 'string' && q.question.trim())
+        .map((q: any) => ({
+          question: q.question.trim(),
+          options: Array.isArray(q.options) ? q.options.map(cleanString).filter(Boolean).slice(0, 6) : [],
+          allowCustomInput: q.allowCustomInput !== false,
+        }))
+    : []
+
   return {
     plan,
     ...(question ? { question } : {}),
     options,
     allowCustomInput: payload.allowCustomInput === false ? false : true,
+    ...(questions.length > 0 ? { questions } : {}),
   }
 }
 
@@ -135,12 +154,17 @@ export async function POST(req: Request) {
         system: [
           'You are Magical AI in Plan mode.',
           'Use the existing chat history as project memory.',
-          'Return JSON only with keys: plan, question, options, allowCustomInput.',
+          'Return JSON with keys: plan, question, options, allowCustomInput, questions.',
           'The plan must be a concise implementation plan, not code.',
           'Mention important files, UI states, data/storage changes, and verification steps when relevant.',
-          'Set question only when the work cannot proceed safely without one blocking answer.',
-          'When question is set, include 2 to 4 short option strings when likely answers exist.',
-          'Set allowCustomInput to true unless the listed options are exhaustive.',
+          '',
+          'QUESTIONS: You MUST ask clarifying questions when the request is ambiguous or has multiple valid interpretations.',
+          '- The number of questions is dynamic: ask 0 if the request is crystal clear, 1-2 for moderate ambiguity, 3-5 for complex/underspecified requests.',
+          '- Each question object has: {"question": "string", "options": ["option1", "option2", ...], "allowCustomInput": boolean}',
+          '- Put questions in the "questions" array field. Each option should be a short, concrete choice (not vague).',
+          '- Always set allowCustomInput: true so users can type their own answer.',
+          '- Example: [{"question": "How many pages do you need?", "options": ["1 page (landing)", "2-3 pages", "5+ pages"], "allowCustomInput": true}]',
+          '- If no clarifications needed, return "questions": []',
           AI_GENERATION_GUIDE,
           supabaseInstruction,
         ].join(' '),

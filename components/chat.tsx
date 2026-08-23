@@ -1174,14 +1174,25 @@ function PlanActionCard({
   disabled?: boolean
   onAcceptPlan?: (plan: MessagePlan, answer?: string) => void
 }) {
-  const [selectedAnswer, setSelectedAnswer] = useState('')
-  const [customAnswer, setCustomAnswer] = useState('')
+  // Support both single question (legacy) and multiple questions
+  const questions = plan.questions || []
+  const hasSingleQuestion = Boolean(plan.question) && questions.length === 0
+  const allQuestions = hasSingleQuestion
+    ? [{ question: plan.question!, options: plan.options || [], allowCustomInput: plan.allowCustomInput !== false }]
+    : questions
+  const [answers, setAnswers] = useState<Record<number, { selected: string; custom: string }>>({})
 
-  const hasQuestion = Boolean(plan.question)
-  const options = plan.options || []
-  const allowCustomInput = plan.allowCustomInput !== false
-  const answer = (customAnswer || selectedAnswer).trim()
-  const isContinueDisabled = disabled || !onAcceptPlan || (hasQuestion && !answer)
+  const getAnswer = (idx: number) => answers[idx] || { selected: '', custom: '' }
+  const hasAnyQuestion = allQuestions.length > 0
+  const allAnswered = allQuestions.every((q, i) => {
+    const a = getAnswer(i)
+    return (a.custom.trim() || a.selected) || !q.options?.length
+  })
+  const isContinueDisabled = disabled || !onAcceptPlan || (hasAnyQuestion && !allAnswered)
+  const combinedAnswer = allQuestions.map((q, i) => {
+    const a = getAnswer(i)
+    return `${q.question}: ${a.custom.trim() || a.selected || 'No answer'}`
+  }).join('\n')
 
   return (
     <div className="w-full max-w-[36rem] whitespace-normal rounded-2xl border border-foreground/50/25 bg-[#151410] p-4 shadow-[0_0_0_1px_rgba(255,184,77,0.08)]">
@@ -1191,7 +1202,9 @@ function PlanActionCard({
         </div>
         <div className="min-w-0">
           <div className="text-sm font-semibold text-white">Plan ready</div>
-          <div className="mt-0.5 text-xs text-white/50">Review it, answer if needed, then continue.</div>
+          <div className="mt-0.5 text-xs text-white/50">
+            {hasAnyQuestion ? `Answer ${allQuestions.length} question${allQuestions.length > 1 ? 's' : ''} to continue, or accept as-is.` : 'Review it, then continue.'}
+          </div>
         </div>
       </div>
 
@@ -1199,25 +1212,22 @@ function PlanActionCard({
         {plan.plan}
       </div>
 
-      {plan.question && (
-        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
+      {allQuestions.map((q, i) => (
+        <div key={i} className="mt-3 rounded-xl border border-white/10 bg-white/[0.035] p-3">
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/50/85">
-            Question
+            {allQuestions.length > 1 ? `Question ${i + 1}` : 'Question'}
           </div>
-          <div className="text-sm leading-6 text-white/85">{plan.question}</div>
+          <div className="text-sm leading-6 text-white/85">{q.question}</div>
 
-          {options.length > 0 && (
+          {q.options && q.options.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
-              {options.map((option) => {
-                const selected = selectedAnswer === option && !customAnswer
+              {q.options.map((option) => {
+                const selected = getAnswer(i).selected === option && !getAnswer(i).custom
                 return (
                   <button
                     key={option}
                     type="button"
-                    onClick={() => {
-                      setSelectedAnswer(option)
-                      setCustomAnswer('')
-                    }}
+                    onClick={() => setAnswers(prev => ({ ...prev, [i]: { selected: option, custom: '' } }))}
                     className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition ${
                       selected
                         ? 'border-foreground/50/70 bg-foreground/50/15 text-white'
@@ -1232,31 +1242,28 @@ function PlanActionCard({
             </div>
           )}
 
-          {allowCustomInput && (
+          {q.allowCustomInput && (
             <input
-              value={customAnswer}
+              value={getAnswer(i).custom}
               onChange={(event) => {
-                setCustomAnswer(event.target.value)
-                if (event.target.value) {
-                  setSelectedAnswer('')
-                }
+                setAnswers(prev => ({ ...prev, [i]: { selected: '', custom: event.target.value } }))
               }}
               placeholder="Type your answer..."
               className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-black/25 px-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-foreground/50/45"
             />
           )}
         </div>
-      )}
+      ))}
 
       <div className="mt-3 flex justify-end">
         <button
           type="button"
-          onClick={() => onAcceptPlan?.(plan, answer || undefined)}
+          onClick={() => onAcceptPlan?.(plan, combinedAnswer || undefined)}
           disabled={isContinueDisabled}
           className="inline-flex h-9 items-center gap-2 rounded-lg border border-foreground/50/40 bg-foreground/50/15 px-3 text-sm font-semibold text-white transition hover:bg-foreground/50/25 disabled:pointer-events-none disabled:opacity-45"
         >
           <Check className="h-4 w-4" />
-          {hasQuestion ? 'Continue with answer' : 'Accept and continue'}
+          {hasAnyQuestion ? 'Continue with answers' : 'Accept and continue'}
         </button>
       </div>
     </div>

@@ -18,12 +18,19 @@ export type MessageImage = {
   image: string
 }
 
+export type PlanQuestionItem = {
+  question: string
+  options: string[]
+  allowCustomInput: boolean
+}
+
 export type MessagePlan = {
   type: 'plan'
   plan: string
   question?: string
   options?: string[]
   allowCustomInput?: boolean
+  questions?: PlanQuestionItem[]
 }
 
 export type MessageFileOp = {

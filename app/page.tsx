@@ -31,7 +31,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { invalidateCache } from '@/lib/caching';
 import type { GitHubWorkspace } from '@/components/github-save';
 import type { PreviewTab } from '@/components/preview';
-import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo, Cpu, Zap, LoaderIcon, ChevronDown, ArrowLeft, Settings, Star, ExternalLink } from 'lucide-react';
+import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo, Cpu, Zap, LoaderIcon, ChevronDown, ArrowLeft, Settings, Star, ExternalLink, Database } from 'lucide-react';
 
 const DEFAULT_MODEL_ID = 'auto'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
@@ -907,6 +907,43 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setTimeout(() => {
         handleSendPrompt(next.message, next.files, next.mode)
       }, 500)
+    }
+
+    // Auto-deploy sandbox when agentic stream ends with a fragment
+    const finalFrag = agenticStream.fragment || fragment
+    if (finalFrag && (finalFrag.code || (finalFrag.files && finalFrag.files.length > 0)) && !result && !warmSandboxResult) {
+      console.log('[Agentic] Auto-deploying sandbox for generated fragment')
+      setIsPreviewLoading(true)
+      setIsPreviewPanelOpen(true)
+      setCurrentTab('fragment')
+      void (async () => {
+        try {
+          const response = await fetch('/api/sandbox', {
+            method: 'POST',
+            body: JSON.stringify({
+              fragment: finalFrag,
+              userID: session?.user?.id,
+              teamID: userTeam?.id,
+              accessToken: session?.access_token,
+              projectID: currentProjectRef.current?.id,
+              sandboxProvider,
+              existingSandboxId: getReusableWarmSandboxId(finalFrag),
+            }),
+          })
+          if (response.ok) {
+            const executionResult = await response.json() as ExecutionResult
+            setResult(executionResult)
+            setCurrentPreview({ fragment: finalFrag, result: executionResult })
+            console.log('[Agentic] Sandbox deployed:', 'url' in executionResult ? executionResult.url : executionResult.sbxId)
+          } else {
+            console.warn('[Agentic] Sandbox deploy failed:', response.status)
+          }
+        } catch (err) {
+          console.warn('[Agentic] Sandbox deploy error:', err)
+        } finally {
+          setIsPreviewLoading(false)
+        }
+      })()
     }
   }, [useAgentic, agenticStream.isStreaming, agenticStream.actions])
 
@@ -2429,6 +2466,24 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     <PanelRightOpen className="h-4 w-4" />
                   )}
                   <span className="hidden sm:inline">{shouldShowPreviewPanel ? 'Close' : 'IDE'}</span>
+                </button>
+                {/* Database tab button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!shouldShowPreviewPanel) {
+                      setIsPreviewPanelOpen(true)
+                    }
+                    setCurrentTab('database')
+                  }}
+                  className={cn(
+                    "inline-flex h-8 items-center justify-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition",
+                    "border-white/10 bg-white/[0.04] text-white/65 hover:bg-white/[0.08] hover:text-white"
+                  )}
+                  title="Database (Supabase)"
+                >
+                  <Database className="h-4 w-4" />
+                  <span className="hidden sm:inline">Database</span>
                 </button>
               </div>
             </div>
