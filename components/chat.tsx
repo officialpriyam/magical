@@ -204,16 +204,35 @@ export function Chat({
         )
       })()}
 
-      {/* Live streaming message — shows during AND after generation when actions exist */}
-      {(agenticStreaming || agenticActions.length > 0) && (
-        <LiveStreamingMessage
-          key="live-stream"
-          actions={agenticActions}
-          todos={agenticTodos}
-          isStreaming={agenticStreaming}
-          onStop={onStop}
-        />
-      )}
+      {/* Live streaming message — shows during and after generation when actions exist */}
+      {(() => {
+        // During streaming: use live agentic state
+        if (agenticStreaming && agenticActions.length > 0) {
+          return (
+            <LiveStreamingMessage
+              key="live-stream"
+              actions={agenticActions}
+              todos={agenticTodos}
+              isStreaming={true}
+              onStop={onStop}
+            />
+          )
+        }
+        // After streaming: use persisted state from the last assistant message
+        const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
+        if (lastAssistant?.agenticActions && lastAssistant.agenticActions.length > 0 && !agenticStreaming) {
+          return (
+            <LiveStreamingMessage
+              key={`persisted-${messages.length}`}
+              actions={lastAssistant.agenticActions}
+              todos={lastAssistant.agenticTodos || []}
+              isStreaming={false}
+              elapsed={lastAssistant.agenticElapsed}
+            />
+          )
+        }
+        return null
+      })()}
       {/* Status card — only during loading, NOT after generation (artifact card handles that) */}
       {(
         !useAgentic ||
@@ -244,13 +263,15 @@ function LiveStreamingMessage({
   todos,
   isStreaming,
   onStop,
+  elapsed: initialElapsed,
 }: {
   actions: ToolAction[]
   todos: TodoItem[]
   isStreaming: boolean
   onStop?: () => void
+  elapsed?: number
 }) {
-  const [elapsed, setElapsed] = useState(0)
+  const [elapsed, setElapsed] = useState(initialElapsed || 0)
   const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set())
   const [expandedReads, setExpandedReads] = useState(false)
   const [expandedWrites, setExpandedWrites] = useState(false)
@@ -264,13 +285,13 @@ function LiveStreamingMessage({
     }
   }, [isStreaming])
 
-  // Live timer
+  // Live timer (only during streaming; for persisted state, use initialElapsed)
   useEffect(() => {
-    if (!isStreaming || actions.length === 0) return
+    if (!isStreaming || actions.length === 0 || initialElapsed) return
     const start = actions[0].timestamp
     const interval = setInterval(() => setElapsed(Date.now() - start), 1000)
     return () => clearInterval(interval)
-  }, [isStreaming, actions.length])
+  }, [isStreaming, actions.length, initialElapsed])
 
 
 
@@ -438,14 +459,15 @@ function LiveStreamingMessage({
                       return next
                     })
                   }}
-                  className="flex items-center gap-1.5 py-1 text-[14px] text-white/50 hover:text-white/65 transition"
+                  className="flex items-center gap-2 py-1.5 text-[15px] text-white/70 hover:text-white/85 transition"
                 >
-                  {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                  <Brain className="h-3 w-3 text-purple-400/50" />
-                  <span className="font-medium text-white/60">Thought for {formatDuration(duration)}</span>
+                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <Brain className="h-4 w-4 text-purple-400/70" />
+                  <span className="font-medium text-white/80">Thought for {formatDuration(duration)}</span>
+                  {!isStreaming && <Check className="h-4 w-4 text-emerald-400 shrink-0" />}
                   {/* Show preview of thinking text when collapsed */}
                   {!isExpanded && hasThinkingContent && (
-                    <span className="text-white/35 truncate max-w-[250px]">— {thinkingText.slice(0, 80)}{thinkingText.length > 80 ? '...' : ''}</span>
+                    <span className="text-white/50 truncate max-w-[300px]">— {thinkingText.slice(0, 80)}{thinkingText.length > 80 ? '...' : ''}</span>
                   )}
                 </button>
                 <AnimatePresence>
@@ -456,7 +478,7 @@ function LiveStreamingMessage({
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden pl-6"
                     >
-                      <div className="py-1 text-[14px] leading-relaxed text-white/60 whitespace-pre-wrap rounded-lg bg-white/[0.03] px-3 py-2 border border-white/[0.05]">
+                      <div className="py-1 text-[15px] leading-relaxed text-white/70 whitespace-pre-wrap rounded-lg bg-white/[0.03] px-3 py-3 border border-white/[0.06]">
                         {renderMarkdownText(thinkingText)}
                       </div>
                     </motion.div>
@@ -484,7 +506,7 @@ function LiveStreamingMessage({
                 <div className="flex items-center gap-2">
                   <span className="text-[12px] text-white/25">⋮</span>
                   <Search className="h-3 w-3 text-[#1EAEDB]/70" />
-                  <span className="text-[13px] text-white/55">Searched: <span className="text-[#1EAEDB]/80">{action.content}</span></span>
+                  <span className="text-[13px] text-white/70">Searched: <span className="text-[#1EAEDB]/80">{action.content}</span></span>
                 </div>
                 {results.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pl-6 mt-1">
@@ -522,7 +544,7 @@ function LiveStreamingMessage({
                   href={action.content}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[13px] text-[#1EAEDB]/80 hover:text-[#1EAEDB] hover:underline truncate max-w-[300px]"
+                  className="text-[14px] text-[#1EAEDB]/80 hover:text-[#1EAEDB] hover:underline truncate max-w-[300px]"
                 >
                   {action.detail || action.content}
                 </a>
@@ -545,7 +567,7 @@ function LiveStreamingMessage({
               ) : (
                 <ActionIcon className={`h-3 w-3 ${color}`} />
               )}
-              <span className="text-[14px] text-white/55 truncate">{label}</span>
+              <span className="text-[14px] text-white/70 truncate">{label}</span>
             </motion.div>
           )
         })}
@@ -557,7 +579,7 @@ function LiveStreamingMessage({
               {expandedReads ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               <span className="text-white/30">⋮</span>
               <Eye className="h-3 w-3 text-blue-400/50" />
-              <span className="font-medium">Explore · {fileReadActions.length} File{fileReadActions.length === 1 ? '' : 's'}</span>
+              <span className="font-medium text-white/60">Explore · {fileReadActions.length} File{fileReadActions.length === 1 ? '' : 's'}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-0.5 pl-5">
@@ -572,7 +594,7 @@ function LiveStreamingMessage({
                       className="flex items-center gap-2 py-0.5"
                     >
                       <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                      <span className="text-[13px] text-white/45">Read</span>
+                      <span className="text-[13px] text-white/60">Read</span>
                       <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
                     </motion.div>
                   )
@@ -589,7 +611,7 @@ function LiveStreamingMessage({
               {expandedWrites ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               <span className="text-white/30">⋮</span>
               <FileEdit className="h-3 w-3 text-emerald-400/50" />
-              <span className="font-medium">Written {fileWriteActions.length} file{fileWriteActions.length === 1 ? '' : 's'}</span>
+              <span className="font-medium text-white/60">Written {fileWriteActions.length} file{fileWriteActions.length === 1 ? '' : 's'}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-0.5 pl-5">
@@ -605,7 +627,7 @@ function LiveStreamingMessage({
                       className="flex items-center gap-2 py-0.5"
                     >
                       <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                      <span className="text-[13px] text-white/45">{isEdit ? 'Edited' : 'Written'}</span>
+                      <span className="text-[13px] text-white/60">{isEdit ? 'Edited' : 'Written'}</span>
                       <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
                     </motion.div>
                   )
@@ -619,29 +641,40 @@ function LiveStreamingMessage({
 
       </div>
 
-      {/* In-message to-dos */}
+      {/* In-message to-dos — styled like screenshot with circle outlines */}
       {todos.length > 0 && (
-        <div className="pl-8 mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-          <div className="flex items-center gap-1.5 text-[11px] text-white/50 mb-1.5">
-            <ListTodo className="h-3.5 w-3.5 text-white/40" />
-            <span className="font-medium">To-dos</span>
-            <span className="text-white/30">{todos.filter(t => t.completed).length}/{todos.length}</span>
-            {todos.every(t => t.completed) && <Check className="h-3 w-3 text-emerald-400" />}
+        <div className="mt-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
+          <div className="flex items-center gap-2 mb-3">
+            <ListTodo className="h-4 w-4 text-white/50" />
+            <span className="text-[14px] font-medium text-white/80">To-dos</span>
+            <span className="text-[13px] text-white/40">{todos.filter(t => t.completed).length}/{todos.length}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-white/30 ml-auto" />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-2.5">
             {todos.map((todo) => (
-              <div key={todo.id} className="flex items-center gap-2 py-0.5">
+              <motion.div
+                key={todo.id}
+                initial={false}
+                animate={{ opacity: 1 }}
+                className="flex items-center gap-3 py-0.5"
+              >
                 {todo.completed ? (
-                  <Check className="h-3 w-3 shrink-0 text-emerald-400" />
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="h-[18px] w-[18px] shrink-0 rounded-full border-2 border-emerald-400 bg-emerald-400/20 flex items-center justify-center"
+                  >
+                    <Check className="h-3 w-3 text-emerald-400" />
+                  </motion.div>
                 ) : isStreaming ? (
-                  <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400/50" />
+                  <LoaderIcon className="h-[18px] w-[18px] shrink-0 animate-spin text-blue-400/60" />
                 ) : (
-                  <div className="h-3 w-3 shrink-0 rounded-full border border-white/20" />
+                  <div className="h-[18px] w-[18px] shrink-0 rounded-full border-2 border-white/25" />
                 )}
-                <span className={`text-[11px] ${todo.completed ? 'text-white/35 line-through' : 'text-white/55'}`}>
+                <span className={`text-[14px] ${todo.completed ? 'text-white/50 line-through' : 'text-white/80'}`}>
                   {todo.text}
                 </span>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -775,7 +808,7 @@ function AgenticLiveActions({
                 ) : (
                   <Check className="h-3 w-3 shrink-0 text-emerald-400/60" />
                 )}
-                <span className="text-[11px] text-white/50">{action.content}</span>
+                <span className="text-[13px] text-white/60">{action.content}</span>
                 <span className="shrink-0 tabular-nums text-[10px] text-white/20">{formatDuration(getActionDuration(i, statusActions))}</span>
               </motion.div>
             ))}

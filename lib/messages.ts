@@ -1,6 +1,7 @@
 import { FragmentSchema } from './schema'
 import { ExecutionResult } from './types'
 import { DeepPartial } from 'ai'
+import { type ToolAction, type TodoItem } from './hooks/use-agentic-stream'
 
 export type MessageText = {
   type: 'text'
@@ -48,6 +49,9 @@ export type Message = {
   content: MessageContent[]
   object?: DeepPartial<FragmentSchema>
   result?: ExecutionResult
+  agenticActions?: ToolAction[]
+  agenticTodos?: TodoItem[]
+  agenticElapsed?: number
 }
 
 export function formatPlanForModel(plan: MessagePlan) {

@@ -31,7 +31,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { invalidateCache } from '@/lib/caching';
 import type { GitHubWorkspace } from '@/components/github-save';
 import type { PreviewTab } from '@/components/preview';
-import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo, Cpu, Zap } from 'lucide-react';
+import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo, Cpu, Zap, LoaderIcon } from 'lucide-react';
 
 const DEFAULT_MODEL_ID = 'auto'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
@@ -741,12 +741,34 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }, [useAgentic, agenticStream.fragment, agenticStream.actions])
 
-  // Safety: when agentic streaming ends, ensure an assistant message exists
+  // Safety: when agentic streaming ends, ensure an assistant message exists AND persist agentic state
   useEffect(() => {
     if (!useAgentic || agenticStream.isStreaming) return
     // Only run once when streaming just ended
     const lastMsg = messagesRef.current[messagesRef.current.length - 1]
     const hasAssistantResponse = lastMsg?.role === 'assistant'
+
+    // Calculate elapsed time
+    const elapsed = agenticStream.actions.length > 0
+      ? Date.now() - agenticStream.actions[0].timestamp
+      : 0
+
+    // Always persist agentic state into the assistant message
+    if (hasAssistantResponse && agenticStream.actions.length > 0) {
+      setMessages(prev => {
+        const next = [...prev]
+        const lastIdx = next.length - 1
+        next[lastIdx] = {
+          ...next[lastIdx],
+          agenticActions: agenticStream.actions,
+          agenticTodos: agenticStream.todos,
+          agenticElapsed: elapsed,
+        } as Message
+        messagesRef.current = next
+        return next
+      })
+    }
+
     if (!hasAssistantResponse && messagesRef.current.length > 0) {
       // Create a minimal assistant message so the chat isn't empty
       const frag = agenticStream.fragment || fragment
@@ -757,6 +779,16 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       if (fragWithCommentary && (fragWithCommentary.code || fragWithCommentary.files || fragWithCommentary.title || fragWithCommentary.description || fragWithCommentary.commentary)) {
         setMessages(prev => {
           const nextMessages = withLatestAssistantFragment(prev, fragWithCommentary)
+          // Also persist agentic state
+          const lastIdx = nextMessages.length - 1
+          if (lastIdx >= 0) {
+            nextMessages[lastIdx] = {
+              ...nextMessages[lastIdx],
+              agenticActions: agenticStream.actions,
+              agenticTodos: agenticStream.todos,
+              agenticElapsed: elapsed,
+            } as Message
+          }
           messagesRef.current = nextMessages
           return nextMessages
         })
@@ -870,7 +902,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     messagesRef.current = updatedMessages
     setMessages(updatedMessages)
     setErrorMessage('')
-    setAutoFixMessage(`Automatic fix ${attempt}/${MAX_AUTO_FIX_ATTEMPTS} is running...`)
+    setAutoFixMessage(`Auto-fixing code (${attempt}/${MAX_AUTO_FIX_ATTEMPTS}) — analyzing the error and regenerating...`)
     setCurrentTab('code')
 
     try {
@@ -2052,12 +2084,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const statusNotices = (
     <>
       {autoFixMessage && (
-        <div className="flex items-center justify-between gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-600 dark:text-amber-400 text-sm">
-          <span className="min-w-0 flex-1 truncate">{autoFixMessage}</span>
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 4 }}
+          className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-sm"
+        >
+          <LoaderIcon className="h-4 w-4 animate-spin text-amber-400 shrink-0" />
+          <span className="flex-1 min-w-0">{autoFixMessage}</span>
           {autoFixMessage.includes('Automatic fix') && (
-            <button onClick={handleStopGeneration} className="px-3 py-1.5 rounded-lg hover:bg-amber-500/20 text-xs font-medium transition-colors shrink-0">Stop</button>
+            <button onClick={handleStopGeneration} className="px-3 py-1.5 rounded-lg hover:bg-amber-500/20 text-xs font-medium transition-colors shrink-0 text-amber-300">Stop</button>
           )}
-        </div>
+        </motion.div>
       )}
       <AnimatePresence>
       {(error || errorMessage) && (
@@ -2066,10 +2104,16 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.2 }}
-          className="flex items-center justify-between gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm"
+          className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm"
         >
-          <span className="min-w-0 flex-1 truncate">{errorMessage || error?.message || 'AI generation failed.'}</span>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-400" />
+            <div className="flex-1 min-w-0">
+              <p className="text-red-400 font-medium">Generation failed</p>
+              <p className="mt-1 text-xs text-red-400/70 break-words">{errorMessage || error?.message || 'An unexpected error occurred. Please try again.'}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
             {fragment && (
               <button
                 onClick={() => {
@@ -2079,12 +2123,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     startAutoFix(fragment, errorMessage || error?.message || 'Unknown error')
                   }
                 }}
-                className="px-3 py-1.5 rounded-lg hover:bg-amber-500/20 text-amber-500 text-xs font-medium transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-xs font-medium transition-colors text-amber-400"
               >
                 Auto Fix
               </button>
             )}
-            <button onClick={retry} className="px-3 py-1.5 rounded-lg hover:bg-red-500/20 text-xs font-medium transition-colors">Retry</button>
+            <button onClick={retry} className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium transition-colors text-white/60">Retry</button>
           </div>
         </motion.div>
       )}
