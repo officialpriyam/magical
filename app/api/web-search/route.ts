@@ -8,6 +8,87 @@ interface SearchResult {
   snippet: string
 }
 
+// ─── Self-hosted open-webSearch MCP ──────────────────────
+let owSessionCache: { sessionId: string; expiresAt: number } | null = null
+
+async function getOpenWebSearchSession(): Promise<string | null> {
+  const baseUrl = process.env.OPEN_WEBSEARCH_URL
+  if (!baseUrl) return null
+  if (owSessionCache && Date.now() < owSessionCache.expiresAt) return owSessionCache.sessionId
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/sse`, {
+      headers: { 'Accept': 'text/event-stream' },
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    const reader = res.body?.getReader()
+    if (!reader) return null
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let sessionId = ''
+    const readPromise = (async () => {
+      const startTime = Date.now()
+      while (Date.now() - startTime < 6000) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        for (let i = 0; i < lines.length - 1; i++) {
+          if (lines[i].startsWith('event: endpoint')) {
+            const dataLine = lines[i + 1]
+            if (dataLine?.startsWith('data: ')) {
+              const urlMatch = dataLine.slice(6).trim().match(/sessionId=([\w-]+)/)
+              if (urlMatch) sessionId = urlMatch[1]
+            }
+          }
+        }
+        if (sessionId) break
+      }
+    })()
+    await Promise.race([readPromise, new Promise(r => setTimeout(r, 7000))])
+    reader.cancel().catch(() => {})
+    if (sessionId) {
+      owSessionCache = { sessionId, expiresAt: Date.now() + 5 * 60 * 1000 }
+    }
+    return sessionId || null
+  } catch { return null }
+}
+
+async function callOpenWebSearchMCP(method: string, params: Record<string, any>): Promise<any> {
+  const baseUrl = process.env.OPEN_WEBSEARCH_URL
+  if (!baseUrl) return null
+  const sessionId = await getOpenWebSearchSession()
+  if (!sessionId) return null
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/messages?sessionId=${sessionId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: method, arguments: params } }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!response.ok) { owSessionCache = null; return null }
+    const data = await response.json()
+    return data?.result || null
+  } catch { return null }
+}
+
+async function searchOpenWebSearch(query: string): Promise<SearchResult[]> {
+  const result = await callOpenWebSearchMCP('search', { query, limit: 5 })
+  if (!result) return []
+  let text = Array.isArray(result.content) ? result.content.map((c: any) => c.text || '').join('') : typeof result === 'string' ? result : ''
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text)
+    const results = Array.isArray(parsed) ? parsed : parsed.results || parsed.data || []
+    return results.slice(0, 5).map((r: any) => ({ title: r.title || '', url: r.url || r.link || '', snippet: r.description || r.snippet || r.text || '' }))
+  } catch {
+    const urls = text.match(/https?:\/\/[^\s"']+/g) || []
+    return urls.slice(0, 5).map((url: string) => ({ title: url, url, snippet: '' }))
+  }
+}
+
 async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
   const encoded = encodeURIComponent(query)
 
@@ -197,16 +278,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Query parameter "q" is required' }, { status: 400 })
   }
 
-  // Try providers in order: Exa → Brave → DuckDuckGo
-  let results = await searchExa(query.trim())
-
-  if (results.length === 0) {
-    results = await searchBrave(query.trim())
-  }
-
-  if (results.length === 0) {
-    results = await searchDuckDuckGo(query.trim())
-  }
+  // Try providers in order: open-webSearch → Exa → Brave → DuckDuckGo
+  let results = await searchOpenWebSearch(query.trim())
+  if (results.length === 0) results = await searchExa(query.trim())
+  if (results.length === 0) results = await searchBrave(query.trim())
+  if (results.length === 0) results = await searchDuckDuckGo(query.trim())
 
   return NextResponse.json({ results })
 }
@@ -218,16 +294,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'query is required' }, { status: 400 })
   }
 
-  // Try providers in order: Exa → Brave → DuckDuckGo
-  let results = await searchExa(query.trim())
-
-  if (results.length === 0) {
-    results = await searchBrave(query.trim())
-  }
-
-  if (results.length === 0) {
-    results = await searchDuckDuckGo(query.trim())
-  }
+  // Try providers in order: open-webSearch → Exa → Brave → DuckDuckGo
+  let results = await searchOpenWebSearch(query.trim())
+  if (results.length === 0) results = await searchExa(query.trim())
+  if (results.length === 0) results = await searchBrave(query.trim())
+  if (results.length === 0) results = await searchDuckDuckGo(query.trim())
 
   return NextResponse.json({ results })
 }

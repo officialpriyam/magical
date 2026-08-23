@@ -1324,44 +1324,142 @@ async function searchDuckDuckGoDirect(query: string): Promise<{ title: string; u
   }
 }
 
-// ─── Self-hosted open-webSearch integration ────────────────
-async function searchOpenWebSearch(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
+// ─── Self-hosted open-webSearch MCP integration ──────────
+// The hosted instance uses MCP SSE transport:
+// 1. GET /sse → returns endpoint with sessionId
+// 2. POST /messages?sessionId=... → sends JSON-RPC requests
+
+let owSessionCache: { sessionId: string; expiresAt: number } | null = null
+
+async function getOpenWebSearchSession(): Promise<string | null> {
   const baseUrl = process.env.OPEN_WEBSEARCH_URL
-  if (!baseUrl) return []
+  if (!baseUrl) return null
+  // Reuse cached session if still valid (5 min TTL)
+  if (owSessionCache && Date.now() < owSessionCache.expiresAt) {
+    return owSessionCache.sessionId
+  }
   try {
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/search`, {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/sse`, {
+      headers: { 'Accept': 'text/event-stream' },
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    // Read the SSE stream to get the endpoint event
+    const reader = res.body?.getReader()
+    if (!reader) return null
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let sessionId = ''
+    // Read until we get the endpoint event or timeout
+    const readPromise = (async () => {
+      const startTime = Date.now()
+      while (Date.now() - startTime < 6000) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        // Parse SSE events
+        const lines = buffer.split('\n')
+        for (let i = 0; i < lines.length - 1; i++) {
+          const line = lines[i]
+          if (line.startsWith('event: endpoint')) {
+            const dataLine = lines[i + 1]
+            if (dataLine?.startsWith('data: ')) {
+              const endpoint = dataLine.slice(6).trim()
+              // Extract sessionId from URL like /messages?sessionId=xxx
+              const urlMatch = endpoint.match(/sessionId=([\w-]+)/)
+              if (urlMatch) sessionId = urlMatch[1]
+            }
+          }
+        }
+        if (sessionId) break
+      }
+    })()
+    await Promise.race([readPromise, new Promise(r => setTimeout(r, 7000))])
+    reader.cancel().catch(() => {})
+    if (sessionId) {
+      owSessionCache = { sessionId, expiresAt: Date.now() + 5 * 60 * 1000 }
+      console.log(`[OpenWebSearch] Got MCP session: ${sessionId.slice(0, 8)}...`)
+    }
+    return sessionId || null
+  } catch (e) {
+    console.warn('[OpenWebSearch] Failed to get session:', e)
+    return null
+  }
+}
+
+async function callOpenWebSearchMCP(method: string, params: Record<string, any>): Promise<any> {
+  const baseUrl = process.env.OPEN_WEBSEARCH_URL
+  if (!baseUrl) return null
+  const sessionId = await getOpenWebSearchSession()
+  if (!sessionId) return null
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/messages?sessionId=${sessionId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, limit: 5, engines: ['bing', 'duckduckgo', 'startpage'] }),
-      signal: AbortSignal.timeout(12000),
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'tools/call',
+        params: { name: method, arguments: params },
+      }),
+      signal: AbortSignal.timeout(15000),
     })
-    if (!response.ok) return []
+    if (!response.ok) {
+      // Session might have expired — clear cache and retry once
+      if (response.status === 400 || response.status === 403) {
+        owSessionCache = null
+      }
+      return null
+    }
     const data = await response.json()
-    if (data.status !== 'ok' || !data.data) return []
-    const results = Array.isArray(data.data) ? data.data : data.data.results || []
+    return data?.result || null
+  } catch { return null }
+}
+
+async function searchOpenWebSearch(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
+  const result = await callOpenWebSearchMCP('search', { query, limit: 5 })
+  if (!result) return []
+  // MCP tool result format: { content: [{ type: 'text', text: '...' }] }
+  let text = ''
+  if (Array.isArray(result.content)) {
+    text = result.content.map((c: any) => c.text || '').join('')
+  } else if (typeof result === 'string') {
+    text = result
+  }
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text)
+    const results = Array.isArray(parsed) ? parsed : parsed.results || parsed.data || []
     return results.slice(0, 5).map((r: any) => ({
       title: r.title || '',
       url: r.url || r.link || '',
       snippet: r.description || r.snippet || r.text || '',
     }))
-  } catch { return [] }
+  } catch {
+    // If not JSON, try to extract URLs from text
+    const urls = text.match(/https?:\/\/[^\s"']+/g) || []
+    return urls.slice(0, 5).map((url: string) => ({ title: url, url, snippet: '' }))
+  }
 }
 
 async function fetchOpenWebSearchUrl(url: string): Promise<{ url: string; title: string; content: string } | null> {
-  const baseUrl = process.env.OPEN_WEBSEARCH_URL
-  if (!baseUrl) return null
+  const result = await callOpenWebSearchMCP('fetchWebContent', { url, maxChars: 30000 })
+  if (!result) return null
+  let text = ''
+  if (Array.isArray(result.content)) {
+    text = result.content.map((c: any) => c.text || '').join('')
+  } else if (typeof result === 'string') {
+    text = result
+  }
+  if (!text) return null
   try {
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/fetch-web`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, maxChars: 30000 }),
-      signal: AbortSignal.timeout(15000),
-    })
-    if (!response.ok) return null
-    const data = await response.json()
-    if (data.status !== 'ok' || !data.data) return null
-    return { url, title: data.data.title || url, content: data.data.content || data.data.text || '' }
-  } catch { return null }
+    const parsed = JSON.parse(text)
+    return { url, title: parsed.title || url, content: parsed.content || parsed.text || text }
+  } catch {
+    return { url, title: url, content: text }
+  }
 }
 
 // ─── URL auto-fetch ────────────────────────────────────────
