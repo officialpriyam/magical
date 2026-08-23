@@ -23,17 +23,11 @@ export async function createE2BSandbox(
     return create({ ...opts, secure: false })
   }
 
-  try {
-    return await create(opts)
-  } catch (error) {
-    if (
-      process.env.E2B_SECURE_ACCESS !== 'true' &&
-      isSecuredAccessCompatibilityError(error)
-    ) {
-      console.warn('Retrying E2B sandbox creation with secure access disabled for an incompatible template.')
-      return create({ ...opts, secure: false })
-    }
-
-    throw error
+  if (process.env.E2B_SECURE_ACCESS === 'true') {
+    return create({ ...opts, secure: true })
   }
+
+  // Default: skip secured access to avoid compatibility errors
+  // Most templates don't support it yet — use secure:false by default
+  return create({ ...opts, secure: false })
 }

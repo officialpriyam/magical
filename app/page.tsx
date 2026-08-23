@@ -2504,18 +2504,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     <div className="w-20" />
                     {/* Center nav links */}
                     <div className="hidden md:flex items-center gap-6">
-                      <Link href="/docs" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Docs</Link>
-                      <Link href="/community" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Community</Link>
-                      <Link href="/projects" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Templates</Link>
+                      <button type="button" onClick={() => router.push('/docs')} className="text-sm text-white/50 hover:text-white transition cursor-pointer bg-transparent border-none p-0">Docs</button>
+                      <button type="button" onClick={() => router.push('/community')} className="text-sm text-white/50 hover:text-white transition cursor-pointer bg-transparent border-none p-0">Community</button>
+                      <button type="button" onClick={() => router.push('/projects')} className="text-sm text-white/50 hover:text-white transition cursor-pointer bg-transparent border-none p-0">Templates</button>
                     </div>
                     {/* Right buttons */}
                     <div className="flex items-center gap-3">
-                      <Link href="/auth/login" className="text-sm text-white/60 hover:text-white transition cursor-pointer">
+                      <button type="button" onClick={() => router.push('/auth/login')} className="text-sm text-white/60 hover:text-white transition cursor-pointer bg-transparent border-none p-0">
                         Sign In
-                      </Link>
-                      <Link href="/auth/register" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90 cursor-pointer">
+                      </button>
+                      <button type="button" onClick={() => router.push('/auth/register')} className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90 cursor-pointer border-none">
                         Start for Free
-                      </Link>
+                      </button>
                     </div>
                   </nav>
                 )}
@@ -2527,9 +2527,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   >
                     <div className="w-20" />
                     <div className="hidden md:flex items-center gap-6">
-                      <Link href="/docs" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Docs</Link>
-                      <Link href="/community" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Community</Link>
-                      <Link href="/projects" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Templates</Link>
+                      <button type="button" onClick={() => router.push('/docs')} className="text-sm text-white/50 hover:text-white transition cursor-pointer bg-transparent border-none p-0">Docs</button>
+                      <button type="button" onClick={() => router.push('/community')} className="text-sm text-white/50 hover:text-white transition cursor-pointer bg-transparent border-none p-0">Community</button>
+                      <button type="button" onClick={() => router.push('/projects')} className="text-sm text-white/50 hover:text-white transition cursor-pointer bg-transparent border-none p-0">Templates</button>
                     </div>
                     <div className="w-20" />
                   </nav>
