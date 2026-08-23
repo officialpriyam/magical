@@ -2495,20 +2495,43 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             >
               <div className="relative z-10 flex w-full flex-col">
                 <div className="flex flex-1 flex-col items-center justify-center px-3 pt-12 text-center sm:px-4 sm:pt-16">
-                  <div className="mb-4 sm:mb-6">
-                    <HeroPillSecond />
-                  </div>
-                  <h1 className="mb-5 max-w-3xl text-xl font-semibold tracking-normal text-white sm:text-2xl sm:mb-7 md:text-4xl">
-                    Let&apos;s build something, {displayName}
-                  </h1>
-                  {!session && (
-                    <button
-                      type="button"
-                      onClick={() => setAuthDialog(true)}
-                      className="mb-5 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
-                    >
-                      Sign in to save chats
-                    </button>
+                  {!session ? (
+                    <>
+                      {/* Landing page for signed-out users — like Meku */}
+                      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-purple-600/8 rounded-full blur-[160px]" />
+                        <div className="absolute bottom-1/3 left-1/3 w-[400px] h-[400px] bg-blue-500/8 rounded-full blur-[128px]" />
+                        <div className="absolute top-1/2 right-1/4 w-[300px] h-[300px] bg-pink-500/5 rounded-full blur-[128px]" />
+                      </div>
+                      <div className="mb-5">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {[...Array(5)].map((_, i) => (
+                            <div key={i} className="h-7 w-7 rounded-full border-2 border-[#0a0b0a] bg-gradient-to-br from-white/20 to-white/5 -ml-2 first:ml-0" style={{ zIndex: 5 - i }} />
+                          ))}
+                        </div>
+                        <p className="mt-3 text-sm text-white/40">Thousands of builders turning ideas into full-stack web apps with Magical AI</p>
+                      </div>
+                      <h1 className="mb-6 max-w-3xl text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl">
+                        Build Full-Stack Web Apps & Sites<br />with Simple AI Prompts
+                      </h1>
+                      <div className="flex items-center gap-3 mb-6">
+                        <button type="button" onClick={() => { router.push('/auth/register') }} className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90">
+                          Start for Free
+                        </button>
+                        <button type="button" onClick={() => { router.push('/auth/login') }} className="rounded-full border border-white/15 bg-white/[0.06] px-5 py-2.5 text-sm font-medium text-white/80 transition hover:bg-white/[0.1]">
+                          Sign In
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mb-4 sm:mb-6">
+                        <HeroPillSecond />
+                      </div>
+                      <h1 className="mb-5 max-w-3xl text-xl font-semibold tracking-normal text-white sm:text-2xl sm:mb-7 md:text-4xl">
+                        Let&apos;s build something, {displayName}
+                      </h1>
+                    </>
                   )}
                   <div className="w-full max-w-2xl">
                     {statusNotices}

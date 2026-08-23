@@ -290,9 +290,8 @@ export function Preview({
                   />
                 </ErrorBoundary>
               </div>
-            </TabsContent>
-            <TabsContent value="database" className="h-full m-0 p-0">
-              <DatabasePanel projectId={projectId} isSupabaseConnected={true} />
+            </TabsContent>              <TabsContent value="database" className="h-full m-0 p-0">
+              <DatabasePanel projectId={projectId} isSupabaseConnected={!!projectId} />
             </TabsContent>
           </div>
       </Tabs>

@@ -267,11 +267,23 @@ export async function saveMessage(
   return safeApiCall(
     supabase!,
     async () => {
+      // Merge agentic state into object_data so it persists across refresh
+      const objectWithAgentic = message.object ? {
+        ...((typeof message.object === 'object' && message.object !== null) ? message.object : {}),
+        _agenticActions: message.agenticActions || [],
+        _agenticTodos: message.agenticTodos || [],
+        _agenticElapsed: message.agenticElapsed || 0,
+      } : (message.agenticActions?.length ? {
+        _agenticActions: message.agenticActions,
+        _agenticTodos: message.agenticTodos || [],
+        _agenticElapsed: message.agenticElapsed || 0,
+      } : message.object)
+
       const { error } = await supabase!.rpc('save_message_and_update_project', {
         project_id_param: projectId,
         role_param: message.role,
         content_param: message.content,
-        object_data_param: message.object,
+        object_data_param: objectWithAgentic,
         result_data_param: message.result,
         sequence_number_param: sequenceNumber,
       })
@@ -345,12 +357,21 @@ export async function getProjectMessages(
 
     if (error) throw error
 
-    const messages = data?.map((msg: DbMessage) => ({
-      role: msg.role,
-      content: msg.content,
-      object: msg.object_data,
-      result: msg.result_data,
-    })) || []
+    const messages = data?.map((msg: DbMessage): Message => {
+      const obj = msg.object_data as Record<string, any> | null
+      const cleanedObj = obj ? Object.fromEntries(
+        Object.entries(obj).filter(([k]) => !k.startsWith('_'))
+      ) : undefined
+      return {
+        role: msg.role,
+        content: msg.content,
+        object: cleanedObj as any || undefined,
+        result: msg.result_data,
+        agenticActions: (obj?._agenticActions || []) as any,
+        agenticTodos: (obj?._agenticTodos || []) as any,
+        agenticElapsed: (obj?._agenticElapsed || 0) as any,
+      }
+    }) || []
 
     setInCache(cacheKey, messages)
     return messages
