@@ -330,22 +330,11 @@ async function runPipeline({
     emitAction('commentary', `Task complexity: ${complexity}. Dispatching ${agentsNeeded.length} agents...`)
     emitProgress(0, totalSteps)
 
-    // Generate initial todo list from the agent plan
-    const agentDisplayNames: Record<string, string> = {
-      planner: 'Plan the approach',
-      architect: 'Design the architecture',
-      frontend: 'Build the frontend',
-      backend: 'Build the backend',
-      reviewer: 'Review code quality',
-      optimizer: 'Optimize performance',
-      fixer: 'Fix issues and bugs',
+    // Generate initial todo list from the user prompt using LLM
+    const initialTodos = await generateTodosFromPrompt(messages, model, config, agentsNeeded)
+    if (initialTodos.length > 0) {
+      emitTodos(initialTodos)
     }
-    const initialTodos = agentsNeeded.map(role => ({
-      id: `agent-${role}`,
-      text: agentDisplayNames[role] || `${AGENT_DISPLAY_NAMES[role]} agent`,
-      completed: false,
-    }))
-    emitTodos(initialTodos)
 
     // ── Step 2: Run agents ────────────────────────────────────
     const plan = PARALLEL_GROUPS[complexity]
@@ -492,14 +481,11 @@ async function runPipeline({
             }
           }
 
-          // Mark the agent's todo as completed if it exists
+          // Mark the next incomplete todo as completed (sequential — agents run in order)
           if (currentTodos.length > 0) {
-            const agentTodoIdx = currentTodos.findIndex(t =>
-              t.text.toLowerCase().includes(AGENT_DISPLAY_NAMES[role].toLowerCase()) ||
-              t.text.toLowerCase().includes(role)
-            )
-            if (agentTodoIdx >= 0) {
-              currentTodos[agentTodoIdx] = { ...currentTodos[agentTodoIdx], completed: true }
+            const nextIncomplete = currentTodos.findIndex(t => !t.completed)
+            if (nextIncomplete >= 0) {
+              currentTodos[nextIncomplete] = { ...currentTodos[nextIncomplete], completed: true }
               emitTodos(currentTodos)
             }
           }
@@ -687,8 +673,21 @@ function extractTodosFromPlan(output: string): { id: string; text: string; compl
         else if (c === '{') depth++
         else if (c === '}') { depth--; if (depth === 0) {
           const parsed = JSON.parse(jsonStr.slice(startIdx, i + 1))
-          // Extract steps from the plan
-          if (Array.isArray(parsed.steps)) {
+          // First, check for explicit todos array from planner
+          if (Array.isArray(parsed.todos) && parsed.todos.length > 0) {
+            for (const todo of parsed.todos.slice(0, 8)) {
+              const text = todo.text || todo.description || todo
+              if (typeof text === 'string' && text.length > 5) {
+                todos.push({
+                  id: `todo-${todos.length}`,
+                  text: text.trim(),
+                  completed: false,
+                })
+              }
+            }
+          }
+          // If no explicit todos, extract from steps
+          if (todos.length === 0 && Array.isArray(parsed.steps)) {
             for (const step of parsed.steps) {
               if (step.description) {
                 todos.push({
@@ -699,8 +698,8 @@ function extractTodosFromPlan(output: string): { id: string; text: string; compl
               }
             }
           }
-          // Also extract pages/components if present
-          if (parsed.architecture) {
+          // Also extract pages/components if still no todos
+          if (todos.length === 0 && parsed.architecture) {
             if (Array.isArray(parsed.architecture.pages)) {
               for (const page of parsed.architecture.pages) {
                 todos.push({
@@ -740,6 +739,122 @@ function extractTodosFromPlan(output: string): { id: string; text: string; compl
   }
 
   return todos.slice(0, 15) // Limit to 15 todos
+}
+
+// ─── Generate real todos from user prompt using LLM ────────
+async function generateTodosFromPrompt(
+  messages: ModelMessage[],
+  model: LLMModel,
+  config: LLMModelConfig,
+  agentsNeeded: AgentRole[],
+): Promise<{ id: string; text: string; completed: boolean }[]> {
+  try {
+    const fallbackChain = getFallbackChain(model, config)
+    if (fallbackChain.length === 0) {
+      console.log('[Todos] No fallback chain, skipping')
+      return []
+    }
+    const candidate = fallbackChain[0]
+    const modelClient = getModelClient(candidate, config)
+    const modelParams = { ...config }
+    delete modelParams.model
+    delete modelParams.apiKey
+    delete modelParams.baseURL
+
+    // Get the user's last message
+    const userPrompt = messages.find(m => m.role === 'user')?.content || ''
+    const promptText = typeof userPrompt === 'string' ? userPrompt : Array.isArray(userPrompt) ? userPrompt.map(p => p.type === 'text' ? p.text : '').join(' ') : ''
+    if (!promptText.trim()) {
+      console.log('[Todos] Empty prompt, skipping')
+      return []
+    }
+
+    console.log(`[Todos] Generating todos for: ${promptText.slice(0, 100)}...`)
+
+    const result = streamText({
+      model: modelClient as any,
+      system: `You are a task planner. Given a user request, generate a concise list of specific tasks to accomplish it.
+
+Return ONLY a JSON array of objects with "text" fields. Each task should be specific and actionable.
+Example: [{"text": "Create the landing page hero section"}, {"text": "Build the navigation bar"}]
+
+Rules:
+- 3-8 tasks max
+- Each task must be specific to the user's request
+- No generic tasks like "Review code" or "Plan approach"
+- Focus on WHAT to build, not HOW
+- Match the complexity: simple requests get fewer tasks, complex ones get more`,
+      messages: [{ role: 'user', content: `Generate task list for: ${promptText.slice(0, 500)}` }],
+      maxRetries: 0,
+      ...modelParams,
+    })
+
+    const text = await readStream(result.textStream)
+    console.log(`[Todos] Raw response length: ${text.length}`)
+    const todos: { id: string; text: string; completed: boolean }[] = []
+
+    // Parse JSON array from response
+    const jsonMatch = text.match(/\[\s\S]*\]/)
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0])
+        if (Array.isArray(parsed)) {
+          for (const item of parsed.slice(0, 8)) {
+            if (item.text && typeof item.text === 'string') {
+              todos.push({
+                id: `todo-${todos.length}`,
+                text: item.text.trim(),
+                completed: false,
+              })
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[Todos] JSON parse failed:', e)
+      }
+    }
+
+    console.log(`[Todos] Generated ${todos.length} todos:`, todos.map(t => t.text))
+    return todos
+  } catch (e) {
+    console.error('[Todos] Generation failed:', e)
+    // Fallback: generate simple todos from the prompt keywords
+    const userPrompt = messages.find(m => m.role === 'user')?.content || ''
+    const promptText = typeof userPrompt === 'string' ? userPrompt : Array.isArray(userPrompt) ? userPrompt.map(p => p.type === 'text' ? p.text : '').join(' ') : ''
+    return generateFallbackTodos(promptText)
+  }
+}
+
+// Fallback todos when LLM generation fails
+function generateFallbackTodos(prompt: string): { id: string; text: string; completed: boolean }[] {
+  const todos: { id: string; text: string; completed: boolean }[] = []
+  const lower = prompt.toLowerCase()
+
+  // Always start with planning
+  todos.push({ id: 'todo-0', text: 'Analyze requirements and plan the approach', completed: false })
+
+  // Extract what to build from the prompt
+  if (lower.includes('landing page') || lower.includes('website') || lower.includes('portfolio')) {
+    todos.push({ id: 'todo-1', text: 'Create the page layout and structure', completed: false })
+    todos.push({ id: 'todo-2', text: 'Build the main content sections', completed: false })
+    todos.push({ id: 'todo-3', text: 'Add styling and animations', completed: false })
+    todos.push({ id: 'todo-4', text: 'Make it responsive for mobile', completed: false })
+  } else if (lower.includes('app') || lower.includes('application')) {
+    todos.push({ id: 'todo-1', text: 'Design the application architecture', completed: false })
+    todos.push({ id: 'todo-2', text: 'Build the main UI components', completed: false })
+    todos.push({ id: 'todo-3', text: 'Implement core functionality', completed: false })
+    todos.push({ id: 'todo-4', text: 'Polish and optimize', completed: false })
+  } else if (lower.includes('fix') || lower.includes('bug') || lower.includes('error')) {
+    todos.push({ id: 'todo-1', text: 'Identify the root cause', completed: false })
+    todos.push({ id: 'todo-2', text: 'Implement the fix', completed: false })
+    todos.push({ id: 'todo-3', text: 'Verify the fix works', completed: false })
+  } else {
+    todos.push({ id: 'todo-1', text: 'Build the requested feature', completed: false })
+    todos.push({ id: 'todo-2', text: 'Add proper styling and polish', completed: false })
+    todos.push({ id: 'todo-3', text: 'Ensure quality and responsiveness', completed: false })
+  }
+
+  return todos
 }
 
 // ─── Analyze complexity ─────────────────────────────────────
@@ -991,19 +1106,21 @@ function fillDefaults(data: Record<string, any>) {
   }
 }
 
-// ─── Auto web search detection (conservative) ─────────────
+// ─── Auto web search detection ─────────────────────────
 function shouldAutoSearch(query: string): boolean {
   if (/^\[Search:/i.test(query)) return true
   if (/https?:\/\//.test(query)) return true
-  // Questions about external things (not pure code generation)
+  // Questions
   const isQuestion = /^\b(what is|what are|who is|who are|when did|when was|where is|how do I find|tell me about|which|compare|best|recommended|popular)\b/i.test(query)
-  const hasTimeRef = /\b(current|latest|today|yesterday|this week|right now|news|outage|down|2024|2025|2026)\b/i.test(query)
-  if (isQuestion && hasTimeRef) return true
+  if (isQuestion) return true
   if (/\b(what is the price|how much does|is .* down|is .* available|how do I|how to)\b/i.test(query)) return true
   // Search-related keywords
   if (/\b(search|find|look up|research|compare|alternative|vs\.?|versus|review)\b/i.test(query)) return true
-  // Requests that reference external things (non-code keywords)
-  if (/\b(landing page|website|blog|portfolio|resume|document|documentation|article|tutorial|guide|template|design|UI|UX|brand|logo|color scheme)\b/i.test(query)) return true
+  // Web/app building keywords — these benefit from seeing real examples
+  if (/\b(landing page|website|blog|portfolio|resume|document|documentation|article|tutorial|guide|template|design|UI|UX|brand|logo|color scheme|web app|webpage|page|site|app|build|create|make|generate|write)\b/i.test(query)) return true
+  // Time references
+  const hasTimeRef = /\b(current|latest|today|yesterday|this week|right now|news|outage|down|2024|2025|2026)\b/i.test(query)
+  if (hasTimeRef) return true
   return false
 }
 
@@ -1065,20 +1182,117 @@ function stripAgentPrefix(text: string): string {
 }
 
 async function fetchWebSearch(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
+  // Call search functions directly (no HTTP roundtrip)
   try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000'
-    const res = await fetch(`${baseUrl}/api/web-search`, {
+    const exaResults = await searchExaDirect(query)
+    if (exaResults.length > 0) return exaResults
+    const braveResults = await searchBraveDirect(query)
+    if (braveResults.length > 0) return braveResults
+    const ddgResults = await searchDuckDuckGoDirect(query)
+    return ddgResults
+  } catch {
+    return []
+  }
+}
+
+// Direct search functions (imported from web-search route logic)
+async function searchExaDirect(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
+  const apiKey = process.env.EXA_API_KEY
+  if (!apiKey) return []
+  try {
+    const response = await fetch('https://api.exa.ai/search', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+      body: JSON.stringify({ query, type: 'neural', numResults: 5, contents: { text: { maxCharacters: 200 } } }),
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!response.ok) return []
+    const data = await response.json()
+    return (data.results || []).slice(0, 5).map((r: any) => ({
+      title: r.title || '',
+      url: r.url || '',
+      snippet: r.text || '',
+    }))
+  } catch { return [] }
+}
+
+async function searchBraveDirect(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
+  const apiKey = process.env.BRAVE_SEARCH_API_KEY
+  if (!apiKey) return []
+  try {
+    const response = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`, {
+      headers: { 'Accept': 'application/json', 'X-Subscription-Token': apiKey },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!response.ok) return []
+    const data = await response.json()
+    return (data.web?.results || []).slice(0, 5).map((r: any) => ({
+      title: r.title || '', url: r.url || '', snippet: r.description || '',
+    }))
+  } catch { return [] }
+}
+
+async function searchDuckDuckGoDirect(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
+  try {
+    const formData = new URLSearchParams()
+    formData.append('q', query)
+    formData.append('kl', 'us-en')
+    const response = await fetch('https://html.duckduckgo.com/html/', {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
       signal: AbortSignal.timeout(15000),
     })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.results || []
-  } catch {
+    if (!response.ok) {
+      console.log(`[WebSearch/DDG] HTTP ${response.status}`)
+      return []
+    }
+    const html = await response.text()
+    console.log(`[WebSearch/DDG] Got ${html.length} bytes of HTML`)
+    const results: { title: string; url: string; snippet: string }[] = []
+    
+    // Split by result blocks
+    const resultBlocks = html.split(/class="result[ _](?:body|snippet)"/gi)
+    for (let i = 1; i < resultBlocks.length && results.length < 5; i++) {
+      const block = resultBlocks[i]
+      const titleMatch = block.match(/class="result__a"[^>]*>([^<]+)<\/a>/i)
+      const snippetMatch = block.match(/class="result__snippet"[^>]*>([^<]+)<\/a>/i)
+      // Try uddg param for URL (DDG redirects through their own domain)
+      const uddgMatch = block.match(/uddg=([^&"\s]+)/i)
+      const urlMatch = block.match(/class="result__url"[^>]*>\s*([^<\s]+)/i)
+      if (titleMatch) {
+        let url = ''
+        if (uddgMatch) url = decodeURIComponent(uddgMatch[1])
+        else if (urlMatch) {
+          url = urlMatch[1].trim()
+          if (!url.startsWith('http')) url = 'https://' + url
+        }
+        if (url && titleMatch[1].trim()) {
+          results.push({
+            title: titleMatch[1].trim(),
+            url,
+            snippet: snippetMatch ? snippetMatch[1].trim() : '',
+          })
+        }
+      }
+    }
+    
+    // Fallback: extract any result links if the above didn't work
+    if (results.length === 0) {
+      const linkRegex = /<a[^>]+href="(https?:\/\/[^"]+)"[^>]*class="result__a"[^>]*>([^<]+)<\/a>/gi
+      let match
+      while ((match = linkRegex.exec(html)) !== null && results.length < 5) {
+        results.push({ title: match[2].trim(), url: match[1], snippet: '' })
+      }
+    }
+    
+    console.log(`[WebSearch/DDG] Parsed ${results.length} results`)
+    return results
+  } catch (e) {
+    console.error('[WebSearch/DDG] Error:', e)
     return []
   }
 }

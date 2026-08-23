@@ -123,9 +123,12 @@ export async function POST(req: Request) {
 
   let lastError: any = null
 
+  console.log(`[Plan] Starting plan generation with ${fallbackChain.length} model(s)`)
+
   for (const candidate of fallbackChain) {
     try {
       const modelClient = getModelClient(candidate, config)
+      console.log(`[Plan] Trying model: ${candidate.id} (${candidate.providerId})`)
 
       const result = streamText({
         model: modelClient as LanguageModel,
@@ -156,6 +159,7 @@ export async function POST(req: Request) {
         accumulated += value
       }
 
+      console.log(`[Plan] Got ${accumulated.length} chars from ${candidate.id}`)
       return Response.json(parsePlanPayload(accumulated))
     } catch (error: any) {
       lastError = error
@@ -164,5 +168,6 @@ export async function POST(req: Request) {
     }
   }
 
+  console.error('[Plan] All models failed')
   return handleAPIError(lastError, { hasOwnApiKey: !!config.apiKey })
 }

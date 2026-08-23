@@ -806,19 +806,19 @@ function AgenticLiveActions({
       className="w-full overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]"
     >
       {/* Status header */}
-      <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-4 py-2.5">
+      <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-5 py-3">
         {isStreaming ? (
-          <LoaderIcon className="h-3.5 w-3.5 animate-spin text-blue-400" />
+          <LoaderIcon className="h-4 w-4 animate-spin text-blue-400" />
         ) : (
-          <Check className="h-3.5 w-3.5 text-emerald-400" />
+          <Check className="h-4 w-4 text-emerald-400" />
         )}
-        <span className="text-xs font-medium text-white/70">
+        <span className="text-sm font-medium text-white/80">
           {isStreaming
             ? (latestStatus?.content || 'Working...')
             : `Completed — ${actions.length} actions`
           }
         </span>
-        <span className="ml-auto text-[11px] text-white/30 tabular-nums">
+        <span className="ml-auto text-xs text-white/35 tabular-nums">
           {Math.floor((Date.now() - actions[0]?.timestamp) / 1000)}s
         </span>
         {onStop && isStreaming && (
@@ -837,21 +837,20 @@ function AgenticLiveActions({
       <div ref={scrollRef} className="max-h-[300px] overflow-y-auto">
         {/* Status updates — shown as individual items */}
         {statusActions.length > 0 && (
-          <div className="space-y-0.5 border-b border-white/[0.04] px-4 py-2">
-            {statusActions.map((action, i) => (
+          <div className="space-y-0.5 border-b border-white/[0.04] px-4 py-2">                {statusActions.map((action, i) => (
               <motion.div
                 key={`${action.timestamp}-${i}`}
                 initial={{ opacity: 0, x: -4 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-2 py-0.5"
+                className="flex items-center gap-2 py-1"
               >
                 {isStreaming && i === statusActions.length - 1 ? (
-                  <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400" />
+                  <LoaderIcon className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-400" />
                 ) : (
-                  <Check className="h-3 w-3 shrink-0 text-emerald-400/60" />
+                  <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400/60" />
                 )}
-                <span className="text-[13px] text-white/60">{action.content}</span>
-                <span className="shrink-0 tabular-nums text-[10px] text-white/20">{formatDuration(getActionDuration(i, statusActions))}</span>
+                <span className="text-[14px] text-white/70">{action.content}</span>
+                <span className="shrink-0 tabular-nums text-[11px] text-white/25">{formatDuration(getActionDuration(i, statusActions))}</span>
               </motion.div>
             ))}
           </div>
@@ -860,14 +859,14 @@ function AgenticLiveActions({
         {/* Thinking / Reasoning */}
         {thinkingActions.length > 0 && (
           <Collapsible open={expandedSections.has('thinking')} onOpenChange={() => toggleSection('thinking')}>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02]">
-              {expandedSections.has('thinking') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              <Brain className="h-3.5 w-3.5 text-purple-400/70" />
+            <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-white/[0.04] px-5 py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.02]">
+              {expandedSections.has('thinking') ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <Brain className="h-4 w-4 text-purple-400/70" />
               <span>Reasoning</span>
-              <span className="ml-auto text-[10px] text-white/25">{thinkingActions.length}</span>
+              <span className="ml-auto text-[11px] text-white/30">{thinkingActions.length} thought{thinkingActions.length !== 1 ? 's' : ''}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="space-y-1 px-4 pb-2">
+              <div className="space-y-2 px-5 pb-3">
                 {thinkingActions.map((action, i) => {
                   const duration = getActionDuration(i, thinkingActions)
                   return (
@@ -875,10 +874,10 @@ function AgenticLiveActions({
                       key={`${action.timestamp}-${i}`}
                       initial={{ opacity: 0, x: -4 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="flex items-start gap-2 text-[11px] leading-relaxed text-white/40"
+                      className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-3 text-[13px] leading-relaxed text-white/60"
                     >
                       <span className="flex-1">{action.content}</span>
-                      <span className="shrink-0 tabular-nums text-[10px] text-white/20">{formatDuration(duration)}</span>
+                      <span className="ml-2 shrink-0 inline-block tabular-nums text-[11px] text-white/25">{formatDuration(duration)}</span>
                     </motion.div>
                   )
                 })}
@@ -889,7 +888,7 @@ function AgenticLiveActions({
 
         {/* Commentary */}
         {commentaryActions.length > 0 && (
-          <div className="border-t border-white/[0.04] px-4 py-2.5">
+          <div className="border-t border-white/[0.04] px-5 py-3">
             {commentaryActions.map((action, i) => {
               const duration = getActionDuration(i, commentaryActions)
               return (
@@ -897,7 +896,7 @@ function AgenticLiveActions({
                   key={`${action.timestamp}-${i}`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-start justify-between gap-2 text-xs leading-relaxed text-white/55"
+                  className="flex items-start justify-between gap-2 text-[13px] leading-relaxed text-white/60"
                 >
                   <span className="flex-1">{action.content}</span>
                   <span className="shrink-0 tabular-nums text-[10px] text-white/20">{formatDuration(duration)}</span>
@@ -910,11 +909,11 @@ function AgenticLiveActions({
         {/* File operations */}
         {fileActions.length > 0 && (
           <Collapsible open={expandedSections.has('files')} onOpenChange={() => toggleSection('files')}>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-white/[0.04] px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02]">
-              {expandedSections.has('files') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              <FileCode2 className="h-3.5 w-3.5 text-emerald-400/70" />
+            <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-white/[0.04] px-5 py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.02]">
+              {expandedSections.has('files') ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <FileCode2 className="h-4 w-4 text-emerald-400/70" />
               <span>Files</span>
-              <span className="ml-auto text-[10px] text-white/25">{fileActions.length}</span>
+              <span className="ml-auto text-[11px] text-white/30">{fileActions.length} file{fileActions.length !== 1 ? 's' : ''}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-0.5 px-4 pb-2">
@@ -959,11 +958,11 @@ function AgenticLiveActions({
         {/* Web searches */}
         {searchActions.length > 0 && (
           <Collapsible open={expandedSections.has('searches')} onOpenChange={() => toggleSection('searches')}>
-            <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-white/[0.04] px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.02]">
-              {expandedSections.has('searches') ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              <Search className="h-3.5 w-3.5 text-[#1EAEDB]/70" />
+            <CollapsibleTrigger className="flex w-full items-center gap-2 border-t border-white/[0.04] px-5 py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.02]">
+              {expandedSections.has('searches') ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <Search className="h-4 w-4 text-[#1EAEDB]/70" />
               <span>Web Search</span>
-              <span className="ml-auto text-[10px] text-white/25">{searchActions.length}</span>
+              <span className="ml-auto text-[11px] text-white/30">{searchActions.length} search{searchActions.length !== 1 ? 'es' : ''}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-0.5 px-4 pb-2">
@@ -987,37 +986,6 @@ function AgenticLiveActions({
           </Collapsible>
         )}
       </div>
-
-      {/* To-dos — real tasks from planner output */}
-      {todos.length > 0 && (
-        <div className="border-t border-white/[0.06] px-4 py-2.5">
-          <div className="flex items-center gap-2 mb-1.5">
-            <ListTodo className="h-3.5 w-3.5 text-white/40" />
-            <span className="text-[11px] font-medium text-white/50">
-              To-dos {completedTodos}/{todos.length}
-            </span>
-            {completedTodos === todos.length && (
-              <Check className="h-3 w-3 text-emerald-400" />
-            )}
-          </div>
-          <div className="space-y-1">
-            {todos.map((todo) => (
-              <div key={todo.id} className="flex items-center gap-2 py-0.5">
-                {todo.completed ? (
-                  <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                ) : isStreaming ? (
-                  <LoaderIcon className="h-3 w-3 shrink-0 animate-spin text-blue-400/50" />
-                ) : (
-                  <Circle className="h-3 w-3 shrink-0 text-white/20" />
-                )}
-                <span className={`text-[11px] ${todo.completed ? 'text-white/40 line-through' : 'text-white/55'}`}>
-                  {todo.text}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </motion.div>
   )
 }

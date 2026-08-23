@@ -33,6 +33,11 @@ You must output a plan in this EXACT JSON format:
   "question": "Any clarifying question for the user (optional)",
   "options": ["Option 1", "Option 2"],
   "allowCustomInput": true,
+  "todos": [
+    {"text": "Specific task 1 — be precise about what to build"},
+    {"text": "Specific task 2 — mention the actual components/pages"},
+    {"text": "Specific task 3 — describe the exact feature"}
+  ],
   "steps": [
     {
       "step": 1,
@@ -50,6 +55,8 @@ You must output a plan in this EXACT JSON format:
     "dependencies": ["New npm packages needed"]
   }
 }
+
+CRITICAL: The "todos" field MUST contain 3-6 specific, actionable tasks that describe WHAT to build for THIS request. Each todo must be specific to the user's request — NOT generic like "Plan the approach" or "Build the frontend". For example, for a Spotify clone: ["Create the main player UI with playback controls", "Build the playlist sidebar with track list", "Design the album art carousel component"]
 
 Guidelines:
 - Be specific about file paths and component names

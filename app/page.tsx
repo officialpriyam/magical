@@ -31,7 +31,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { invalidateCache } from '@/lib/caching';
 import type { GitHubWorkspace } from '@/components/github-save';
 import type { PreviewTab } from '@/components/preview';
-import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo, Cpu, Zap, LoaderIcon } from 'lucide-react';
+import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo, Cpu, Zap, LoaderIcon, ChevronDown, ArrowLeft, Settings, Star, ExternalLink } from 'lucide-react';
 
 const DEFAULT_MODEL_ID = 'auto'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
@@ -139,6 +139,88 @@ const Sidebar = dynamic(() => import('@/components/sidebar').then(mod => ({ defa
 const Preview = dynamic(() => import('@/components/preview').then(mod => ({ default: mod.Preview })), {
   ssr: false,
 });
+
+function ProjectDropdownMenu({ projectTitle, projectSubtitle, isPublic, onToggleVisibility, onNewChat, onBackToDashboard }: {
+  projectTitle: string
+  projectSubtitle: string
+  isPublic?: boolean
+  onToggleVisibility?: () => void
+  onNewChat?: () => void
+  onBackToDashboard?: () => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setIsOpen(false)
+    }
+    function handleEscape(e: KeyboardEvent) { if (e.key === 'Escape') setIsOpen(false) }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', handleEscape) }
+  }, [isOpen])
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button type="button" onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-white/[0.06]">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-[11px] font-bold text-white shrink-0">
+          {projectTitle?.[0] || 'M'}
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-white max-w-[200px] sm:max-w-[300px]">{projectTitle}</div>
+        </div>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-white/10 bg-[#1a1b1d] p-2 shadow-2xl">
+          <div className="mb-2 rounded-lg bg-white/[0.04] p-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-xs font-bold text-white">
+                {projectTitle?.[0] || 'M'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-white truncate">{projectTitle}</div>
+                <div className="text-xs text-white/40 truncate">{projectSubtitle}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-0.5">
+            {onNewChat && (
+              <button type="button" onClick={() => { onNewChat(); setIsOpen(false) }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white">
+                <Zap className="h-4 w-4 text-white/40" />
+                New chat
+              </button>
+            )}
+            {onBackToDashboard && (
+              <button type="button" onClick={() => { onBackToDashboard(); setIsOpen(false) }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white">
+                <ArrowLeft className="h-4 w-4 text-white/40" />
+                Dashboard
+              </button>
+            )}
+            <button type="button" onClick={() => { window.location.reload() }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white">
+              <Star className="h-4 w-4 text-white/40" />
+              Star project
+            </button>
+            {onToggleVisibility && (
+              <button type="button" onClick={() => { onToggleVisibility(); setIsOpen(false) }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white">
+                {isPublic ? <Globe2 className="h-4 w-4 text-white/40" /> : <Lock className="h-4 w-4 text-white/40" />}
+                {isPublic ? 'Make private' : 'Make public'}
+              </button>
+            )}
+            <button type="button" onClick={() => { setIsOpen(false) }} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white">
+              <Settings className="h-4 w-4 text-white/40" />
+              Settings
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function TodoBar({ todos }: { todos: { id: string; text: string; completed: boolean }[] }) {
   const [isOpen, setIsOpen] = useState(true)
@@ -1015,11 +1097,16 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     const r2Workspace = getProjectR2Workspace(project)
     const sandboxStorageWorkspace = getProjectSandboxStorageWorkspace(project)
 
+    // Skip if no storage backend, no template, or already restoring
     if (
-      (!workspace && !r2Workspace && !sandboxStorageWorkspace) ||
       !savedFragment?.template ||
       restoringProjectRef.current === project.id
     ) {
+      return
+    }
+    // Only restore if there's actually a connected storage source (GitHub or R2)
+    // Skip sandbox-storage since the Go binary may not be running
+    if (!workspace && !r2Workspace) {
       return
     }
 
@@ -2228,7 +2315,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         )}
       </AnimatePresence>
 
-      {session && (
+      {/* Sidebar only shown in dashboard mode */}
+      {session && isDashboardMode && (
         <Sidebar
           userPlan={userTeam?.tier}
           onChatSelected={handleChatSelected}
@@ -2265,32 +2353,18 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           {!isDashboardMode && (
             <div className="flex h-[56px] shrink-0 items-center justify-between gap-1 border-b border-white/10 px-2 py-2 md:h-[64px] md:gap-3 md:px-4">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-white">
-                  {projectHeaderTitle}
-                </div>
-                <div className="mt-0.5 truncate text-xs text-white/55 hidden sm:block">
-                  {projectHeaderSubtitle}
-                </div>
+                {/* Project dropdown (like Lovable) */}
+                <ProjectDropdownMenu
+                  projectTitle={projectHeaderTitle}
+                  projectSubtitle={projectHeaderSubtitle}
+                  isPublic={currentProject?.is_public}
+                  onToggleVisibility={handleToggleProjectVisibility}
+                  onNewChat={handleStartNewChat}
+                  onBackToDashboard={() => router.push('/')}
+                />
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
-                {currentProject && (
-                  <button
-                    type="button"
-                    onClick={handleToggleProjectVisibility}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 text-xs text-white/70 transition hover:bg-white/[0.08] hover:text-white md:px-2.5"
-                    title={currentProject.is_public ? 'Public project' : 'Private project'}
-                  >
-                    {currentProject.is_public ? (
-                      <Globe2 className="h-3.5 w-3.5" />
-                    ) : (
-                      <Lock className="h-3.5 w-3.5" />
-                    )}
-                    <span className="hidden sm:inline">
-                      {currentProject.is_public ? 'Public' : 'Private'}
-                    </span>
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={handleUndo}
