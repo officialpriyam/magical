@@ -1598,7 +1598,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     const shouldRenameProject =
       projectForPrompt.title === DEFAULT_NEW_CHAT_TITLE &&
       messagesRef.current.length === 0
-    setCurrentTab('code')
+    // Don't force code tab — preserve user's current tab (e.g. IDE)
 
     const content: Message['content'] = [{ type: 'text', text: currentInput }]
     
@@ -2860,9 +2860,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     agenticTodos={useAgentic ? agenticStream.todos : []}
                     agenticStreaming={useAgentic && agenticStream.isStreaming}
                     onFileClick={(filePath) => {
-                      // Switch to code tab and try to select the file
-                      setCurrentTab('code')
-                      // Store the target file path for the IDE to open
+                      // Switch to IDE tab and open the file
+                      setCurrentTab('ide')
                       window.dispatchEvent(new CustomEvent('open-file', { detail: { path: filePath } }))
                     }}
                   />

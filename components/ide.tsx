@@ -109,7 +109,21 @@ export function IDE({
 
           if (Array.isArray(storageData.files)) {
             if (storageData.files.length > 0) {
-              setFiles(storageData.files)
+              // Merge with fragment files — sandbox-storage may miss some
+              const fragmentMap = new Map(fragmentFiles.map(f => [f.path, f]))
+              for (const sf of storageData.files) {
+                if (!fragmentMap.has(sf.path)) {
+                  fragmentMap.set(sf.path, sf)
+                }
+              }
+              const merged: FileSystemNode[] = Array.from(fragmentMap.values()).map(f => ({
+                name: f.path.split('/').pop() || f.path,
+                path: f.path,
+                content: f.content,
+                type: 'file' as const,
+                isDirectory: false,
+              }))
+              setFiles(merged)
               setLoadError(null)
               setStorageSlow(Boolean(storageData.slow))
               setStorageStatus('ok')
@@ -279,7 +293,7 @@ export function IDE({
 
   // Immediately load fragment files as fast path while sandbox-storage loads in background
   useEffect(() => {
-    if (fragmentFiles.length > 0 && files.length === 0 && storageStatus === 'idle') {
+    if (fragmentFiles.length > 0 && files.length === 0 && storageStatus !== 'ok') {
       const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
         name: f.path.split('/').pop() || f.path,
         path: f.path,
@@ -288,15 +302,17 @@ export function IDE({
         isDirectory: false,
       }))
       setFiles(fsNodes)
-      setStorageStatus('ok')
+      if (storageStatus !== 'loading') {
+        setStorageStatus('ok')
+      }
       setLoadError(null)
       console.log(`[IDE] Loaded ${fragmentFiles.length} files from fragment (fast path)`)
     }
   }, [fragmentFiles, files.length, storageStatus])
 
-  // Fallback: when sandbox-storage fails, load from fragments
+  // Fallback: when sandbox-storage fails or returns empty, load from fragments
   useEffect(() => {
-    if (storageStatus === 'error' && files.length === 0 && fragmentFiles.length > 0) {
+    if ((storageStatus === 'error' || storageStatus === 'degraded') && files.length === 0 && fragmentFiles.length > 0) {
       const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
         name: f.path.split('/').pop() || f.path,
         path: f.path,
