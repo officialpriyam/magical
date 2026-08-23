@@ -368,6 +368,8 @@ interface PromptInputTextareaProps {
   onCommandNavigate?: (direction: 'up' | 'down') => void;
   onCommandSelect?: () => void;
   onCommandCancel?: () => void;
+  onHistoryNavigate?: (direction: 'up' | 'down') => void;
+  messageHistory?: string[];
 }
 const PromptInputTextarea: React.FC<PromptInputTextareaProps & React.ComponentProps<typeof Textarea>> = ({
   className,
@@ -380,9 +382,11 @@ const PromptInputTextarea: React.FC<PromptInputTextareaProps & React.ComponentPr
   onCommandNavigate,
   onCommandSelect,
   onCommandCancel,
+  onHistoryNavigate,
+  messageHistory = [],
   ...props
 }) => {
-  const { value, setValue, maxHeight, onSubmit, disabled } = usePromptInput();
+  const { value: inputValue, setValue, maxHeight, onSubmit, disabled } = usePromptInput();
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   React.useEffect(() => {
@@ -392,7 +396,7 @@ const PromptInputTextarea: React.FC<PromptInputTextareaProps & React.ComponentPr
       typeof maxHeight === "number"
         ? `${Math.min(textareaRef.current.scrollHeight, maxHeight)}px`
         : `min(${textareaRef.current.scrollHeight}px, ${maxHeight})`;
-  }, [value, maxHeight, disableAutosize]);
+  }, [inputValue, maxHeight, disableAutosize]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showSlashCommands) {
@@ -418,6 +422,18 @@ const PromptInputTextarea: React.FC<PromptInputTextareaProps & React.ComponentPr
       }
     }
 
+    // History navigation: ArrowUp when input is empty cycles through history
+    if (e.key === 'ArrowUp' && !inputValue && messageHistory.length > 0) {
+      e.preventDefault();
+      onHistoryNavigate?.('up');
+      return;
+    }
+    if (e.key === 'ArrowDown' && messageHistory.length > 0) {
+      e.preventDefault();
+      onHistoryNavigate?.('down');
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       onSubmit?.();
@@ -428,7 +444,7 @@ const PromptInputTextarea: React.FC<PromptInputTextareaProps & React.ComponentPr
   return (
     <Textarea
       ref={textareaRef}
-      value={value}
+      value={inputValue}
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
       className={cn("text-base", className)}
@@ -510,6 +526,8 @@ interface PromptInputBoxProps {
   sandboxProvider?: SandboxProviderMode
   onSandboxProviderChange?: (provider: SandboxProviderMode) => void
   onStop?: () => void
+  onHistoryNavigate?: (direction: 'up' | 'down') => void
+  messageHistory?: string[]
 }
 type ChatMode = 'plan' | 'build'
 export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref: React.Ref<HTMLDivElement>) => {
@@ -521,7 +539,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       document.head.removeChild(styleSheet);
     };
   }, []);
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, useAgentic = true, onUseAgenticChange, selectedStyle, onStyleSelect, onOpenStyleSelector, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, templates, selectedTemplate, onSelectedTemplateChange, models, languageModel, onLanguageModelChange, apiKeyConfigurable, baseURLConfigurable, useMorphApply, onUseMorphApplyChange, useAgentic = true, onUseAgenticChange, selectedStyle, onStyleSelect, onOpenStyleSelector, chatMode = 'build', onChatModeChange, sandboxProvider = 'auto', onSandboxProviderChange, onStop, onHistoryNavigate, messageHistory = [] } = props;
   const [input, setInput] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
@@ -535,6 +553,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const [showSlashCommands, setShowSlashCommands] = React.useState(false);
   const [matchingCommands, setMatchingCommands] = React.useState<SlashCommand[]>([]);
   const [selectedCommandIndex, setSelectedCommandIndex] = React.useState(0);
+  const historyIdxRef = React.useRef(-1);
 
   const handleToggleChange = (value: string) => {
     if (value === "search") {
@@ -639,6 +658,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       setShowSlashCommands(false);
       setMatchingCommands([]);
       setSelectedCommandIndex(0);
+      historyIdxRef.current = -1;
     }
   };
 
@@ -664,6 +684,27 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
         return prevIndex === 0 ? matchingCommands.length - 1 : prevIndex - 1;
       }
     });
+  };
+
+  // History navigation: cycle through previous messages when input is empty
+  const handleHistoryNavigate = (direction: 'up' | 'down') => {
+    if (messageHistory.length === 0) return;
+    if (direction === 'up') {
+      if (historyIdxRef.current < messageHistory.length - 1) {
+        historyIdxRef.current++
+      } else {
+        return
+      }
+    } else {
+      if (historyIdxRef.current > 0) {
+        historyIdxRef.current--
+      } else {
+        historyIdxRef.current = -1
+        setInput('')
+        return
+      }
+    }
+    setInput(messageHistory[messageHistory.length - 1 - historyIdxRef.current] || '')
   };
 
   const handleSelectCurrentCommand = () => {
@@ -798,6 +839,8 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
             onCommandNavigate={handleCommandNavigate}
             onCommandSelect={handleSelectCurrentCommand}
             onCommandCancel={handleCancelCommands}
+            onHistoryNavigate={handleHistoryNavigate}
+            messageHistory={messageHistory}
           />
           {showSlashCommands && (
             <SlashCommandMenu

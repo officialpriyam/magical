@@ -247,6 +247,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false)
   const [projectShelfView, setProjectShelfView] = useState<ProjectShelfView>('recent')
+  // Message queue — stores messages sent while streaming
+  const [messageQueue, setMessageQueue] = useState<{ message: string; files: File[]; mode: ChatMode }[]>([])
+  // Message history — tracks which message the user is viewing
+  const [historyIndex, setHistoryIndex] = useState<number>(-1)
+  const messageQueueRef = useRef<{ message: string; files: File[]; mode: ChatMode }[]>([])
 
   const setProjectShelfViewAndReset = useCallback((view: ProjectShelfView) => {
     setProjectShelfView(view)
@@ -794,6 +799,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         })
       }
     }
+    // Process queued messages after streaming completes
+    if (messageQueueRef.current.length > 0) {
+      const next = messageQueueRef.current[0]
+      messageQueueRef.current = messageQueueRef.current.slice(1)
+      setMessageQueue(messageQueueRef.current)
+      setTimeout(() => {
+        handleSendPrompt(next.message, next.files, next.mode)
+      }, 500)
+    }
   }, [useAgentic, agenticStream.isStreaming, agenticStream.actions])
 
   function getTemplateForSubmission(preferredTemplate?: string) {
@@ -1295,6 +1309,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     planAbortControllerRef.current?.abort()
     planAbortControllerRef.current = null
     stop()
+    agenticStream.stop()
     setIsPlanLoading(false)
     setIsPreviewLoading(false)
     setAutoFixMessage('')
@@ -1394,9 +1409,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setErrorMessage('')
     setAutoFixMessage('')
 
+    // If currently streaming, queue the message instead of stopping
     if (isLoading || agenticStream.isStreaming) {
-      stop()
-      agenticStream.stop()
+      const queued = { message, files, mode }
+      setMessageQueue(prev => {
+        const next = [...prev, queued]
+        messageQueueRef.current = next
+        return next
+      })
+      return
     }
 
     if (!currentModel) {
@@ -2079,8 +2100,33 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       onStyleSelect={setSelectedStyle}
       onOpenStyleSelector={() => setShowStyleSelector(true)}
       className={!isDashboardMode ? "mb-0 border-white/10 bg-[#20211f] shadow-none" : undefined}
+      messageHistory={messages.filter(m => m.role === 'user').map(m => {
+        const textPart = m.content.find(c => c.type === 'text')
+        return textPart && 'text' in textPart ? (textPart as any).text || '' : ''
+      })}
     />
   )
+  // Queue indicator when messages are queued while streaming
+  const queueIndicator = messageQueue.length > 0 ? (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-2 px-4 py-2 text-[13px] text-white/50"
+    >
+      <div className="flex gap-1">
+        {messageQueue.slice(0, 3).map((_, i) => (
+          <div key={i} className="h-1.5 w-1.5 rounded-full bg-blue-400/50" />
+        ))}
+      </div>
+      <span>{messageQueue.length} message{messageQueue.length === 1 ? '' : 's'} queued — will send after current response</span>
+      <button
+        onClick={() => { setMessageQueue([]); messageQueueRef.current = [] }}
+        className="ml-auto text-[12px] text-white/30 hover:text-white/50 transition"
+      >
+        Clear
+      </button>
+    </motion.div>
+  ) : null
   const statusNotices = (
     <>
       {autoFixMessage && (
@@ -2299,6 +2345,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   <div className="w-full max-w-2xl">
                     {statusNotices}
                     {promptInput}
+                    {queueIndicator}
                   </div>
                 </div>
 
@@ -2557,6 +2604,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 <div className="flex items-end gap-2">
                   <div className="flex-1 min-w-0">
                     {promptInput}
+                    {queueIndicator}
                   </div>
                 </div>
               </div>

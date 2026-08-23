@@ -77,20 +77,16 @@ function extractSearchQuery(messages: ModelMessage[]): string | null {
   return null
 }
 
-// Only auto-search when there's a URL or very explicit current-info need
-// Keep this conservative — users can always use the manual search toggle
+// Auto-search triggers for queries that benefit from real-time web data
 function shouldAutoSearch(query: string): boolean {
-  // Explicit [Search: ...] prefix — always search
   if (/^\[Search:/i.test(query)) return true
-  // Has a URL — fetch it
   if (/https?:\/\//.test(query)) return true
-  // Very explicit current-info queries (not code requests)
-  // Must be a question pattern AND contain time-sensitive words
-  const isQuestion = /^\b(what is|what are|who is|who are|when did|when was|where is|how do I find|tell me about)\b/i.test(query)
-  const hasTimeRef = /\b(current|latest|today|yesterday|this week|right now|news|outage|down)\b/i.test(query)
+  const isQuestion = /^\b(what is|what are|who is|who are|when did|when was|where is|how do I find|tell me about|which|compare|best|recommended|popular)\b/i.test(query)
+  const hasTimeRef = /\b(current|latest|today|yesterday|this week|right now|news|outage|down|2024|2025|2026)\b/i.test(query)
   if (isQuestion && hasTimeRef) return true
-  // Explicit pricing/status checks
-  if (/\b(what is the price|how much does|is .* down|is .* available)\b/i.test(query)) return true
+  if (/\b(what is the price|how much does|is .* down|is .* available|how do I|how to)\b/i.test(query)) return true
+  if (/\b(search|find|look up|research|compare|alternative|vs\.?|versus|review)\b/i.test(query)) return true
+  if (/\b(landing page|website|blog|portfolio|resume|document|documentation|article|tutorial|guide|template|design|UI|UX|brand|logo|color scheme)\b/i.test(query)) return true
   return false
 }
 

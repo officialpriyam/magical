@@ -187,10 +187,12 @@ export async function POST(req: Request) {
   let enrichedMessages = [...messages]
   if (autoSearchQuery) {
     try {
+      console.log(`[WebSearch] Auto-searching for: ${autoSearchQuery}`)
       const searchResults = await fetchWebSearch(autoSearchQuery)
+      console.log(`[WebSearch] Got ${searchResults.length} results`)
+      // Always emit the search action so frontend shows it
+      emitAction('web_search', autoSearchQuery, JSON.stringify(searchResults.map(r => ({ title: r.title, url: r.url, snippet: r.snippet }))))
       if (searchResults.length > 0) {
-        // Emit web search results to frontend
-        emitAction('web_search', autoSearchQuery, JSON.stringify(searchResults.map(r => ({ title: r.title, url: r.url, snippet: r.snippet }))))
         const searchContext = searchResults
           .map((r, i) => `[${i + 1}] ${r.title}\n    ${r.url}\n    ${r.snippet}`)
           .join('\n\n')
@@ -202,8 +204,10 @@ export async function POST(req: Request) {
           },
         ]
       }
-    } catch {
-      // Web search failed, continue without it
+    } catch (err) {
+      console.error(`[WebSearch] Failed:`, err)
+      // Still emit so the user sees a search was attempted
+      emitAction('web_search', autoSearchQuery)
     }
   }
 
@@ -326,7 +330,22 @@ async function runPipeline({
     emitAction('commentary', `Task complexity: ${complexity}. Dispatching ${agentsNeeded.length} agents...`)
     emitProgress(0, totalSteps)
 
-    // No initial todos — real tasks will be emitted from agent output
+    // Generate initial todo list from the agent plan
+    const agentDisplayNames: Record<string, string> = {
+      planner: 'Plan the approach',
+      architect: 'Design the architecture',
+      frontend: 'Build the frontend',
+      backend: 'Build the backend',
+      reviewer: 'Review code quality',
+      optimizer: 'Optimize performance',
+      fixer: 'Fix issues and bugs',
+    }
+    const initialTodos = agentsNeeded.map(role => ({
+      id: `agent-${role}`,
+      text: agentDisplayNames[role] || `${AGENT_DISPLAY_NAMES[role]} agent`,
+      completed: false,
+    }))
+    emitTodos(initialTodos)
 
     // ── Step 2: Run agents ────────────────────────────────────
     const plan = PARALLEL_GROUPS[complexity]
@@ -347,6 +366,7 @@ async function runPipeline({
 
     let completedAgents = 0
     const emittedFilePaths = new Set<string>()
+    let currentTodos: { id: string; text: string; completed: boolean }[] = []
 
     for (const group of plan) {
       const contextMessages = buildAgentMessages(messages, agentResults, latestFragment)
@@ -367,9 +387,8 @@ async function runPipeline({
       for (const role of group) {
         const agentName = AGENT_DISPLAY_NAMES[role]
 
-        // Emit real status and thinking for agent start
+        // Emit real status for agent start (no fake thinking)
         emitAction('status', `Running ${agentName}...`)
-        emitAction('thinking', `${agentName} is analyzing the request and planning the approach...`)
 
         // Emit file reads from context (existing project files the agent sees, deduplicated)
         if (latestFragment.files && latestFragment.files.length > 0) {
@@ -439,20 +458,24 @@ async function runPipeline({
           }
 
           // Emit REAL file paths from the agent's fragment (deduplicated)
+          // Distinguish edits from new writes based on whether the file already existed
           if (result.fragment) {
             const fragment = result.fragment as Record<string, any>
+            const existingFiles = new Set((latestFragment.files || []).map((f: any) => f.path))
             if (Array.isArray(fragment.files)) {
               for (const file of fragment.files) {
                 if (file?.path && !emittedFilePaths.has(file.path)) {
                   emittedFilePaths.add(file.path)
-                  emitAction('file_write', file.path, file.purpose || undefined)
+                  const isEdit = existingFiles.has(file.path)
+                  emitAction(isEdit ? 'file_edit' : 'file_write', file.path, file.purpose || undefined)
                 }
               }
             }
             // Also emit main file_path if no files array
             if (fragment.file_path && !fragment.files?.length && !emittedFilePaths.has(fragment.file_path)) {
               emittedFilePaths.add(fragment.file_path)
-              emitAction('file_write', fragment.file_path)
+              const isEdit = existingFiles.has(fragment.file_path)
+              emitAction(isEdit ? 'file_edit' : 'file_write', fragment.file_path)
             }
           }
 
@@ -464,10 +487,24 @@ async function runPipeline({
             const realTodos = extractTodosFromPlan(result.output)
             if (realTodos.length > 0) {
               emitTodos(realTodos)
+              // Store todos so we can mark them complete as agents finish
+              currentTodos = realTodos
             }
           }
 
-          // Emit completion status (not fake thinking)
+          // Mark the agent's todo as completed if it exists
+          if (currentTodos.length > 0) {
+            const agentTodoIdx = currentTodos.findIndex(t =>
+              t.text.toLowerCase().includes(AGENT_DISPLAY_NAMES[role].toLowerCase()) ||
+              t.text.toLowerCase().includes(role)
+            )
+            if (agentTodoIdx >= 0) {
+              currentTodos[agentTodoIdx] = { ...currentTodos[agentTodoIdx], completed: true }
+              emitTodos(currentTodos)
+            }
+          }
+
+          // Emit completion status
           emitAction('status', `${AGENT_DISPLAY_NAMES[role]} completed${result.duration ? ` in ${(result.duration / 1000).toFixed(1)}s` : ''}`)
         } else {
           emitAction('status', `${AGENT_DISPLAY_NAMES[role]} failed: ${result.errors?.join(', ') || 'unknown error'}`)
@@ -958,10 +995,15 @@ function fillDefaults(data: Record<string, any>) {
 function shouldAutoSearch(query: string): boolean {
   if (/^\[Search:/i.test(query)) return true
   if (/https?:\/\//.test(query)) return true
-  const isQuestion = /^\b(what is|what are|who is|who are|when did|when was|where is|how do I find|tell me about)\b/i.test(query)
-  const hasTimeRef = /\b(current|latest|today|yesterday|this week|right now|news|outage|down)\b/i.test(query)
+  // Questions about external things (not pure code generation)
+  const isQuestion = /^\b(what is|what are|who is|who are|when did|when was|where is|how do I find|tell me about|which|compare|best|recommended|popular)\b/i.test(query)
+  const hasTimeRef = /\b(current|latest|today|yesterday|this week|right now|news|outage|down|2024|2025|2026)\b/i.test(query)
   if (isQuestion && hasTimeRef) return true
-  if (/\b(what is the price|how much does|is .* down|is .* available)\b/i.test(query)) return true
+  if (/\b(what is the price|how much does|is .* down|is .* available|how do I|how to)\b/i.test(query)) return true
+  // Search-related keywords
+  if (/\b(search|find|look up|research|compare|alternative|vs\.?|versus|review)\b/i.test(query)) return true
+  // Requests that reference external things (non-code keywords)
+  if (/\b(landing page|website|blog|portfolio|resume|document|documentation|article|tutorial|guide|template|design|UI|UX|brand|logo|color scheme)\b/i.test(query)) return true
   return false
 }
 

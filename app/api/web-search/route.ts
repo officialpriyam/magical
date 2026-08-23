@@ -9,16 +9,22 @@ interface SearchResult {
 }
 
 async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
-  // Use DuckDuckGo lite (HTML) endpoint
   const encoded = encodeURIComponent(query)
-  const url = `https://lite.duckduckgo.com/lite/?q=${encoded}`
 
+  // Try DuckDuckGo HTML endpoint with form POST
   try {
-    const response = await fetch(url, {
+    const formData = new URLSearchParams()
+    formData.append('q', query)
+    formData.append('kl', 'us-en')
+
+    const response = await fetch('https://html.duckduckgo.com/html/', {
+      method: 'POST',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'text/html',
       },
+      body: formData.toString(),
       signal: AbortSignal.timeout(10000),
       redirect: 'follow',
     })
@@ -28,36 +34,50 @@ async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
     const html = await response.text()
     const results: SearchResult[] = []
 
-    // Try multiple regex patterns for DuckDuckGo lite HTML
-    // Pattern 1: table-based layout with result links
-    const linkRegex = /<a[^>]*rel="nofollow"[^>]*href="([^"]+)"[^>]*class="result-link"[^>]*>([^<]+)<\/a>/gi
-    let match
-    while ((match = linkRegex.exec(html)) !== null) {
-      const rawUrl = match[1]
-      const title = match[2].trim()
-      if (title && rawUrl) {
-        results.push({ title, url: rawUrl, snippet: '' })
+    // Pattern 1: Extract from result class divs
+    const resultBlocks = html.split(/class="result__body"/gi)
+    for (let i = 1; i < resultBlocks.length && results.length < 5; i++) {
+      const block = resultBlocks[i]
+      const titleMatch = block.match(/class="result__a"[^>]*>([^<]+)<\/a>/i)
+      const urlMatch = block.match(/class="result__url"[^>]*>\s*([^<\s]+)/i)
+      const snippetMatch = block.match(/class="result__snippet"[^>]*>([^<]+)<\/a>/i)
+      if (titleMatch && urlMatch) {
+        let url = urlMatch[1].trim()
+        if (!url.startsWith('http')) url = 'https://' + url
+        results.push({
+          title: titleMatch[1].trim(),
+          url,
+          snippet: snippetMatch ? snippetMatch[1].trim() : '',
+        })
       }
     }
 
-    // Pattern 2: try extracting from href with uddg parameter
+    // Pattern 2: Extract from uddg redirect URLs
     if (results.length === 0) {
-      const uddgRegex = /href="([^"]*uddg=([^&"]+)[^"]*)"/gi
-      while ((match = uddgRegex.exec(html)) !== null) {
+      const uddgRegex = /href="[^"]*uddg=([^&"]+)/gi
+      let match
+      const seen = new Set<string>()
+      while ((match = uddgRegex.exec(html)) !== null && results.length < 5) {
         try {
-          const decoded = decodeURIComponent(match[2])
-          if (decoded.startsWith('http') && decoded.length > 10) {
-            results.push({ title: decoded.replace(/^https?:\/\/[^/]+\//, '').slice(0, 80), url: decoded, snippet: '' })
+          const decoded = decodeURIComponent(match[1])
+          if (decoded.startsWith('http') && !seen.has(decoded)) {
+            seen.add(decoded)
+            results.push({
+              title: decoded.replace(/^https?:\/\/[^/]+\//, '').split('/')[0].replace(/[\-_]/g, ' ').slice(0, 80),
+              url: decoded,
+              snippet: '',
+            })
           }
         } catch {}
       }
     }
 
-    // Pattern 3: generic link extraction from result blocks
+    // Pattern 3: generic external links as last resort
     if (results.length === 0) {
       const genericRegex = /<a[^>]*href="(https?:\/\/[^"]+)"[^>]*>([^<]{10,80})<\/a>/gi
+      let match
       const seen = new Set<string>()
-      while ((match = genericRegex.exec(html)) !== null) {
+      while ((match = genericRegex.exec(html)) !== null && results.length < 5) {
         const url = match[1]
         const title = match[2].trim()
         if (title && url && !seen.has(url) && !url.includes('duckduckgo.com')) {
@@ -67,7 +87,7 @@ async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
       }
     }
 
-    return results.slice(0, 5)
+    return results
   } catch {
     return []
   }
