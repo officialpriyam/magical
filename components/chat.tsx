@@ -254,7 +254,6 @@ function LiveStreamingMessage({
   const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set())
   const [expandedReads, setExpandedReads] = useState(false)
   const [expandedWrites, setExpandedWrites] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
 
   // Live timer
   useEffect(() => {
@@ -264,12 +263,7 @@ function LiveStreamingMessage({
     return () => clearInterval(interval)
   }, [isStreaming, actions.length])
 
-  // Auto-scroll to latest
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [actions.length, actions[actions.length - 1]?.content])
+
 
   const elapsedSec = Math.floor(elapsed / 1000)
 
@@ -352,13 +346,13 @@ function LiveStreamingMessage({
         </div>
         <span className="text-[15px] font-semibold text-white/90">Magical</span>
         {isStreaming && (
-          <span className="flex items-center gap-1.5 text-xs text-white/40">
+          <span className="flex items-center gap-1.5 text-[13px] text-white/45">
             Working for {elapsedSec}s
             <ChevronDown className="h-3 w-3" />
           </span>
         )}
         {!isStreaming && elapsedSec > 0 && (
-          <span className="text-xs text-white/30">Done in {formatDuration(elapsed)}</span>
+          <span className="text-[13px] text-white/35">Done in {formatDuration(elapsed)}</span>
         )}
         {isStreaming && onStop && (
           <button
@@ -379,7 +373,7 @@ function LiveStreamingMessage({
           : isStreaming && actions.length > 0 ? (
             <span className="flex items-center gap-2 text-white/40">
               <span className="inline-block h-4 w-[2px] bg-blue-400/50 animate-pulse" />
-              <span className="text-xs">Thinking...</span>
+              <span className="text-[13px]">Thinking...</span>
             </span>
           ) : null}
         {isStreaming && latestCommentary && (
@@ -387,9 +381,9 @@ function LiveStreamingMessage({
         )}
       </div>
 
-      {/* Scrollable timeline + commentary area — only show during streaming */}
+      {/* Timeline area — flows with page scroll during streaming */}
       {isStreaming && (
-      <div ref={scrollRef} className="pl-8 space-y-1 max-h-[400px] overflow-y-auto overscroll-contain">
+      <div className="pl-8 space-y-1">
         {/* Connecting state — when streaming but no actions yet */}
         {actions.length === 0 && (
           <motion.div
@@ -398,7 +392,7 @@ function LiveStreamingMessage({
             className="flex items-center gap-2 py-1"
           >
             <LoaderIcon className="h-3 w-3 animate-spin text-blue-400" />
-            <span className="text-[12px] text-white/40">Connecting...</span>
+            <span className="text-[14px] text-white/45">Connecting...</span>
           </motion.div>
         )}
         {/* Chronological timeline of actions */}
@@ -436,14 +430,14 @@ function LiveStreamingMessage({
                       return next
                     })
                   }}
-                  className="flex items-center gap-1.5 py-1 text-[13px] text-white/45 hover:text-white/60 transition"
+                  className="flex items-center gap-1.5 py-1 text-[14px] text-white/50 hover:text-white/65 transition"
                 >
                   {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                   <Brain className="h-3 w-3 text-purple-400/50" />
-                  <span className="font-medium">Thought for {formatDuration(duration)}</span>
+                  <span className="font-medium text-white/60">Thought for {formatDuration(duration)}</span>
                   {/* Show preview of thinking text when collapsed */}
                   {!isExpanded && hasThinkingContent && (
-                    <span className="text-white/25 truncate max-w-[200px]">— {thinkingText.slice(0, 60)}{thinkingText.length > 60 ? '...' : ''}</span>
+                    <span className="text-white/35 truncate max-w-[250px]">— {thinkingText.slice(0, 80)}{thinkingText.length > 80 ? '...' : ''}</span>
                   )}
                 </button>
                 <AnimatePresence>
@@ -454,7 +448,7 @@ function LiveStreamingMessage({
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden pl-6"
                     >
-                      <div className="py-1 text-[13px] leading-relaxed text-white/55 whitespace-pre-wrap rounded-lg bg-white/[0.03] px-3 py-2 border border-white/[0.05]">
+                      <div className="py-1 text-[14px] leading-relaxed text-white/60 whitespace-pre-wrap rounded-lg bg-white/[0.03] px-3 py-2 border border-white/[0.05]">
                         {renderMarkdownText(thinkingText)}
                       </div>
                     </motion.div>
@@ -480,9 +474,9 @@ function LiveStreamingMessage({
                 className="py-0.5"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-white/20">⋮</span>
+                  <span className="text-[12px] text-white/25">⋮</span>
                   <Search className="h-3 w-3 text-[#1EAEDB]/70" />
-                  <span className="text-[12px] text-white/50">Searched: <span className="text-[#1EAEDB]/80">{action.content}</span></span>
+                  <span className="text-[13px] text-white/55">Searched: <span className="text-[#1EAEDB]/80">{action.content}</span></span>
                 </div>
                 {results.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pl-6 mt-1">
@@ -514,13 +508,13 @@ function LiveStreamingMessage({
                 transition={{ duration: 0.15 }}
                 className="flex items-center gap-2 py-0.5"
               >
-                <span className="text-[10px] text-white/20">⋮</span>
+                <span className="text-[12px] text-white/25">⋮</span>
                 <Globe className="h-3 w-3 text-[#1EAEDB]/70" />
                 <a
                   href={action.content}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[12px] text-[#1EAEDB]/80 hover:text-[#1EAEDB] hover:underline truncate max-w-[300px]"
+                  className="text-[13px] text-[#1EAEDB]/80 hover:text-[#1EAEDB] hover:underline truncate max-w-[300px]"
                 >
                   {action.detail || action.content}
                 </a>
@@ -537,13 +531,13 @@ function LiveStreamingMessage({
               transition={{ duration: 0.15 }}
               className="flex items-center gap-2 py-0.5"
             >
-              <span className="text-[10px] text-white/20">⋮</span>
+              <span className="text-[12px] text-white/25">⋮</span>
               {isLatest && isStreaming ? (
                 <LoaderIcon className="h-3 w-3 animate-spin text-blue-400/60" />
               ) : (
                 <ActionIcon className={`h-3 w-3 ${color}`} />
               )}
-              <span className="text-[13px] text-white/55 truncate">{label}</span>
+              <span className="text-[14px] text-white/55 truncate">{label}</span>
             </motion.div>
           )
         })}
@@ -570,7 +564,7 @@ function LiveStreamingMessage({
                       className="flex items-center gap-2 py-0.5"
                     >
                       <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                      <span className="text-[12px] text-white/40">Read</span>
+                      <span className="text-[13px] text-white/45">Read</span>
                       <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
                     </motion.div>
                   )
@@ -603,7 +597,7 @@ function LiveStreamingMessage({
                       className="flex items-center gap-2 py-0.5"
                     >
                       <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                      <span className="text-[12px] text-white/40">{isEdit ? 'Edited' : 'Writing'}</span>
+                      <span className="text-[13px] text-white/45">{isEdit ? 'Edited' : 'Writing'}</span>
                       <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
                     </motion.div>
                   )

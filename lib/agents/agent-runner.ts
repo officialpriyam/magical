@@ -285,25 +285,41 @@ async function readStreamWithEvents(
         }
 
         // ── Emit real thinking from the stream text ──
-        // For streamText: the accumulated text IS the agent's reasoning
-        // Emit it as thinking so the user sees actual AI thought process
-        if (!commentaryFieldFound && text.length > 50) {
-          // Extract meaningful thinking from the text (skip JSON boilerplate)
-          const thinkingText = text
-            .replace(/```[\s\S]*?```/g, '') // Skip code blocks
-            .replace(/\{[\s\S]*?\}/g, '') // Skip JSON objects
-            .split('\n')
-            .filter(l => l.trim().length > 15 && !l.trim().startsWith('"') && !l.trim().startsWith('{'))
-            .join('\n')
-            .trim()
+        // Only emit when we have meaningful natural language, NOT JSON/code
+        // Emit at most one thinking per agent run to avoid spam
+        if (!commentaryFieldFound && text.length > 100 && lastThinkingEmitLen === 0) {
+          // Check if this looks like natural language (not pure JSON)
+          const trimmedText = text.trim()
+          const isJson = trimmedText.startsWith('{') || trimmedText.startsWith('[')
+          const isCodeBlock = trimmedText.startsWith('```') || trimmedText.startsWith('import ')
 
-          if (thinkingText.length > lastThinkingEmitLen + 40 && thinkingText.length > 30) {
-            // Emit the latest thinking chunk
-            const chunk = thinkingText.slice(lastThinkingEmitLen, lastThinkingEmitLen + 300)
-            if (chunk.trim().length > 15) {
-              emitter.emitThinking(chunk.trim())
+          if (!isJson && !isCodeBlock) {
+            // Extract first meaningful paragraph as the agent's thinking
+            const paragraphs = trimmedText
+              .split(/\n\n+/)
+              .filter(p => {
+                const t = p.trim()
+                return t.length > 20
+                  && !t.startsWith('{')
+                  && !t.startsWith('[')
+                  && !t.startsWith('"')
+                  && !t.startsWith('```')
+                  && !t.startsWith('import ')
+                  && !t.startsWith('export ')
+                  && !t.startsWith('const ')
+                  && !t.startsWith('function ')
+                  && !/^\s*[{[]/.test(t)
+              })
+
+            // Find first paragraph that looks like reasoning
+            for (const para of paragraphs) {
+              const clean = para.replace(/\s+/g, ' ').trim()
+              if (clean.length > 30 && clean.length < 500) {
+                emitter.emitThinking(clean)
+                lastThinkingEmitLen = text.length // Mark as emitted
+                break
+              }
             }
-            lastThinkingEmitLen = thinkingText.length
           }
         }
 
