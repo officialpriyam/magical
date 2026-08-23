@@ -1204,7 +1204,12 @@ function stripAgentPrefix(text: string): string {
 }
 
 async function fetchWebSearch(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
-  // Call search functions directly (no HTTP roundtrip)
+  // Try self-hosted open-webSearch first (no API key needed)
+  try {
+    const owResults = await searchOpenWebSearch(query)
+    if (owResults.length > 0) return owResults
+  } catch {}
+  // Fallback to other providers
   try {
     const exaResults = await searchExaDirect(query)
     if (exaResults.length > 0) return exaResults
@@ -1319,6 +1324,46 @@ async function searchDuckDuckGoDirect(query: string): Promise<{ title: string; u
   }
 }
 
+// ─── Self-hosted open-webSearch integration ────────────────
+async function searchOpenWebSearch(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
+  const baseUrl = process.env.OPEN_WEBSEARCH_URL
+  if (!baseUrl) return []
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, limit: 5, engines: ['bing', 'duckduckgo', 'startpage'] }),
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!response.ok) return []
+    const data = await response.json()
+    if (data.status !== 'ok' || !data.data) return []
+    const results = Array.isArray(data.data) ? data.data : data.data.results || []
+    return results.slice(0, 5).map((r: any) => ({
+      title: r.title || '',
+      url: r.url || r.link || '',
+      snippet: r.description || r.snippet || r.text || '',
+    }))
+  } catch { return [] }
+}
+
+async function fetchOpenWebSearchUrl(url: string): Promise<{ url: string; title: string; content: string } | null> {
+  const baseUrl = process.env.OPEN_WEBSEARCH_URL
+  if (!baseUrl) return null
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/fetch-web`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, maxChars: 30000 }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!response.ok) return null
+    const data = await response.json()
+    if (data.status !== 'ok' || !data.data) return null
+    return { url, title: data.data.title || url, content: data.data.content || data.data.text || '' }
+  } catch { return null }
+}
+
 // ─── URL auto-fetch ────────────────────────────────────────
 const URL_REGEX = /https?:\/\/[^\s<>")\]]+/gi
 
@@ -1339,6 +1384,12 @@ function extractUrlsFromMessages(messages: ModelMessage[]): string[] {
 }
 
 async function fetchSingleUrl(url: string): Promise<{ url: string; title: string; content: string } | null> {
+  // Try self-hosted open-webSearch first
+  try {
+    const owResult = await fetchOpenWebSearchUrl(url)
+    if (owResult && owResult.content) return owResult
+  } catch {}
+  // Fallback to built-in web-fetch
   try {
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`

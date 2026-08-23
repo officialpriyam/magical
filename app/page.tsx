@@ -2493,50 +2493,132 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               className="relative flex min-h-0 flex-1 overflow-hidden text-white"
             >
               <div className="relative z-10 flex w-full flex-col">
-                <div className="flex flex-1 flex-col items-center justify-center px-3 pt-12 text-center sm:px-4 sm:pt-16">
-                  {!session ? (
-                    <>
-                      {/* Landing page for signed-out users — like Meku */}
-                      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-purple-600/8 rounded-full blur-[160px]" />
-                        <div className="absolute bottom-1/3 left-1/3 w-[400px] h-[400px] bg-blue-500/8 rounded-full blur-[128px]" />
-                        <div className="absolute top-1/2 right-1/4 w-[300px] h-[300px] bg-pink-500/5 rounded-full blur-[128px]" />
+                {/* ─── Landing navbar (Meku-style) ──────────────── */}
+                {!session && isDashboardMode && (
+                  <motion.nav
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                    className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]"
+                  >
+                    <div className="flex items-center gap-8">
+                      <Link href="/" className="flex items-center gap-2">
+                        <img src="/icon.png" alt="Magical AI" className="h-7 w-7" />
+                        <span className="text-lg font-bold text-white">Magical AI</span>
+                      </Link>
+                      <div className="hidden md:flex items-center gap-5">
+                        <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Community</Link>
+                        <Link href="/projects" className="text-sm text-white/50 hover:text-white transition">Templates</Link>
+                        <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Docs</Link>
                       </div>
-                      <div className="mb-5">
-                        <div className="flex items-center justify-center gap-1.5">
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Link href="/auth/login" className="text-sm text-white/60 hover:text-white transition">
+                        Sign In
+                      </Link>
+                      <Link href="/auth/register" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90">
+                        Start for Free
+                      </Link>
+                    </div>
+                  </motion.nav>
+                )}
+
+                {/* ─── Signed-in top bar ──────────────── */}
+                {session && isDashboardMode && (
+                  <motion.nav
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                    className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]"
+                  >
+                    <div className="flex items-center gap-8">
+                      <Link href="/" className="flex items-center gap-2">
+                        <img src="/icon.png" alt="Magical AI" className="h-7 w-7" />
+                        <span className="text-lg font-bold text-white">Magical AI</span>
+                      </Link>
+                      <div className="hidden md:flex items-center gap-5">
+                        <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Community</Link>
+                        <Link href="/projects" className="text-sm text-white/50 hover:text-white transition">Templates</Link>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Community</Link>
+                    </div>
+                  </motion.nav>
+                )}
+
+                <div className="flex flex-1 flex-col items-center justify-center px-3 pt-8 text-center sm:px-4 sm:pt-12">
+                  {/* ─── Mesh gradient background (Meku-style) ─────────── */}
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                    {/* Main mesh gradient orbs */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 2, ease: 'easeOut' }}
+                      className="absolute top-[15%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-br from-blue-500/15 via-purple-500/10 to-pink-500/8 rounded-full blur-[100px]"
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 2.5, ease: 'easeOut', delay: 0.3 }}
+                      className="absolute top-[30%] right-[10%] w-[400px] h-[400px] bg-gradient-to-br from-violet-500/12 to-blue-500/8 rounded-full blur-[100px]"
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 2.5, ease: 'easeOut', delay: 0.5 }}
+                      className="absolute top-[25%] left-[5%] w-[350px] h-[350px] bg-gradient-to-br from-cyan-500/10 to-purple-500/8 rounded-full blur-[100px]"
+                    />
+                    {/* Subtle grid pattern overlay */}
+                    <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+                    {/* Bottom glow bar */}
+                    <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
+                  </div>
+
+                  {!session ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
+                    >
+                      <div className="mb-4">
+                        <div className="flex items-center justify-center gap-0">
                           {[...Array(5)].map((_, i) => (
-                            <div key={i} className="h-7 w-7 rounded-full border-2 border-[#0a0b0a] bg-gradient-to-br from-white/20 to-white/5 -ml-2 first:ml-0" style={{ zIndex: 5 - i }} />
+                            <div key={i} className="h-8 w-8 rounded-full border-2 border-[#0a0b0a] bg-gradient-to-br from-white/25 to-white/5 -ml-2 first:ml-0 overflow-hidden" style={{ zIndex: 5 - i }}>
+                              <div className="w-full h-full bg-gradient-to-br from-blue-400/30 to-purple-400/30" />
+                            </div>
                           ))}
                         </div>
                         <p className="mt-3 text-sm text-white/40">Thousands of builders turning ideas into full-stack web apps with Magical AI</p>
                       </div>
-                      <h1 className="mb-6 max-w-3xl text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl">
+                      <h1 className="mb-5 max-w-3xl text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl leading-tight">
                         Build Full-Stack Web Apps & Sites<br />with Simple AI Prompts
                       </h1>
-                      <div className="flex items-center gap-3 mb-6">
-                        <button type="button" onClick={() => { router.push('/auth/register') }} className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-white/90">
-                          Start for Free
-                        </button>
-                        <button type="button" onClick={() => { router.push('/auth/login') }} className="rounded-full border border-white/15 bg-white/[0.06] px-5 py-2.5 text-sm font-medium text-white/80 transition hover:bg-white/[0.1]">
-                          Sign In
-                        </button>
-                      </div>
-                    </>
+                    </motion.div>
                   ) : (
-                    <>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
+                    >
                       <div className="mb-4 sm:mb-6">
                         <HeroPillSecond />
                       </div>
                       <h1 className="mb-5 max-w-3xl text-xl font-semibold tracking-normal text-white sm:text-2xl sm:mb-7 md:text-4xl">
                         Let&apos;s build something, {displayName}
                       </h1>
-                    </>
+                    </motion.div>
                   )}
-                  <div className="w-full max-w-2xl">
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, ease: 'easeOut', delay: 0.4 }}
+                    className="w-full max-w-2xl"
+                  >
                     {statusNotices}
                     {promptInput}
                     {queueIndicator}
-                  </div>
+                  </motion.div>
                 </div>
 
                 <div className="mx-auto mt-4 w-[calc(100%-1rem)] max-w-7xl border-t border-white/10 bg-[#111315]/80 p-2 backdrop-blur-md sm:mt-6 sm:w-[calc(100%-2rem)] sm:p-3 md:mt-8 md:p-4 lg:p-5">

@@ -19,21 +19,20 @@
   <img src="https://img.shields.io/badge/TypeScript-blue?logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white" alt="Tailwind" />
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?logo=supabase&logoColor=white" alt="Supabase" />
-  <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License" />
 </p>
 
 ---
 
 ## What is Magical AI?
 
-Magical AI is an open-source AI-powered app builder — similar to Bolt.new, Lovable, and v0.dev. Describe what you want to build in natural language, and Magical AI generates, previews, and deploys your full-stack web application in seconds.
+Magical AI is an AI-powered app builder — similar to Bolt.new, Lovable, and v0.dev. Describe what you want to build in natural language, and Magical AI generates, previews, and deploys your full-stack web application in seconds.
 
 ### Features
 
-- **Multi-Agent AI Pipeline** — Plans, architects, builds, reviews, and optimizes code using specialized AI agents
+- **Multi-Agent AI Pipeline** — Plans, architectures, builds, reviews, and optimizes code using specialized AI agents
 - **Live Preview** — See your app running in real-time as the AI generates code
 - **Built-in IDE** — Full code editor with file tree, syntax highlighting, and inline editing
-- **Web Search** — AI fetches live data from the web (Exa, Brave, DuckDuckGo) when building
+- **Web Search** — AI fetches live data from the web when building (self-hosted open-webSearch, Exa, Brave)
 - **Multiple Templates** — Next.js, React, Vue, Svelte, Python (Streamlit/Gradio), HTML/CSS/JS, Expo Mobile, PWA
 - **Sandbox Providers** — E2B, Vercel, Modal, Daytona — no local setup required
 - **Plan Mode** — AI asks clarifying questions before building
@@ -41,7 +40,6 @@ Magical AI is an open-source AI-powered app builder — similar to Bolt.new, Lov
 - **Supabase Integration** — Connect your project for database, auth, and storage management
 - **Community Gallery** — Share public projects and discover what others are building
 - **Message Queue** — Send follow-up prompts while the AI is still working
-- **Dark Mode** — Beautiful dark UI with claymorphism design
 
 ---
 
@@ -82,8 +80,8 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 OPENAI_API_KEY=sk-...            # or any other AI provider
 
-# Optional — web search
-EXA_API_KEY=...
+# Optional — self-hosted web search (no API key needed)
+OPEN_WEBSEARCH_URL=https://your-instance.onrender.com
 
 # Optional — sandbox
 E2B_API_KEY=...
@@ -114,7 +112,7 @@ magical/
 │   ├── preview.tsx         # Live preview panel
 │   └── database-panel.tsx  # Supabase database manager
 ├── lib/                    # Core logic
-│   ├── agents/             # Multi-agent AI pipeline (planner, architect, frontend, etc.)
+│   ├── agents/             # Multi-agent AI pipeline
 │   ├── hooks/              # React hooks (agentic streaming, etc.)
 │   ├── templates.json      # Project templates
 │   └── models.ts           # AI model configuration
@@ -162,18 +160,6 @@ magical/
 
 ---
 
-## Deployment
-
-The easiest way to deploy is on [Vercel](https://vercel.com):
-
-```bash
-npx vercel
-```
-
-Make sure to set all environment variables in the Vercel dashboard.
-
----
-
 ## Environment Variables
 
 See [`.env.example`](.env.example) for the full list. Key variables:
@@ -184,27 +170,29 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anonymous key |
 | `OPENAI_API_KEY` | One of | OpenAI API key |
 | `ANTHROPIC_API_KEY` | One of | Anthropic API key |
-| `EXA_API_KEY` | No | Exa web search (primary) |
+| `OPEN_WEBSEARCH_URL` | No | Self-hosted web search (primary, no API key) |
+| `EXA_API_KEY` | No | Exa web search (fallback) |
 | `E2B_API_KEY` | No | E2B sandbox provider |
 | `MORPH_API_KEY` | No | Morph code editing |
 
 ---
 
-## Contributing
-
-Contributions are welcome! Please open an issue first to discuss what you'd like to change.
-
-```bash
-git checkout -b feature/amazing-feature
-git commit -m 'feat: add amazing feature'
-git push origin feature/amazing-feature
-```
-
----
-
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+**Private Source Code** — This project is proprietary software owned by [priyx](https://github.com/officialpriyam).
+
+You are free to:
+- ✅ Fork this repository for personal reference
+- ✅ Study the code and learn from it
+- ✅ Use it as inspiration for your own projects
+
+You may **NOT**:
+- ❌ Claim this code as your own work
+- ❌ Redistribute this code as a separate project
+- ❌ Use this code in commercial products without permission
+- ❌ Remove or modify the attribution in the source code
+
+For commercial use or collaboration, please contact the author.
 
 ---
 
