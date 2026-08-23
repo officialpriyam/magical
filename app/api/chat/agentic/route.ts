@@ -1037,19 +1037,24 @@ function detectAutoSearchQuery(messages: ModelMessage[]): string | null {
     const content = typeof msg.content === 'string' ? msg.content : ''
     const searchMatch = content.match(/^\[Search:\s*(.+?)\]\s*$/)
     if (searchMatch) return searchMatch[1]
-    // Skip agent prefixes for auto-search detection
-    const agentMatch = content.match(/^\[Agent:\s*\w+\]/)
+    // Agent prefix handling
+    const agentMatch = content.match(/^\[Agent:\s*(\w+)\]/i)
     if (agentMatch) {
-      // If agent is 'search', always search
-      const agent = agentMatch[0].match(/\[Agent:\s*(\w+)\]/)?.[1]
+      const agent = agentMatch[1].toLowerCase()
+      const cleaned = content.replace(/^\[Agent:\s*\w+\]\s*/i, '').trim()
+      // 'search' agent always triggers search
       if (agent === 'search') {
-        const cleaned = content.replace(/^\[Agent:\s*\w+\]\s*/, '').trim()
+        return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
+      }
+      // Other agents: search if the prompt benefits from it
+      if (cleaned && shouldAutoSearch(cleaned)) {
         return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
       }
     }
+    // No agent prefix: strip other prefixes and check
     const cleaned = content.replace(/^\[\w+:\s*.+?\]\s*/, '').trim()
     if (!cleaned) continue
-    if (!shouldAutoSearch(cleaned)) return null
+    if (!shouldAutoSearch(cleaned)) continue
     return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
   }
   return null

@@ -58,6 +58,7 @@ export function Chat({
   agenticActions = [],
   agenticTodos = [],
   agenticStreaming = false,
+  onFileClick,
 }: {
   messages: Message[]
   isLoading: boolean
@@ -70,6 +71,7 @@ export function Chat({
     fragment: DeepPartial<FragmentSchema> | undefined
     result: ExecutionResult | undefined
   }) => void
+  onFileClick?: (filePath: string) => void
   useAgentic?: boolean
   agenticActions?: ToolAction[]
   agenticTodos?: TodoItem[]
@@ -231,6 +233,7 @@ export function Chat({
               todos={agenticTodos}
               isStreaming={true}
               onStop={onStop}
+              onFileClick={onFileClick}
             />
           )
         }
@@ -244,6 +247,7 @@ export function Chat({
               todos={lastAssistant.agenticTodos || []}
               isStreaming={false}
               elapsed={lastAssistant.agenticElapsed}
+              onFileClick={onFileClick}
             />
           )
         }
@@ -255,6 +259,7 @@ export function Chat({
               actions={agenticActions}
               todos={agenticTodos}
               isStreaming={false}
+              onFileClick={onFileClick}
             />
           )
         }
@@ -291,12 +296,14 @@ function LiveStreamingMessage({
   isStreaming,
   onStop,
   elapsed: initialElapsed,
+  onFileClick,
 }: {
   actions: ToolAction[]
   todos: TodoItem[]
   isStreaming: boolean
   onStop?: () => void
   elapsed?: number
+  onFileClick?: (filePath: string) => void
 }) {
   const [elapsed, setElapsed] = useState(initialElapsed || 0)
   const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set())
@@ -580,13 +587,19 @@ function LiveStreamingMessage({
           }
 
           // For non-thinking, non-search actions, show as a simple timeline item
+          // File actions are clickable to open in code view
+          const isFileAction = action.type === 'file_read' || action.type === 'file_write' || action.type === 'file_edit'
+          const filePath = isFileAction ? action.content.replace(/^(Reading|Writing|Editing)\s+/i, '').replace(/\.\.\.$/, '').trim() : ''
+          const handleClick = isFileAction && onFileClick && filePath ? () => onFileClick(filePath) : undefined
+          
           return (
             <motion.div
               key={`${action.timestamp}-${i}`}
               initial={{ opacity: 0, x: -4 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.15 }}
-              className="flex items-center gap-2 py-0.5"
+              className={`flex items-center gap-2 py-0.5 ${isFileAction ? 'cursor-pointer hover:bg-white/[0.04] rounded px-1 -mx-1 transition-colors' : ''}`}
+              onClick={handleClick}
             >
               <span className="text-[12px] text-white/25">⋮</span>
               {isLatest && isStreaming ? (
@@ -594,7 +607,7 @@ function LiveStreamingMessage({
               ) : (
                 <ActionIcon className={`h-3 w-3 ${color}`} />
               )}
-              <span className="text-[14px] text-white/70 truncate">{label}</span>
+              <span className={`text-[14px] truncate ${isFileAction ? 'text-white/85 hover:text-white' : 'text-white/70'}`}>{label}</span>
             </motion.div>
           )
         })}
@@ -618,11 +631,12 @@ function LiveStreamingMessage({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.03 }}
-                      className="flex items-center gap-2 py-0.5"
+                      className={`flex items-center gap-2 py-0.5 ${onFileClick ? 'cursor-pointer hover:bg-white/[0.04] rounded px-1 -mx-1 transition-colors' : ''}`}
+                      onClick={onFileClick ? () => onFileClick(path) : undefined}
                     >
                       <Check className="h-3 w-3 shrink-0 text-emerald-400" />
                       <span className="text-[13px] text-white/60">Read</span>
-                      <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
+                      <code className="text-[11px] text-white/60 hover:text-white/80 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
                     </motion.div>
                   )
                 })}
@@ -651,11 +665,12 @@ function LiveStreamingMessage({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.03 }}
-                      className="flex items-center gap-2 py-0.5"
+                      className={`flex items-center gap-2 py-0.5 ${onFileClick ? 'cursor-pointer hover:bg-white/[0.04] rounded px-1 -mx-1 transition-colors' : ''}`}
+                      onClick={onFileClick ? () => onFileClick(path) : undefined}
                     >
                       <Check className="h-3 w-3 shrink-0 text-emerald-400" />
                       <span className="text-[13px] text-white/60">{isEdit ? 'Edited' : 'Written'}</span>
-                      <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
+                      <code className="text-[11px] text-white/60 hover:text-white/80 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
                     </motion.div>
                   )
                 })}
