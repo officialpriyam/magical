@@ -309,9 +309,9 @@ function LiveStreamingMessage({
     if (action.type === 'file_write' || action.type === 'file_edit') {
       const path = action.content.replace(/^(Writing|Editing)\s+/i, '').replace(/\.\.\.$/, '').trim()
       const isEdit = action.type === 'file_edit'
-      return `${isEdit ? 'Edited' : 'Writing'} ${path}`
+      return isEdit ? `Edited ${path}` : `Written ${path}`
     }
-    if (action.type === 'web_search') return `Explore · ${action.content}`
+    if (action.type === 'web_search') return `Search · ${action.content}`
     if (action.type === 'web_fetch') return `Fetched ${action.content}`
     return action.content
   }
@@ -589,7 +589,7 @@ function LiveStreamingMessage({
               {expandedWrites ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               <span className="text-white/30">⋮</span>
               <FileEdit className="h-3 w-3 text-emerald-400/50" />
-              <span className="font-medium">Writing {fileWriteActions.length} file{fileWriteActions.length === 1 ? '' : 's'}</span>
+              <span className="font-medium">Written {fileWriteActions.length} file{fileWriteActions.length === 1 ? '' : 's'}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-0.5 pl-5">
@@ -605,7 +605,7 @@ function LiveStreamingMessage({
                       className="flex items-center gap-2 py-0.5"
                     >
                       <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                      <span className="text-[13px] text-white/45">{isEdit ? 'Edited' : 'Writing'}</span>
+                      <span className="text-[13px] text-white/45">{isEdit ? 'Edited' : 'Written'}</span>
                       <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
                     </motion.div>
                   )

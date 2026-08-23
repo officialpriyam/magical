@@ -367,8 +367,9 @@ async function runPipeline({
       for (const role of group) {
         const agentName = AGENT_DISPLAY_NAMES[role]
 
-        // Emit real status for agent start
+        // Emit real status and thinking for agent start
         emitAction('status', `Running ${agentName}...`)
+        emitAction('thinking', `${agentName} is analyzing the request and planning the approach...`)
 
         // Emit file reads from context (existing project files the agent sees, deduplicated)
         if (latestFragment.files && latestFragment.files.length > 0) {
@@ -429,6 +430,12 @@ async function runPipeline({
           const agentCommentary = extractCommentary(result)
           if (agentCommentary) {
             emitAction('commentary', agentCommentary)
+          }
+
+          // Emit thinking from the agent's actual reasoning
+          const thinkingText = extractThinking(result)
+          if (thinkingText) {
+            emitAction('thinking', thinkingText)
           }
 
           // Emit REAL file paths from the agent's fragment (deduplicated)
@@ -588,6 +595,40 @@ function extractCommentary(result: AgentResult): string {
     }
   }
   return ''
+}
+
+// ─── Extract thinking/reasoning from agent output ──────────
+function extractThinking(result: AgentResult): string {
+  if (!result.output) return ''
+
+  // Try to find natural language paragraphs that look like reasoning
+  const lines = result.output.split('\n')
+  const thinkingLines: string[] = []
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    // Skip JSON, code blocks, file paths, and short lines
+    if (
+      trimmed.length < 20 ||
+      trimmed.startsWith('{') ||
+      trimmed.startsWith('[') ||
+      trimmed.startsWith('"') ||
+      trimmed.startsWith('```') ||
+      trimmed.startsWith('import ') ||
+      trimmed.startsWith('export ') ||
+      trimmed.startsWith('const ') ||
+      trimmed.startsWith('function ') ||
+      trimmed.startsWith('///') ||
+      trimmed.match(/^[A-Z]:\\/)
+    ) continue
+
+    thinkingLines.push(trimmed)
+    if (thinkingLines.length >= 3) break
+  }
+
+  if (thinkingLines.length === 0) return ''
+  const thinking = thinkingLines.join(' ').replace(/\s+/g, ' ').trim()
+  return thinking.length > 300 ? `${thinking.slice(0, 297)}...` : thinking
 }
 
 // ─── Extract real todos from planner output ─────────────────

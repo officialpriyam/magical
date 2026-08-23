@@ -211,7 +211,7 @@ async function readStreamWithEvents(
   let text = ''
   let lastEmitTime = Date.now()
   let lastCommentaryEmitLen = 0
-  let lastThinkingEmitLen = 0
+  let thinkingEmittedCount = 0
   const EMIT_INTERVAL = 250 // Emit commentary every 250ms for live streaming feel
 
   // Track commentary extraction state across chunks
@@ -284,40 +284,64 @@ async function readStreamWithEvents(
           }
         }
 
-        // ── Emit real thinking from the stream text ──
-        // Only emit when we have meaningful natural language, NOT JSON/code
-        // Emit at most one thinking per agent run to avoid spam
-        if (!commentaryFieldFound && text.length > 100 && lastThinkingEmitLen === 0) {
-          // Check if this looks like natural language (not pure JSON)
-          const trimmedText = text.trim()
-          const isJson = trimmedText.startsWith('{') || trimmedText.startsWith('[')
-          const isCodeBlock = trimmedText.startsWith('```') || trimmedText.startsWith('import ')
+        // ── Emit real thinking from the stream ──
+        // For streamObject: extract reasoning from commentary field
+        // For streamText: extract natural language paragraphs
+        // Emit up to 3 thinking entries per agent (enough for real reasoning)
+        if (thinkingEmittedCount < 3 && text.length > 50) {
+          // For streamObject: emit commentary text as thinking (it IS the reasoning)
+          if (commentaryFieldFound && commentaryStartIdx >= 0 && commentaryStartIdx < text.length) {
+            const raw = text.slice(commentaryStartIdx)
+            let endIdx = -1
+            let escaped = false
+            for (let i = 0; i < Math.min(raw.length, 600); i++) {
+              if (escaped) { escaped = false; continue }
+              if (raw[i] === '\\') { escaped = true; continue }
+              if (raw[i] === '"') { endIdx = i; break }
+            }
+            const commentaryText = (endIdx >= 0 ? raw.slice(0, endIdx) : raw.slice(0, 300))
+              .replace(/\\n/g, '\n')
+              .replace(/\\"/g, '"')
+              .trim()
+            if (commentaryText.length > 30 && commentaryText.length < 500) {
+              // Only emit if it looks like natural language reasoning (not file paths or JSON)
+              const isNaturalLanguage = !commentaryText.startsWith('/')
+                && !commentaryText.startsWith('{')
+                && !commentaryText.match(/^[A-Z]:\\/)
+                && commentaryText.split(' ').length > 5
+              if (isNaturalLanguage) {
+                emitter.emitThinking(commentaryText)
+                thinkingEmittedCount++
+              }
+            }
+          }
 
-          if (!isJson && !isCodeBlock) {
-            // Extract first meaningful paragraph as the agent's thinking
-            const paragraphs = trimmedText
-              .split(/\n\n+/)
-              .filter(p => {
-                const t = p.trim()
-                return t.length > 20
-                  && !t.startsWith('{')
-                  && !t.startsWith('[')
-                  && !t.startsWith('"')
-                  && !t.startsWith('```')
-                  && !t.startsWith('import ')
-                  && !t.startsWith('export ')
-                  && !t.startsWith('const ')
-                  && !t.startsWith('function ')
-                  && !/^\s*[{[]/.test(t)
-              })
-
-            // Find first paragraph that looks like reasoning
-            for (const para of paragraphs) {
-              const clean = para.replace(/\s+/g, ' ').trim()
-              if (clean.length > 30 && clean.length < 500) {
-                emitter.emitThinking(clean)
-                lastThinkingEmitLen = text.length // Mark as emitted
-                break
+          // For streamText: extract meaningful paragraphs as thinking
+          if (!commentaryFieldFound && lastCommentaryEmitLen === 0) {
+            const trimmedText = text.trim()
+            const isPureJson = trimmedText.startsWith('{') && trimmedText.includes('"commentary"')
+            if (!isPureJson && trimmedText.length > 100) {
+              const paragraphs = trimmedText
+                .split(/\n\n+/)
+                .filter(p => {
+                  const t = p.trim()
+                  return t.length > 30
+                    && !t.startsWith('{')
+                    && !t.startsWith('[')
+                    && !t.startsWith('"')
+                    && !t.startsWith('```')
+                    && !t.startsWith('import ')
+                    && !t.startsWith('export ')
+                    && !t.startsWith('const ')
+                    && !t.startsWith('function ')
+                })
+              for (const para of paragraphs) {
+                const clean = para.replace(/\s+/g, ' ').trim()
+                if (clean.length > 30 && clean.length < 500) {
+                  emitter.emitThinking(clean)
+                  thinkingEmittedCount++
+                  break
+                }
               }
             }
           }
