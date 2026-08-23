@@ -112,13 +112,19 @@ export function Chat({
           {message.content.map((content, id) => {
             if (content.type === 'text') {
               const text = content.text || ''
-              // Strip style injection metadata from display
+              // Strip ALL injection metadata from display (agent, style, search, think, canvas)
               const cleanedText = text
-                .replace(/\[Style:\s*[^\]]*\]\s*/g, '')
-                .replace(/\[Custom Style\]\s*/g, '')
+                .replace(/\[Agent:\s*\w+\]\s*/gi, '')
+                .replace(/\[Style:\s*[^\]]*\][\s\S]*$/g, '')
+                .replace(/\[Custom Style\][\s\S]*$/g, '')
+                .replace(/\[Search:\s*[^\]]*\]\s*/g, '')
+                .replace(/\[Think:\s*[^\]]*\]\s*/g, '')
+                .replace(/\[Canvas:\s*[^\]]*\]\s*/g, '')
                 .trim()
               // If nothing remains after cleaning, skip rendering
               if (!cleanedText && message.role === 'user') return null
+              // Detect agent prefix for icon display
+              const agentMatch = text.match(/^\[Agent:\s*(\w+)\]/i)
               const displayText = cleanedText || text
               const searchMatch = displayText.match(/^\[Search:\s*(.*?)\]\s*$/)
               const thinkMatch = displayText.match(/^\[Think:\s*(.*?)\]\s*$/)
@@ -157,7 +163,17 @@ export function Chat({
                   </span>
                 )
               }
-              return <span key={id} className="text-white/95 leading-relaxed">{renderMarkdownText(displayText)}</span>
+              return (
+                <span key={id} className="block">
+                  {agentMatch && message.role === 'user' && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/30 bg-purple-400/10 px-2 py-0.5 text-[11px] text-purple-300 mb-1">
+                      <Cpu className="h-3 w-3" />
+                      {agentMatch[1]}
+                    </span>
+                  )}
+                  <span className="text-white/95 leading-relaxed">{renderMarkdownText(displayText)}</span>
+                </span>
+              )
             }
             if (content.type === 'image') {
               return (
@@ -228,6 +244,17 @@ export function Chat({
               todos={lastAssistant.agenticTodos || []}
               isStreaming={false}
               elapsed={lastAssistant.agenticElapsed}
+            />
+          )
+        }
+        // Fallback: show live actions even after streaming ends (before persistence completes)
+        if (!agenticStreaming && agenticActions.length > 0) {
+          return (
+            <LiveStreamingMessage
+              key="live-stream-done"
+              actions={agenticActions}
+              todos={agenticTodos}
+              isStreaming={false}
             />
           )
         }

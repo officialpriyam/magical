@@ -775,16 +775,27 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
 
     if (!hasAssistantResponse && messagesRef.current.length > 0) {
-      // Create a minimal assistant message so the chat isn't empty
+      // Always create an assistant message so the Magical message persists
       const frag = agenticStream.fragment || fragment
-      // Include latest commentary from agentic actions in the fragment
       const commentaryActions = agenticStream.actions.filter((a: any) => a.type === 'commentary' || a.type === 'commentary_chunk')
       const latestCommentary = commentaryActions.length > 0 ? commentaryActions[commentaryActions.length - 1].content : ''
       const fragWithCommentary = latestCommentary ? { ...frag, commentary: frag?.commentary || latestCommentary } : frag
+      // Create assistant message even with minimal data — agentic actions are the important part
+      const assistantContent: Message['content'] = [
+        { type: 'text', text: latestCommentary || fragWithCommentary?.commentary || 'Generation complete.' },
+      ]
+      const assistantMsg: Message = {
+        role: 'assistant',
+        content: assistantContent,
+        agenticActions: agenticStream.actions,
+        agenticTodos: agenticStream.todos,
+        agenticElapsed: elapsed,
+      }
       if (fragWithCommentary && (fragWithCommentary.code || fragWithCommentary.files || fragWithCommentary.title || fragWithCommentary.description || fragWithCommentary.commentary)) {
+        // Merge fragment data into the assistant message
+        assistantMsg.content = assistantContent
         setMessages(prev => {
           const nextMessages = withLatestAssistantFragment(prev, fragWithCommentary)
-          // Also persist agentic state
           const lastIdx = nextMessages.length - 1
           if (lastIdx >= 0) {
             nextMessages[lastIdx] = {
@@ -796,6 +807,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           }
           messagesRef.current = nextMessages
           return nextMessages
+        })
+      } else if (agenticStream.actions.length > 0) {
+        // No fragment data but we have actions — still persist them
+        setMessages(prev => {
+          const next = [...prev, assistantMsg]
+          messagesRef.current = next
+          return next
         })
       }
     }
