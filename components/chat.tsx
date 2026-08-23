@@ -255,6 +255,15 @@ function LiveStreamingMessage({
   const [expandedReads, setExpandedReads] = useState(false)
   const [expandedWrites, setExpandedWrites] = useState(false)
 
+  // Auto-expand all sections when streaming completes so user can see results
+  useEffect(() => {
+    if (!isStreaming && actions.length > 0) {
+      setExpandedThoughts(new Set(thinkingActions.map((_, i) => i)))
+      if (fileReadActions.length > 0) setExpandedReads(true)
+      if (fileWriteActions.length > 0) setExpandedWrites(true)
+    }
+  }, [isStreaming])
+
   // Live timer
   useEffect(() => {
     if (!isStreaming || actions.length === 0) return
@@ -381,11 +390,10 @@ function LiveStreamingMessage({
         )}
       </div>
 
-      {/* Timeline area — flows with page scroll during streaming */}
-      {isStreaming && (
+      {/* Timeline area — flows with page scroll, visible during and after streaming */}
       <div className="pl-8 space-y-1">
-        {/* Connecting state — when streaming but no actions yet */}
-        {actions.length === 0 && (
+        {/* Connecting state — only show during streaming when no actions yet */}
+        {isStreaming && actions.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -610,7 +618,6 @@ function LiveStreamingMessage({
         {/* Web search items are intentionally hidden — user requested removal of blue search boxes */}
 
       </div>
-      )}
 
       {/* In-message to-dos */}
       {todos.length > 0 && (
