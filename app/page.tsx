@@ -2493,7 +2493,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               className="relative flex min-h-0 flex-1 overflow-hidden text-white"
             >
               <div className="relative z-10 flex w-full flex-col">
-                {/* ─── Landing navbar (Meku-style) ──────────────── */}
+                {/* ─── Landing navbar (Meku-style, no logo, centered nav) ── */}
                 {!session && isDashboardMode && (
                   <motion.nav
                     initial={{ opacity: 0, y: -10 }}
@@ -2501,17 +2501,14 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     transition={{ duration: 0.5, ease: 'easeOut' }}
                     className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]"
                   >
-                    <div className="flex items-center gap-8">
-                      <Link href="/" className="flex items-center gap-2">
-                        <img src="/icon.png" alt="Magical AI" className="h-7 w-7" />
-                        <span className="text-lg font-bold text-white">Magical AI</span>
-                      </Link>
-                      <div className="hidden md:flex items-center gap-5">
-                        <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Community</Link>
-                        <Link href="/projects" className="text-sm text-white/50 hover:text-white transition">Templates</Link>
-                        <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Docs</Link>
-                      </div>
+                    <div className="w-20" />
+                    {/* Center nav links */}
+                    <div className="hidden md:flex items-center gap-6">
+                      <Link href="/docs" className="text-sm text-white/50 hover:text-white transition">Docs</Link>
+                      <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Community</Link>
+                      <Link href="/projects" className="text-sm text-white/50 hover:text-white transition">Templates</Link>
                     </div>
+                    {/* Right buttons */}
                     <div className="flex items-center gap-3">
                       <Link href="/auth/login" className="text-sm text-white/60 hover:text-white transition">
                         Sign In
@@ -2523,7 +2520,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   </motion.nav>
                 )}
 
-                {/* ─── Signed-in top bar ──────────────── */}
+                {/* ─── Signed-in top bar (centered nav) ──────────── */}
                 {session && isDashboardMode && (
                   <motion.nav
                     initial={{ opacity: 0, y: -10 }}
@@ -2531,19 +2528,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                     transition={{ duration: 0.5, ease: 'easeOut' }}
                     className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]"
                   >
-                    <div className="flex items-center gap-8">
-                      <Link href="/" className="flex items-center gap-2">
-                        <img src="/icon.png" alt="Magical AI" className="h-7 w-7" />
-                        <span className="text-lg font-bold text-white">Magical AI</span>
-                      </Link>
-                      <div className="hidden md:flex items-center gap-5">
-                        <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Community</Link>
-                        <Link href="/projects" className="text-sm text-white/50 hover:text-white transition">Templates</Link>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
+                    <div className="w-20" />
+                    <div className="hidden md:flex items-center gap-6">
+                      <Link href="/docs" className="text-sm text-white/50 hover:text-white transition">Docs</Link>
                       <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Community</Link>
+                      <Link href="/projects" className="text-sm text-white/50 hover:text-white transition">Templates</Link>
                     </div>
+                    <div className="w-20" />
                   </motion.nav>
                 )}
 
@@ -2582,12 +2573,20 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
                     >
                       <div className="mb-4">
-                        <div className="flex items-center justify-center gap-0">
-                          {[...Array(5)].map((_, i) => (
-                            <div key={i} className="h-8 w-8 rounded-full border-2 border-[#0a0b0a] bg-gradient-to-br from-white/25 to-white/5 -ml-2 first:ml-0 overflow-hidden" style={{ zIndex: 5 - i }}>
-                              <div className="w-full h-full bg-gradient-to-br from-blue-400/30 to-purple-400/30" />
-                            </div>
-                          ))}
+                        <div className="flex items-center justify-center">
+                          <div className="flex -space-x-2">
+                            {[
+                              'bg-gradient-to-br from-blue-400 to-blue-600',
+                              'bg-gradient-to-br from-purple-400 to-purple-600',
+                              'bg-gradient-to-br from-pink-400 to-pink-600',
+                              'bg-gradient-to-br from-cyan-400 to-cyan-600',
+                              'bg-gradient-to-br from-emerald-400 to-emerald-600',
+                            ].map((gradient, i) => (
+                              <div key={i} className={`relative h-8 w-8 rounded-full ${gradient} ring-2 ring-[#0a0b0a] flex items-center justify-center text-[10px] font-bold text-white/80`} style={{ zIndex: 5 - i }}>
+                                {['A', 'B', 'C', 'D', 'E'][i]}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                         <p className="mt-3 text-sm text-white/40">Thousands of builders turning ideas into full-stack web apps with Magical AI</p>
                       </div>

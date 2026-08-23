@@ -68,11 +68,11 @@ export default function LoginPage() {
   }
 
   const providerLabels: Record<string, string> = {
-    google: 'Continue with Google',
-    github: 'Continue with GitHub',
-    discord: 'Continue with Discord',
-    facebook: 'Continue with Facebook',
-    twitter: 'Continue with Twitter',
+    google: 'Google',
+    github: 'GitHub',
+    discord: 'Discord',
+    facebook: 'Facebook',
+    twitter: 'Twitter',
   }
 
   return (
@@ -80,11 +80,7 @@ export default function LoginPage() {
       <div className="flex flex-1 flex-col justify-center px-8 py-12 sm:px-12 lg:px-16 xl:px-24">
         <div className="mx-auto w-full max-w-md">
           <Link href="/" className="flex items-center gap-2.5 mb-10">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
-              <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-              </svg>
-            </div>
+            <img src="/icon.png" alt="" className="h-9 w-9" />
             <span className="text-xl font-bold text-white">Magical AI</span>
           </Link>
 
@@ -199,11 +195,7 @@ export default function LoginPage() {
         </div>
         <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
         <div className="relative z-10 text-center px-12">
-          <div className="flex h-20 w-20 mx-auto mb-8 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/30 to-purple-600/30 border border-white/10">
-            <svg className="h-10 w-10 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-            </svg>
-          </div>
+          <img src="/icon.png" alt="" className="h-20 w-20 mx-auto mb-8" />
           <h2 className="text-2xl font-bold text-white mb-3">Build with Magical AI</h2>
           <p className="text-white/40 text-sm leading-relaxed max-w-sm mx-auto">
             Create full-stack web apps and mobile apps with simple AI prompts. Plan, build, and deploy — all in one place.
