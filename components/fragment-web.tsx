@@ -39,22 +39,49 @@ export function FragmentWeb({ result }: { result: ExecutionResultWeb }) {
   const VpIcon = vpConfig.icon
   const isMobile = viewport !== 'desktop'
 
+  // Detect if this is a mobile app (Expo/React Native) by checking the URL
+  const isMobileApp = /expo|react-native|:8081/.test(result.url)
+
   return (
     <div className="flex flex-col w-full h-full bg-[#0a0a0b]">
       {/* Preview area with centered viewport */}
-      <div className="flex-1 overflow-hidden flex items-start justify-center bg-[#0a0a0b] p-0">
-        <div
-          className={`h-full transition-all duration-300 ${isMobile ? 'border-x border-white/[0.06] shadow-2xl' : 'w-full'}`}
-          style={{ width: vpConfig.width, maxWidth: isMobile ? '100%' : '100%' }}
-        >
-          <iframe
-            key={iframeKey}
-            className="h-full w-full border-0"
-            sandbox="allow-forms allow-scripts allow-same-origin"
-            loading="lazy"
-            src={result.url}
-          />
-        </div>
+      <div className="flex-1 overflow-hidden flex items-center justify-center bg-[#0a0a0b] p-4">
+        {isMobileApp ? (
+          /* Phone frame for mobile apps */
+          <div className="relative flex flex-col items-center">
+            {/* Phone bezel */}
+            <div className="relative rounded-[2.5rem] border-[3px] border-[#2a2b2d] bg-[#1a1b1d] shadow-2xl" style={{ width: 390, height: 844 }}>
+              {/* Notch */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 h-7 w-36 rounded-b-2xl bg-[#1a1b1d] z-10" />
+              {/* Screen */}
+              <div className="absolute inset-[3px] overflow-hidden rounded-[2.2rem]">
+                <iframe
+                  key={iframeKey}
+                  className="h-full w-full border-0"
+                  sandbox="allow-forms allow-scripts allow-same-origin"
+                  loading="lazy"
+                  src={result.url}
+                />
+              </div>
+              {/* Home indicator */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 h-1.5 w-28 rounded-full bg-white/20" />
+            </div>
+          </div>
+        ) : (
+          /* Regular viewport */
+          <div
+            className={`h-full transition-all duration-300 ${isMobile ? 'border-x border-white/[0.06] shadow-2xl rounded-xl overflow-hidden' : 'w-full'}`}
+            style={{ width: vpConfig.width, maxWidth: '100%' }}
+          >
+            <iframe
+              key={iframeKey}
+              className="h-full w-full border-0"
+              sandbox="allow-forms allow-scripts allow-same-origin"
+              loading="lazy"
+              src={result.url}
+            />
+          </div>
+        )}
       </div>
       {/* Bottom bar with URL, viewport toggle, and open-in-new-tab */}
       <div className="shrink-0 border-t border-white/[0.08] bg-[#151615] px-3 py-2">

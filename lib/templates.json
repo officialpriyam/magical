@@ -48,6 +48,20 @@
     "instructions": "A Svelte app with Vite. Lightweight and reactive UI components.",
     "port": 5173
   },
+  "expo-mobile": {
+    "name": "Mobile App (Expo)",
+    "lib": ["expo@~52.0.0", "react-native@0.76.0", "react@18.3.1", "expo-router", "expo-status-bar", "react-native-safe-area-context", "react-native-screens", "@expo/vector-icons"],
+    "file": "app/(tabs)/index.tsx",
+    "instructions": "A React Native Expo app with expo-router. Generate a complete mobile app with proper navigation, screens, and components. Use React Native components (View, Text, ScrollView, TouchableOpacity, FlatList, Image, etc.) instead of HTML elements. Include proper SafeAreaView, StatusBar, and mobile-specific styling. The app must be installable on phones via Expo Go or EAS Build. Use StyleSheet.create for styling. Support both iOS and Android.",
+    "port": 8081
+  },
+  "pwa-mobile": {
+    "name": "Mobile PWA",
+    "lib": ["react@latest", "react-dom@latest", "vite", "@vitejs/plugin-react", "typescript", "tailwindcss", "vite-plugin-pwa"],
+    "file": "src/App.tsx",
+    "instructions": "A Progressive Web App (PWA) that can be installed on mobile devices. Generate a complete mobile-first web app with installable PWA manifest, service worker, offline support, and app-like UI. Include proper viewport meta tags, apple-touch-icon, theme-color, and a web manifest. Use touch-friendly UI (44px touch targets, swipe gestures, bottom navigation). The app should feel native when installed on a phone.",
+    "port": 5173
+  },
   "streamlit-developer": {
     "name": "Streamlit",
     "lib": [

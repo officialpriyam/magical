@@ -79,6 +79,13 @@ export const slashCommands: SlashCommand[] = [
     category: 'Agent',
     agent: 'think'
   },
+  {
+    command: '/mobile',
+    description: 'Build a mobile app with React Native/Expo (installable on phones)',
+    icon: '📱',
+    category: 'Agent',
+    agent: 'build'
+  },
   // ─── Skills (from skills.sh) ─────────────────────────────────
   {
     command: '/design',
@@ -215,6 +222,11 @@ export function extractCommand(input: string): { command: string; args: string }
 // ─── Auto-detect agent skill from prompt content ───────────────
 export function detectAgentFromPrompt(prompt: string): string | null {
   const lower = prompt.toLowerCase()
+
+  // Mobile app request
+  if (/\b(mobile\s*app|react\s*native|expo|ios|android|installable|install.*phone|phone\s*app)\b/i.test(lower)) {
+    return 'build'
+  }
 
   // Fix errors / bugs
   if (/\b(fix|bug|error|broken|issue|crash|debug|not work|doesn't work)\b/i.test(lower)) {

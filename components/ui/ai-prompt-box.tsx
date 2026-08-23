@@ -1,7 +1,7 @@
 import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowUp, Check, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCog, Server, Shuffle, Settings2, Palette } from "lucide-react";
+import { ArrowUp, Check, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCog, Server, Shuffle, Settings2, Palette, Smartphone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ChatSettings } from '../chat-settings'
@@ -548,6 +548,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const [showSearch, setShowSearch] = React.useState(false);
   const [showThink, setShowThink] = React.useState(false);
   const [showCanvas, setShowCanvas] = React.useState(false);
+  const [showMobile, setShowMobile] = React.useState(false);
   const uploadInputRef = React.useRef<HTMLInputElement>(null);
   const promptBoxRef = React.useRef<HTMLDivElement>(null);
   const [showSlashCommands, setShowSlashCommands] = React.useState(false);
@@ -566,6 +567,18 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   };
 
   const handleCanvasToggle = () => setShowCanvas(prev => !prev);
+  const handleMobileToggle = () => {
+    setShowMobile(prev => {
+      const next = !prev
+      // Switch template when mobile is toggled
+      if (next) {
+        onSelectedTemplateChange?.('expo-mobile' as any)
+      } else {
+        onSelectedTemplateChange?.('auto' as any)
+      }
+      return next
+    })
+  };
 
   const isImageFile = (file: File) => file.type.startsWith("image/");
 
@@ -646,8 +659,10 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
           formattedInput = `[Search: ${input}]`;
         } else if (showThink) {
           formattedInput = `[Think: ${input}]`;
-        } else if (showCanvas) {
+        } else      if (showCanvas) {
           formattedInput = `[Canvas: ${input}]`;
+        } else if (showMobile) {
+          formattedInput = `[Mobile App] ${input}`;
         }
       }
 
@@ -830,6 +845,8 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                 ? "Think deeply..."
                 : showCanvas
                 ? "Create on canvas..."
+                : showMobile
+                ? "Describe your mobile app..."
                 : placeholder
             }
             className="text-base"
@@ -1025,6 +1042,42 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                       className="text-xs overflow-hidden whitespace-nowrap text-[#ec4899] flex-shrink-0"
                     >
                       Style
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </button>
+
+              <CustomDivider />
+
+              <button
+                type="button"
+                onClick={handleMobileToggle}
+                className={cn(
+                  "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                  showMobile
+                    ? "bg-[#10b981]/15 border-[#10b981] text-[#10b981]"
+                    : "bg-transparent border-transparent text-muted-foreground hover:text-primary"
+                )}
+              >
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                  <motion.div
+                    animate={{ rotate: showMobile ? 360 : 0, scale: showMobile ? 1.1 : 1 }}
+                    whileHover={{ rotate: showMobile ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
+                    transition={{ type: "spring", stiffness: 260, damping: 25 }}
+                  >
+                    <Smartphone className={cn("w-4 h-4", showMobile ? "text-[#10b981]" : "text-inherit")} />
+                  </motion.div>
+                </div>
+                <AnimatePresence>
+                  {showMobile && (
+                    <motion.span
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: "auto", opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-xs overflow-hidden whitespace-nowrap text-[#10b981] flex-shrink-0"
+                    >
+                      Mobile
                     </motion.span>
                   )}
                 </AnimatePresence>

@@ -185,6 +185,28 @@ export async function POST(req: Request) {
   // Auto web search: detect if the query needs up-to-date information
   const autoSearchQuery = detectAutoSearchQuery(messages)
   let enrichedMessages = [...messages]
+
+  // Detect mobile app request and fetch Expo/React Native docs
+  const isMobileAppRequest = /\b(mobile\s*app|react\s*native|expo|ios|android|installable|install.*phone|pwa|progressive)\b/i.test(promptText)
+  if (isMobileAppRequest) {
+    try {
+      console.log('[Mobile] Detected mobile app request, fetching Expo docs...')
+      const expoDocs = await fetchWebSearch('React Native Expo tutorial 2024 app.json navigation expo-router')
+      if (expoDocs.length > 0) {
+        emitAction('web_search', 'React Native Expo docs', JSON.stringify(expoDocs.map(r => ({ title: r.title, url: r.url, snippet: r.snippet }))))
+        const docsContext = expoDocs.map((r, i) => `[${i + 1}] ${r.title}\n    ${r.url}\n    ${r.snippet}`).join('\n\n')
+        enrichedMessages = [
+          ...enrichedMessages,
+          {
+            role: 'user' as const,
+            content: `React Native Expo reference docs (use these for accurate mobile app generation):\n\n${docsContext}\n\nUse these docs as reference for generating the mobile app. Follow Expo and React Native best practices.`,
+          },
+        ]
+      }
+    } catch (err) {
+      console.error('[Mobile] Failed to fetch Expo docs:', err)
+    }
+  }
   if (autoSearchQuery) {
     try {
       console.log(`[WebSearch] Auto-searching for: ${autoSearchQuery}`)
