@@ -205,6 +205,17 @@ export function Chat({
               return <WebSearchCard key={id} query={content.query} results={content.results} />
             }
           })}
+          {/* Persisted agentic timeline — render inline with each assistant message */}
+          {message.role === 'assistant' && message.agenticActions && message.agenticActions.length > 0 && !agenticStreaming && (
+            <LiveStreamingMessage
+              key={`persisted-${index}`}
+              actions={message.agenticActions}
+              todos={message.agenticTodos || []}
+              isStreaming={false}
+              elapsed={message.agenticElapsed}
+              onFileClick={onFileClick}
+            />
+          )}
         </motion.div>
       ))}
 
@@ -222,49 +233,17 @@ export function Chat({
         )
       })()}
 
-      {/* Live streaming message — shows during and after generation when actions exist */}
-      {(() => {
-        // During streaming: use live agentic state
-        if (agenticStreaming && agenticActions.length > 0) {
-          return (
-            <LiveStreamingMessage
-              key="live-stream"
-              actions={agenticActions}
-              todos={agenticTodos}
-              isStreaming={true}
-              onStop={onStop}
-              onFileClick={onFileClick}
-            />
-          )
-        }
-        // After streaming: use persisted state from the last assistant message
-        const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
-        if (lastAssistant?.agenticActions && lastAssistant.agenticActions.length > 0 && !agenticStreaming) {
-          return (
-            <LiveStreamingMessage
-              key={`persisted-${messages.length}`}
-              actions={lastAssistant.agenticActions}
-              todos={lastAssistant.agenticTodos || []}
-              isStreaming={false}
-              elapsed={lastAssistant.agenticElapsed}
-              onFileClick={onFileClick}
-            />
-          )
-        }
-        // Fallback: show live actions even after streaming ends (before persistence completes)
-        if (!agenticStreaming && agenticActions.length > 0) {
-          return (
-            <LiveStreamingMessage
-              key="live-stream-done"
-              actions={agenticActions}
-              todos={agenticTodos}
-              isStreaming={false}
-              onFileClick={onFileClick}
-            />
-          )
-        }
-        return null
-      })()}
+      {/* Live streaming message — during active streaming */}
+      {agenticStreaming && agenticActions.length > 0 && (
+        <LiveStreamingMessage
+          key="live-stream"
+          actions={agenticActions}
+          todos={agenticTodos}
+          isStreaming={true}
+          onStop={onStop}
+          onFileClick={onFileClick}
+        />
+      )}
       {/* Status card — only during loading, NOT after generation (artifact card handles that) */}
       {(
         !useAgentic ||

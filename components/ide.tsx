@@ -277,9 +277,9 @@ export function IDE({
     }
   }, [session, isSandboxMode, fetchFiles])
 
-  // Immediately load fragment files when available (fast path — no network needed)
+  // When sandbox-storage is unavailable and we have fragment files, load them
   useEffect(() => {
-    if (fragmentFiles.length > 0 && files.length === 0 && storageStatus !== 'ok') {
+    if (storageStatus === 'error' && files.length === 0 && fragmentFiles.length > 0) {
       const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
         name: f.path.split('/').pop() || f.path,
         path: f.path,
@@ -290,9 +290,9 @@ export function IDE({
       setFiles(fsNodes)
       setStorageStatus('ok')
       setLoadError(null)
-      console.log(`[IDE] Loaded ${fragmentFiles.length} files from fragment (fast path)`)
+      console.log(`[IDE] Loaded ${fragmentFiles.length} files from fragment (sandbox-storage unavailable)`)
     }
-  }, [fragmentFiles, files.length, storageStatus])
+  }, [storageStatus, files.length, fragmentFiles])
 
   useEffect(() => {
     return () => {

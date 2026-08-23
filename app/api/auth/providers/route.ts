@@ -1,7 +1,7 @@
 import { supabaseUrl, supabaseServiceRoleKey } from '@/lib/supabase-credentials'
 import { Provider } from '@supabase/supabase-js'
 
-const COMMON_PROVIDERS: Provider[] = ['github', 'google', 'discord', 'gitlab', 'bitbucket', 'facebook', 'twitter']
+const COMMON_PROVIDERS: Provider[] = ['github', 'google', 'discord', 'facebook', 'twitter', 'gitlab', 'bitbucket', 'linkedin', 'slack', 'twitch', 'apple', 'notion']
 
 export async function GET() {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -23,16 +23,20 @@ export async function GET() {
         const location = res.headers.get('location') || ''
         const body = await res.text().catch(() => '')
 
+        // 302 redirect = provider is configured and working
         if (res.status === 302) {
-          if (location && !location.includes('error') && !location.includes('unsupported') && !location.includes('invalid_request')) {
+          if (location && !location.includes('error=server_error') && !location.includes('unsupported')) {
             return provider
           }
         }
 
-        if (res.status === 200 && body) {
-          if (!body.includes('unsupported') && !body.includes('Provider not found') && !body.includes('invalid')) {
-            return provider
+        // 200 with OAuth page = provider is configured
+        if (res.status === 200 && body && body.length > 100) {
+          // Only reject if it clearly says unsupported
+          if (body.includes('Provider "' + provider + '" is not enabled')) {
+            return null
           }
+          return provider
         }
 
         return null

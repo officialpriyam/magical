@@ -72,13 +72,13 @@ export function DatabasePanel({ projectId, isSupabaseConnected }: { projectId?: 
               <Database className="h-8 w-8 text-white/25" />
             </div>
             <div className="text-center space-y-2">
-              <p className="text-sm font-medium text-white/70">Connect Supabase to manage your database</p>
+              <p className="text-sm font-medium text-white/70">No Supabase connected</p>
               <p className="max-w-sm text-xs text-white/40 leading-relaxed">
-                Connect your project to Supabase to manage tables, authentication, storage, edge functions, and more — all from here.
+                Tell the AI to integrate Supabase database into your project — it will set up tables, auth, storage, and more automatically.
               </p>
-              <button className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition">
-                Connect Supabase
-              </button>
+              <p className="max-w-xs text-[11px] text-white/25 mt-2 font-mono bg-white/[0.03] rounded-lg px-3 py-2">
+                &quot;Connect Supabase to this project and add a users table&quot;
+              </p>
             </div>
           </div>
         ) : activeTab === 'tables' ? (

@@ -2495,47 +2495,41 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               <div className="relative z-10 flex w-full flex-col">
                 {/* ─── Landing navbar (Meku-style, no logo, centered nav) ── */}
                 {!session && isDashboardMode && (
-                  <motion.nav
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, ease: 'easeOut' }}
-                    className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]"
+                  <nav
+                    className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06] animate-[fadeDown_0.5s_ease-out]"
                   >
                     <div className="w-20" />
                     {/* Center nav links */}
                     <div className="hidden md:flex items-center gap-6">
-                      <Link href="/docs" className="text-sm text-white/50 hover:text-white transition">Docs</Link>
-                      <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Community</Link>
-                      <Link href="/projects" className="text-sm text-white/50 hover:text-white transition">Templates</Link>
+                      <Link href="/docs" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Docs</Link>
+                      <Link href="/community" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Community</Link>
+                      <Link href="/projects" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Templates</Link>
                     </div>
                     {/* Right buttons */}
                     <div className="flex items-center gap-3">
-                      <Link href="/auth/login" className="text-sm text-white/60 hover:text-white transition">
+                      <Link href="/auth/login" className="text-sm text-white/60 hover:text-white transition cursor-pointer">
                         Sign In
                       </Link>
-                      <Link href="/auth/register" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90">
+                      <Link href="/auth/register" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90 cursor-pointer">
                         Start for Free
                       </Link>
                     </div>
-                  </motion.nav>
+                  </nav>
                 )}
 
                 {/* ─── Signed-in top bar (centered nav) ──────────── */}
                 {session && isDashboardMode && (
-                  <motion.nav
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, ease: 'easeOut' }}
-                    className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06]"
+                  <nav
+                    className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06] animate-[fadeDown_0.5s_ease-out]"
                   >
                     <div className="w-20" />
                     <div className="hidden md:flex items-center gap-6">
-                      <Link href="/docs" className="text-sm text-white/50 hover:text-white transition">Docs</Link>
-                      <Link href="/community" className="text-sm text-white/50 hover:text-white transition">Community</Link>
-                      <Link href="/projects" className="text-sm text-white/50 hover:text-white transition">Templates</Link>
+                      <Link href="/docs" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Docs</Link>
+                      <Link href="/community" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Community</Link>
+                      <Link href="/projects" className="text-sm text-white/50 hover:text-white transition cursor-pointer">Templates</Link>
                     </div>
                     <div className="w-20" />
-                  </motion.nav>
+                  </nav>
                 )}
 
                 <div className="flex flex-1 flex-col items-center justify-center px-3 pt-8 text-center sm:px-4 sm:pt-12">
