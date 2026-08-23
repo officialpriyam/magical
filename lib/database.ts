@@ -298,7 +298,7 @@ export async function saveMessage(
               project_id: projectId,
               role: message.role,
               content: message.content,
-              object_data: message.object ?? null,
+              object_data: objectWithAgentic ?? null,
               result_data: message.result ?? null,
               sequence_number: sequenceNumber,
             },

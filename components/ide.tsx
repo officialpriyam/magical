@@ -109,21 +109,7 @@ export function IDE({
 
           if (Array.isArray(storageData.files)) {
             if (storageData.files.length > 0) {
-              // Merge with fragment files — sandbox-storage may miss some
-              const fragmentMap = new Map(fragmentFiles.map(f => [f.path, f]))
-              for (const sf of storageData.files) {
-                if (!fragmentMap.has(sf.path)) {
-                  fragmentMap.set(sf.path, sf)
-                }
-              }
-              const merged: FileSystemNode[] = Array.from(fragmentMap.values()).map(f => ({
-                name: f.path.split('/').pop() || f.path,
-                path: f.path,
-                content: f.content,
-                type: 'file' as const,
-                isDirectory: false,
-              }))
-              setFiles(merged)
+              setFiles(storageData.files)
               setLoadError(null)
               setStorageSlow(Boolean(storageData.slow))
               setStorageStatus('ok')
@@ -290,42 +276,6 @@ export function IDE({
       fetchFiles()
     }
   }, [session, isSandboxMode, fetchFiles])
-
-  // Immediately load fragment files as fast path while sandbox-storage loads in background
-  useEffect(() => {
-    if (fragmentFiles.length > 0 && files.length === 0 && storageStatus !== 'ok') {
-      const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
-        name: f.path.split('/').pop() || f.path,
-        path: f.path,
-        content: f.content,
-        type: 'file' as const,
-        isDirectory: false,
-      }))
-      setFiles(fsNodes)
-      if (storageStatus !== 'loading') {
-        setStorageStatus('ok')
-      }
-      setLoadError(null)
-      console.log(`[IDE] Loaded ${fragmentFiles.length} files from fragment (fast path)`)
-    }
-  }, [fragmentFiles, files.length, storageStatus])
-
-  // Fallback: when sandbox-storage fails or returns empty, load from fragments
-  useEffect(() => {
-    if ((storageStatus === 'error' || storageStatus === 'degraded') && files.length === 0 && fragmentFiles.length > 0) {
-      const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
-        name: f.path.split('/').pop() || f.path,
-        path: f.path,
-        content: f.content,
-        type: 'file' as const,
-        isDirectory: false,
-      }))
-      setFiles(fsNodes)
-      setStorageStatus('ok')
-      setLoadError(null)
-      console.log(`[IDE] Loaded ${fragmentFiles.length} files from fragment (sandbox-storage fallback)`)
-    }
-  }, [storageStatus, files.length, fragmentFiles])
 
   useEffect(() => {
     return () => {
@@ -737,21 +687,21 @@ export function IDE({
         <div className="min-h-0 flex-1 overflow-auto">
           {storageStatus === 'error' && files.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 p-4 text-center">
-              <WifiOff className="h-8 w-8 text-amber-400/60" />
+              <WifiOff className="h-8 w-8 text-red-400/60" />
               <div className="space-y-1">
-                <p className="text-sm font-medium text-amber-300">Storage Unavailable</p>
+                <p className="text-sm font-medium text-red-300">Storage Unavailable</p>
                 <p className="text-xs text-white/40 max-w-[200px]">
-                  Sandbox storage is not configured. Files will appear once code is generated.
+                  Cannot connect to sandbox storage. Files may still be available in the live sandbox.
                 </p>
               </div>
               <Button
                 onClick={fetchFiles}
                 variant="outline"
                 size="sm"
-                className="border-amber-500/20 text-amber-300 hover:bg-amber-500/10"
+                className="border-red-500/20 text-red-300 hover:bg-red-500/10"
               >
                 <RefreshCw className="h-3 w-3 mr-1" />
-                Retry
+                Retry Connection
               </Button>
             </div>
           ) : (

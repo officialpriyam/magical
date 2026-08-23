@@ -317,6 +317,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const isHydratingProjectMessagesRef = useRef(false)
   const pendingNavigateRef = useRef<string | null>(null)
   const isLandingPagePromptRef = useRef(false)
+  const initialTabSetRef = useRef(false)
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
   const [availableModels, setAvailableModels] = useState<LLMModel[]>([])
   const [currentTab, setCurrentTab] = useState<PreviewTab>('code');
@@ -572,6 +573,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setWarmSandboxResult(undefined)
       warmingSandboxKeyRef.current = ''
       setFragment(undefined)
+      initialTabSetRef.current = false
       setCurrentTab('code')
       setIsPreviewLoading(false)
       setIsPreviewPanelOpen(false)
@@ -994,9 +996,17 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     const lastMessage = nextMessages[nextMessages.length - 1]
 
     if (lastMessage?.role === 'assistant') {
+      // Preserve existing agentic state when merging fragment data
+      const existingAgentic = {
+        agenticActions: lastMessage.agenticActions,
+        agenticTodos: lastMessage.agenticTodos,
+        agenticElapsed: lastMessage.agenticElapsed,
+      }
       nextMessages[nextMessages.length - 1] = {
         ...lastMessage,
         ...assistantMessage,
+        // Only overwrite agentic if the new message has agentic data
+        ...(assistantMessage.agenticActions ? {} : existingAgentic),
       }
       return nextMessages
     }
@@ -1240,7 +1250,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setFragment(latestPreviewMessage?.object)
       setResult(latestPreviewMessage?.result)
       setWarmSandboxResult(undefined)
-      setCurrentTab('code')
+      // Only force code tab on initial project load, not on re-runs
+      if (!initialTabSetRef.current) {
+        initialTabSetRef.current = true
+        setCurrentTab('code')
+      }
       setIsLoadingProject(false)
 
       if (isLandingPagePromptRef.current) {
@@ -1931,6 +1945,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setResult(undefined)
     setWarmSandboxResult(undefined)
     warmingSandboxKeyRef.current = ''
+    initialTabSetRef.current = false
     setCurrentTab('code')
     setIsPreviewLoading(false)
     setAutoFixMessage('')
