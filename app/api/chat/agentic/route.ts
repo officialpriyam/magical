@@ -22,6 +22,7 @@ import {
   AGENT_DISPLAY_NAMES,
 } from '@/lib/agents/prompts'
 import { runAgent, type AgentEventEmitter } from '@/lib/agents/agent-runner'
+import { detectSkillsFromPrompt, buildSkillPrompt, getSkillById, type Skill } from '@/lib/skills/registry'
 
 export const maxDuration = 300
 
@@ -170,7 +171,15 @@ export async function POST(req: Request) {
   // Detect agent skill from message prefix
   const detectedAgent = detectAgentFromMessage(messages)
   if (detectedAgent) {
-    emitAction('thinking', `Using ${detectedAgent} agent for your request...`)
+    emitAction('commentary', `Using ${detectedAgent} agent for your request...`)
+  }
+
+  // Auto-detect skills from the user prompt
+  const userPrompt = messages.find(m => m.role === 'user')?.content || ''
+  const promptText = typeof userPrompt === 'string' ? userPrompt : Array.isArray(userPrompt) ? userPrompt.map(p => p.type === 'text' ? p.text : '').join(' ') : ''
+  const detectedSkills = detectSkillsFromPrompt(promptText)
+  if (detectedSkills.length > 0) {
+    emitAction('commentary', `Applying skills: ${detectedSkills.map(s => s.name).join(', ')}`)
   }
 
   // Auto web search: detect if the query needs up-to-date information
@@ -230,6 +239,7 @@ export async function POST(req: Request) {
     supabaseContext,
     fallbackChain,
     detectedAgent,
+    detectedSkills,
     emitAction,
     emitTodos,
     emitProgress,
@@ -259,6 +269,7 @@ async function runPipeline({
   supabaseContext,
   fallbackChain,
   detectedAgent,
+  detectedSkills,
   emitAction,
   emitTodos,
   emitProgress,
@@ -272,6 +283,7 @@ async function runPipeline({
   supabaseContext: PromptContext['supabase']
   fallbackChain: any[]
   detectedAgent?: string | null
+  detectedSkills?: Skill[]
   emitAction: (type: string, content: string, detail?: string) => void
   emitTodos: (todos: { id: string; text: string; completed: boolean }[]) => void
   emitProgress: (completed: number, total: number) => void
@@ -280,7 +292,7 @@ async function runPipeline({
 }) {
   try {
     // ── Step 1: Analyze complexity ────────────────────────────
-    emitAction('thinking', 'Analyzing your request to determine the best approach...')
+    emitAction('commentary', 'Analyzing your request to determine the best approach...')
 
     // If agent was explicitly selected, use it; otherwise analyze complexity
     let complexity: TaskComplexity
@@ -340,6 +352,7 @@ async function runPipeline({
       const contextMessages = buildAgentMessages(messages, agentResults, latestFragment)
       const context: Record<string, any> = {
         supabase: supabaseContext,
+        skills: detectedSkills && detectedSkills.length > 0 ? buildSkillPrompt(detectedSkills) : '',
       }
 
       const plannerResult = agentResults.find(r => r.role === 'planner')
@@ -354,8 +367,7 @@ async function runPipeline({
       for (const role of group) {
         const agentName = AGENT_DISPLAY_NAMES[role]
 
-        // Emit real thinking action for agent start
-        emitAction('thinking', `${agentName}: Analyzing and generating...`)
+        // Emit real status for agent start
         emitAction('status', `Running ${agentName}...`)
 
         // Emit file reads from context (existing project files the agent sees, deduplicated)
@@ -448,10 +460,10 @@ async function runPipeline({
             }
           }
 
-          // Emit thinking with real agent summary
-          emitAction('thinking', `${AGENT_DISPLAY_NAMES[role]} completed — ${result.fragment ? 'generated code' : 'analysis done'}${result.duration ? ` in ${(result.duration / 1000).toFixed(1)}s` : ''}`)
+          // Emit completion status (not fake thinking)
+          emitAction('status', `${AGENT_DISPLAY_NAMES[role]} completed${result.duration ? ` in ${(result.duration / 1000).toFixed(1)}s` : ''}`)
         } else {
-          emitAction('thinking', `${AGENT_DISPLAY_NAMES[role]} failed: ${result.errors?.join(', ') || 'unknown error'}`)
+          emitAction('status', `${AGENT_DISPLAY_NAMES[role]} failed: ${result.errors?.join(', ') || 'unknown error'}`)
         }
 
         // Merge agent output into the fragment
@@ -537,9 +549,8 @@ async function runPipeline({
 
     emitAction('commentary', `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`)
 
-    // Mark all real todos as completed (from planner output)
-    // Emit a completion action so the UI knows we're done
-    emitAction('thinking', `Pipeline complete — ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s`)
+    // Emit a completion status so the UI knows we're done
+    emitAction('status', `Pipeline complete — ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s`)
 
     // Emit final fragment
     emitFragment(finalFragment)

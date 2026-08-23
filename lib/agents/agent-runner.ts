@@ -211,6 +211,7 @@ async function readStreamWithEvents(
   let text = ''
   let lastEmitTime = Date.now()
   let lastCommentaryEmitLen = 0
+  let lastThinkingEmitLen = 0
   const EMIT_INTERVAL = 250 // Emit commentary every 250ms for live streaming feel
 
   // Track commentary extraction state across chunks
@@ -223,7 +224,6 @@ async function readStreamWithEvents(
 
   // Track what we've already emitted to avoid duplicates
   const emittedPaths = new Set<string>()
-  const emittedSearches = new Set<string>()
 
   try {
     while (true) {
@@ -284,53 +284,42 @@ async function readStreamWithEvents(
           }
         }
 
-        // ── Detect file paths from JSON output ──
-        // Look for "path": "..." patterns in the accumulated text
+        // ── Emit real thinking from the stream text ──
+        // For streamText: the accumulated text IS the agent's reasoning
+        // Emit it as thinking so the user sees actual AI thought process
+        if (!commentaryFieldFound && text.length > 50) {
+          // Extract meaningful thinking from the text (skip JSON boilerplate)
+          const thinkingText = text
+            .replace(/```[\s\S]*?```/g, '') // Skip code blocks
+            .replace(/\{[\s\S]*?\}/g, '') // Skip JSON objects
+            .split('\n')
+            .filter(l => l.trim().length > 15 && !l.trim().startsWith('"') && !l.trim().startsWith('{'))
+            .join('\n')
+            .trim()
+
+          if (thinkingText.length > lastThinkingEmitLen + 40 && thinkingText.length > 30) {
+            // Emit the latest thinking chunk
+            const chunk = thinkingText.slice(lastThinkingEmitLen, lastThinkingEmitLen + 300)
+            if (chunk.trim().length > 15) {
+              emitter.emitThinking(chunk.trim())
+            }
+            lastThinkingEmitLen = thinkingText.length
+          }
+        }
+
+        // ── Detect file paths ONLY from actual JSON "path" fields ──
+        // Must be inside a "files" array context to avoid false positives
         const pathMatches = text.matchAll(/"path"\s*:\s*"([\w\/\._\-]+\.[\w]+)"/g)
         for (const match of pathMatches) {
           const filePath = match[1]
-          // Determine if read or write based on surrounding context
           const matchIdx = match.index ?? 0
-          const before = text.slice(Math.max(0, matchIdx - 80), matchIdx).toLowerCase()
-          if (before.includes('read') || before.includes('existing') || before.includes('current')) {
-            if (!emittedPaths.has(`read:${filePath}`)) {
-              emittedPaths.add(`read:${filePath}`)
-              emitter.emitFileRead(filePath)
-            }
-          } else {
+          // Only emit if we can confirm this is inside a "files" array context
+          const precedingContext = text.slice(Math.max(0, matchIdx - 200), matchIdx).toLowerCase()
+          if (precedingContext.includes('"files"') || precedingContext.includes('[{')) {
             if (!emittedPaths.has(`write:${filePath}`)) {
               emittedPaths.add(`write:${filePath}`)
               emitter.emitFileWrite(filePath)
             }
-          }
-        }
-
-        // Also detect natural language file patterns
-        const readFilePatterns = text.matchAll(/(?:reading|read|loaded|opened)\s+([\w\/\._\-]+\.[\w]+)/gi)
-        for (const match of readFilePatterns) {
-          const path = match[1]
-          if (!emittedPaths.has(`read:${path}`)) {
-            emittedPaths.add(`read:${path}`)
-            emitter.emitFileRead(path)
-          }
-        }
-
-        const writeFilePatterns = text.matchAll(/(?:writing|write|created?|creating)\s+([\w\/\._\-]+\.[\w]+)/gi)
-        for (const match of writeFilePatterns) {
-          const path = match[1]
-          if (!emittedPaths.has(`write:${path}`)) {
-            emittedPaths.add(`write:${path}`)
-            emitter.emitFileWrite(path)
-          }
-        }
-
-        // ── Detect web search patterns ──
-        const searchPatterns = text.matchAll(/(?:search(?:ing)?|fetch(?:ing)?|looking up)\s+(?:for\s+)?([\w\s\.\/\-]{5,60})/gi)
-        for (const match of searchPatterns) {
-          const query = match[1].trim()
-          if (!emittedSearches.has(query)) {
-            emittedSearches.add(query)
-            emitter.emitWebSearch(query)
           }
         }
 

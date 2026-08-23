@@ -340,6 +340,10 @@ export function getAgentPrompt(role: AgentRole, context?: Record<string, any>): 
 
   let prompt = prompts[role] || ''
 
+  if (context?.skills) {
+    prompt += `\n\n${context.skills}`
+  }
+
   if (context?.existingCode) {
     prompt += `\n\nExisting code to work with:\n\`\`\`\n${context.existingCode}\n\`\`\``
   }

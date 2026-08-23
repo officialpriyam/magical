@@ -79,6 +79,77 @@ export const slashCommands: SlashCommand[] = [
     category: 'Agent',
     agent: 'think'
   },
+  // ─── Skills (from skills.sh) ─────────────────────────────────
+  {
+    command: '/design',
+    description: 'Frontend design skill — distinctive, intentional visual design',
+    icon: '🎨',
+    category: 'Skills',
+    agent: 'frontend'
+  },
+  {
+    command: '/uiux',
+    description: 'UI/UX Pro Max — advanced interface patterns',
+    icon: '📐',
+    category: 'Skills',
+    agent: 'frontend'
+  },
+  {
+    command: '/brainstorm',
+    description: 'Brainstorming — validate ideas before building',
+    icon: '💡',
+    category: 'Skills',
+    agent: 'planner'
+  },
+  {
+    command: '/browser',
+    description: 'Browser automation — navigate, scrape, interact',
+    icon: '🌐',
+    category: 'Skills',
+    agent: 'search'
+  },
+  {
+    command: '/docs',
+    description: 'Reference docs and API specs while building',
+    icon: '📚',
+    category: 'Skills',
+    agent: 'frontend'
+  },
+  {
+    command: '/debug',
+    description: 'Systematic debugging — hypothesis-driven fixes',
+    icon: '🐛',
+    category: 'Skills',
+    agent: 'fixer'
+  },
+  {
+    command: '/composition',
+    description: 'React composition patterns — flexible component architecture',
+    icon: '🧩',
+    category: 'Skills',
+    agent: 'frontend'
+  },
+  {
+    command: '/guidelines',
+    description: 'Web design guidelines — Vercel standards',
+    icon: '📏',
+    category: 'Skills',
+    agent: 'frontend'
+  },
+  {
+    command: '/mobile',
+    description: 'Mobile-first responsive design',
+    icon: '📱',
+    category: 'Skills',
+    agent: 'frontend'
+  },
+  {
+    command: '/supabase',
+    description: 'Supabase/PostgreSQL best practices',
+    icon: '🗄️',
+    category: 'Skills',
+    agent: 'backend'
+  },
   // ─── Code Actions ────────────────────────────────────────────
   {
     command: '/edit',

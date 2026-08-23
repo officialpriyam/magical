@@ -205,7 +205,7 @@ export function Chat({
       })()}
 
       {/* Live streaming message — shows during AND after generation when actions exist */}
-      {useAgentic && (agenticStreaming || agenticActions.length > 0) && (
+      {(agenticStreaming || agenticActions.length > 0) && (
         <LiveStreamingMessage
           key="live-stream"
           actions={agenticActions}
@@ -350,7 +350,7 @@ function LiveStreamingMessage({
             <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
           </svg>
         </div>
-        <span className="text-[13px] font-semibold text-white/85">Magical</span>
+        <span className="text-[15px] font-semibold text-white/90">Magical</span>
         {isStreaming && (
           <span className="flex items-center gap-1.5 text-xs text-white/40">
             Working for {elapsedSec}s
@@ -373,7 +373,7 @@ function LiveStreamingMessage({
       </div>
 
       {/* Streaming commentary text — appears as normal message body with markdown */}
-      <div className="text-[13px] leading-[1.7] text-white/80 mb-2 whitespace-pre-wrap">
+      <div className="text-[15px] leading-[1.8] text-white/85 mb-3 whitespace-pre-wrap">
         {latestCommentary
           ? renderMarkdownText(latestCommentary)
           : isStreaming && actions.length > 0 ? (
@@ -436,7 +436,7 @@ function LiveStreamingMessage({
                       return next
                     })
                   }}
-                  className="flex items-center gap-1.5 py-0.5 text-xs text-white/40 hover:text-white/55 transition"
+                  className="flex items-center gap-1.5 py-1 text-[13px] text-white/45 hover:text-white/60 transition"
                 >
                   {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                   <Brain className="h-3 w-3 text-purple-400/50" />
@@ -454,7 +454,7 @@ function LiveStreamingMessage({
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden pl-6"
                     >
-                      <div className="py-1 text-xs leading-relaxed text-white/50 whitespace-pre-wrap rounded-lg bg-white/[0.03] px-3 py-2 border border-white/[0.05]">
+                      <div className="py-1 text-[13px] leading-relaxed text-white/55 whitespace-pre-wrap rounded-lg bg-white/[0.03] px-3 py-2 border border-white/[0.05]">
                         {renderMarkdownText(thinkingText)}
                       </div>
                     </motion.div>
@@ -543,7 +543,7 @@ function LiveStreamingMessage({
               ) : (
                 <ActionIcon className={`h-3 w-3 ${color}`} />
               )}
-              <span className="text-[12px] text-white/50 truncate">{label}</span>
+              <span className="text-[13px] text-white/55 truncate">{label}</span>
             </motion.div>
           )
         })}
@@ -570,7 +570,7 @@ function LiveStreamingMessage({
                       className="flex items-center gap-2 py-0.5"
                     >
                       <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                      <span className="text-[11px] text-white/35">Read</span>
+                      <span className="text-[12px] text-white/40">Read</span>
                       <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
                     </motion.div>
                   )
@@ -603,7 +603,7 @@ function LiveStreamingMessage({
                       className="flex items-center gap-2 py-0.5"
                     >
                       <Check className="h-3 w-3 shrink-0 text-emerald-400" />
-                      <span className="text-[11px] text-white/35">{isEdit ? 'Edited' : 'Writing'}</span>
+                      <span className="text-[12px] text-white/40">{isEdit ? 'Edited' : 'Writing'}</span>
                       <code className="text-[11px] text-white/60 bg-white/[0.06] px-1.5 py-0.5 rounded font-mono">{path}</code>
                     </motion.div>
                   )
