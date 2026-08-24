@@ -3715,6 +3715,94 @@
       },
       "contextLength": 8191,
       "description": "OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader general knowledge and advanced reasoning capabilities. Training data: up to Sep 2021."
+    },
+    {
+      "id": "deepseek/deepseek-r1",
+      "provider": "DeepSeek: R1",
+      "providerId": "openrouter",
+      "name": "DeepSeek: R1",
+      "multiModal": false,
+      "contextLength": 163840
+    },
+    {
+      "id": "deepseek/deepseek-v4",
+      "provider": "DeepSeek: V4",
+      "providerId": "openrouter",
+      "name": "DeepSeek: V4",
+      "multiModal": true,
+      "contextLength": 256000
+    },
+    {
+      "id": "deepseek/deepseek-v4-flash",
+      "provider": "DeepSeek: V4 Flash",
+      "providerId": "openrouter",
+      "name": "DeepSeek: V4 Flash",
+      "multiModal": true,
+      "contextLength": 256000
+    },
+    {
+      "id": "deepseek/deepseek-v3.1",
+      "provider": "DeepSeek: V3.1",
+      "providerId": "openrouter",
+      "name": "DeepSeek: V3.1",
+      "multiModal": false,
+      "contextLength": 163840
+    },
+    {
+      "id": "google/gemini-3.0-flash",
+      "provider": "Google: Gemini 3.0 Flash",
+      "providerId": "openrouter",
+      "name": "Google: Gemini 3.0 Flash",
+      "multiModal": true,
+      "contextLength": 1048576
+    },
+    {
+      "id": "google/gemini-3.5-pro",
+      "provider": "Google: Gemini 3.5 Pro",
+      "providerId": "openrouter",
+      "name": "Google: Gemini 3.5 Pro",
+      "multiModal": true,
+      "contextLength": 2097152
+    },
+    {
+      "id": "google/gemini-3.7-flash",
+      "provider": "Google: Gemini 3.7 Flash",
+      "providerId": "openrouter",
+      "name": "Google: Gemini 3.7 Flash",
+      "multiModal": true,
+      "contextLength": 1048576
+    },
+    {
+      "id": "google/gemini-3.5-flash-lite",
+      "provider": "Google: Gemini 3.5 Flash Lite",
+      "providerId": "openrouter",
+      "name": "Google: Gemini 3.5 Flash Lite",
+      "multiModal": true,
+      "contextLength": 1048576
+    },
+    {
+      "id": "mimo/mimo-v2.5",
+      "provider": "Mimo: V2.5",
+      "providerId": "openrouter",
+      "name": "Mimo: V2.5",
+      "multiModal": false,
+      "contextLength": 163840
+    },
+    {
+      "id": "xiaomi/mimo-v2",
+      "provider": "Xiaomi: MiMo V2",
+      "providerId": "openrouter",
+      "name": "Xiaomi: MiMo V2",
+      "multiModal": false,
+      "contextLength": 163840
+    },
+    {
+      "id": "mistralai/mistral-medium-4",
+      "provider": "Mistral: Medium 4",
+      "providerId": "openrouter",
+      "name": "Mistral: Medium 4",
+      "multiModal": true,
+      "contextLength": 131072
     }
   ]
 }

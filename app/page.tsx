@@ -1338,7 +1338,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       isMounted = false
     }
-  }, [currentProject, currentProjectId, projectMessagesRefreshKey, restoreProjectWorkspace, supabase, warmProjectSandbox, useAgentic, agenticStream, currentModel, session, userTeam, languageModel])
+  }, [currentProject, currentProjectId, projectMessagesRefreshKey, restoreProjectWorkspace, supabase, warmProjectSandbox, currentModel, session, userTeam, languageModel])
 
   useEffect(() => {
     async function saveMessagesToDb() {
