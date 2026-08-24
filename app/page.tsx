@@ -1135,7 +1135,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       }
     } catch (error) {
       warmingSandboxKeyRef.current = ''
+      const msg = error instanceof Error ? error.message : 'Failed to start sandbox'
       console.warn('Project sandbox warm start failed:', error)
+      setErrorMessage(`Sandbox failed: ${msg}. Check your sandbox provider settings.`)
     }
   }, [sandboxProvider, selectedTemplate, session?.access_token, session?.user?.id, userTeam?.id])
 
@@ -1147,16 +1149,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     const r2Workspace = getProjectR2Workspace(project)
     const sandboxStorageWorkspace = getProjectSandboxStorageWorkspace(project)
 
-    // Skip if no storage backend, no template, or already restoring
+    // Skip if no template or already restoring
     if (
       !savedFragment?.template ||
       restoringProjectRef.current === project.id
     ) {
       return
     }
-    // Only restore if there's actually a connected storage source (GitHub or R2)
-    // Skip sandbox-storage since the Go binary may not be running
-    if (!workspace && !r2Workspace) {
+    // Allow restore if any storage source is available (GitHub, R2, or sandbox-storage)
+    if (!workspace && !r2Workspace && !sandboxStorageWorkspace) {
       return
     }
 
@@ -1186,8 +1187,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        console.warn('Workspace restore skipped:', data.error)
+        console.warn('Workspace restore failed:', data.error)
         setAutoFixMessage('')
+        setErrorMessage(`Restore failed: ${data.error || `HTTP ${response.status}`}`)
         setIsPreviewLoading(false)
         return
       }
@@ -1202,8 +1204,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setCurrentTab('ide')
       setAutoFixMessage('')
     } catch (error) {
-      console.warn('Workspace restore skipped:', error)
+      console.warn('Workspace restore failed:', error)
       setAutoFixMessage('')
+      const msg = error instanceof Error ? error.message : 'Failed to restore project'
+      setErrorMessage(`Restore failed: ${msg}`)
     } finally {
       restoringProjectRef.current = ''
       setIsPreviewLoading(false)
@@ -2938,6 +2942,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 onRedeploy={handleRedeploy}
                 executeCode={handleExecuteCode}
                 isSupabaseConnected={!!(currentProject?.metadata as any)?.supabaseProject}
+                errorMessage={errorMessage || null}
+                onDismissError={() => setErrorMessage('')}
               />
             </motion.div>
           )}

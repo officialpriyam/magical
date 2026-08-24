@@ -53,6 +53,8 @@ export function Preview({
   onRedeploy,
   executeCode,
   isSupabaseConnected = false,
+  errorMessage = null,
+  onDismissError,
 }: {
   teamID: string | undefined
   accessToken: string | undefined
@@ -74,6 +76,8 @@ export function Preview({
   onRedeploy?: () => Promise<void>
   executeCode?: (code: string) => Promise<any>
   isSupabaseConnected?: boolean
+  errorMessage?: string | null
+  onDismissError?: () => void
 }) {
   const [sandboxFiles, setSandboxFiles] = useState(result?.files || [])
   const [isGitHubSaveOpen, setIsGitHubSaveOpen] = useState(false)
@@ -214,6 +218,23 @@ export function Preview({
         {isGitHubSaveBlocked && (
           <div className="w-full border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-600 dark:text-amber-300">
             Save this project to GitHub before editing files. Use the Save to GitHub button above to connect a repository.
+          </div>
+        )}
+        {errorMessage && (
+          <div className="w-full border-b border-red-500/20 bg-red-500/10 px-4 py-2 flex items-center justify-between text-xs text-red-400">
+            <span className="truncate">{errorMessage}</span>
+            <button
+              onClick={onDismissError}
+              className="ml-2 shrink-0 text-red-400/60 hover:text-red-400"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+        {isPreviewLoading && !result && (
+          <div className="w-full border-b border-blue-500/20 bg-blue-500/10 px-4 py-2 flex items-center gap-2 text-xs text-blue-400">
+            <LoaderCircle className="h-3 w-3 animate-spin" />
+            <span>Starting sandbox and deploying preview...</span>
           </div>
         )}
         <div className="min-h-0 w-full flex-1 overflow-hidden">
