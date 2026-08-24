@@ -1574,6 +1574,70 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setErrorMessage('')
     setAutoFixMessage('')
 
+    // Handle sandbox commands directly without sending to AI
+    const cmd = message.trim().toLowerCase()
+    const isSandboxCommand = /^(redeploy|restart|start|deploy|rebuild|refresh|reload)\s+(sandbox|preview|project|server|page)/.test(cmd) || /^(redeploy|restart|start|deploy|rebuild|refresh|reload)$/.test(cmd)
+    const isOpenIdeCommand = /^(open\s+)?(ide|editor|code|files?)$/i.test(cmd)
+    if (isSandboxCommand) {
+      const commandLabel = cmd.includes('redeploy') || cmd.includes('rebuild') ? 'Redeploying' : cmd.includes('restart') || cmd.includes('reload') || cmd.includes('refresh') ? 'Restarting' : cmd.includes('deploy') ? 'Deploying' : 'Starting'
+      // Add a user message and assistant response to chat
+      const userMsg: Message = { role: 'user', content: [{ type: 'text', text: message }] }
+      const assistantMsg: Message = { role: 'assistant', content: [{ type: 'text', text: `${commandLabel} sandbox...` }] }
+      setMessages(prev => {
+        const next = [...prev, userMsg, assistantMsg]
+        messagesRef.current = next
+        return next
+      })
+      // Save both messages to DB
+      if (currentProject?.id) {
+        const seq = messagesRef.current.length - 2
+        void saveMessage(supabase, currentProject.id, userMsg, seq)
+        void saveMessage(supabase, currentProject.id, assistantMsg, seq + 1)
+      }
+      // Trigger the actual sandbox action
+      setIsPreviewLoading(true)
+      setIsPreviewPanelOpen(true)
+      setCurrentTab('fragment')
+      let commandFailed = false
+      try {
+        await handleRedeploy()
+      } catch (err) {
+        commandFailed = true
+        console.warn('Sandbox command failed:', err)
+      }
+      // Update assistant message with result after a short delay (let state settle)
+      setTimeout(() => {
+        const hasError = !!errorMessage || commandFailed
+        setMessages(prev => {
+          const next = [...prev]
+          const lastIdx = next.length - 1
+          if (lastIdx >= 0 && next[lastIdx].role === 'assistant') {
+            next[lastIdx] = {
+              ...next[lastIdx],
+              content: [{ type: 'text', text: hasError ? `${commandLabel} sandbox failed. Check the error above.` : `${commandLabel} sandbox successfully.` }],
+            } as Message
+            messagesRef.current = next
+          }
+          return next
+        })
+      }, 500)
+      return
+    }
+
+    // Handle open IDE/editor commands
+    if (isOpenIdeCommand) {
+      setIsPreviewPanelOpen(true)
+      setCurrentTab('ide')
+      const userMsg: Message = { role: 'user', content: [{ type: 'text', text: message }] }
+      const assistantMsg: Message = { role: 'assistant', content: [{ type: 'text', text: 'Opening the code editor...' }] }
+      setMessages(prev => {
+        const next = [...prev, userMsg, assistantMsg]
+        messagesRef.current = next
+        return next
+      })
+      return
+    }
+
     // If currently streaming, queue the message instead of stopping
     if (isLoading || agenticStream.isStreaming) {
       const queued = { message, files, mode }
