@@ -87,6 +87,12 @@ function createSSEStream() {
     emit({ type: 'action', action_type: actionType, content, detail })
   }
 
+  // Throttle helper: emit with a delay so actions appear one by one
+  async function emitActionThrottled(actionType: string, content: string, detail?: string, delayMs = 150) {
+    emitAction(actionType, content, detail)
+    await new Promise(r => setTimeout(r, delayMs))
+  }
+
   function emitTodos(todos: { id: string; text: string; completed: boolean }[]) {
     emit({ type: 'todos', todos })
   }
@@ -114,7 +120,7 @@ function createSSEStream() {
     }
   }
 
-  return { stream, emit, emitAction, emitTodos, emitProgress, emitFragment, emitError, close }
+  return { stream, emit, emitAction, emitActionThrottled, emitTodos, emitProgress, emitFragment, emitError, close }
 }
 
 export async function POST(req: Request) {
@@ -163,7 +169,7 @@ export async function POST(req: Request) {
     projectsMode: supabaseStatus.projectsMode,
   }
 
-  const { stream, emit, emitAction, emitTodos, emitProgress, emitFragment, emitError, close } = createSSEStream()
+  const { stream, emit, emitAction, emitActionThrottled, emitTodos, emitProgress, emitFragment, emitError, close } = createSSEStream()
 
   // Emit connected event immediately so the frontend knows the stream is alive
   emit({ type: 'connected', timestamp: Date.now() })
@@ -267,6 +273,7 @@ export async function POST(req: Request) {
     detectedAgent,
     detectedSkills,
     emitAction,
+    emitActionThrottled,
     emitTodos,
     emitProgress,
     emitFragment,
@@ -297,6 +304,7 @@ async function runPipeline({
   detectedAgent,
   detectedSkills,
   emitAction,
+  emitActionThrottled,
   emitTodos,
   emitProgress,
   emitFragment,
@@ -311,11 +319,13 @@ async function runPipeline({
   detectedAgent?: string | null
   detectedSkills?: Skill[]
   emitAction: (type: string, content: string, detail?: string) => void
+  emitActionThrottled: (type: string, content: string, detail?: string, delayMs?: number) => Promise<void>
   emitTodos: (todos: { id: string; text: string; completed: boolean }[]) => void
   emitProgress: (completed: number, total: number) => void
   emitFragment: (data: Record<string, any>) => void
   emitError: (message: string) => void
 }) {
+  let flushPendingWrites: ReturnType<typeof setInterval> | undefined
   try {
     // ── Step 1: Analyze complexity ────────────────────────────
     emitAction('commentary', 'Analyzing your request to determine the best approach...')
@@ -378,6 +388,18 @@ async function runPipeline({
     let completedAgents = 0
     const emittedFilePaths = new Set<string>()
     let currentTodos: { id: string; text: string; completed: boolean }[] = []
+    let lastFileWriteTime = 0
+    const pendingFileWrites: { path: string; purpose?: string; emitAt: number }[] = []
+
+    // Flush pending file writes periodically
+    flushPendingWrites = setInterval(() => {
+      const now = Date.now()
+      while (pendingFileWrites.length > 0 && pendingFileWrites[0].emitAt <= now) {
+        const pw = pendingFileWrites.shift()!
+        emitAction('file_write', pw.path, pw.purpose)
+        lastFileWriteTime = Date.now()
+      }
+    }, 200)
 
     for (const group of plan) {
       const contextMessages = buildAgentMessages(messages, agentResults, latestFragment)
@@ -401,14 +423,13 @@ async function runPipeline({
         // Emit real status for agent start (no fake thinking)
         emitAction('status', `Running ${agentName}...`)
 
-        // Emit file reads from context (existing project files the agent sees, deduplicated)
+        // Emit file reads from context one by one with throttle
         if (latestFragment.files && latestFragment.files.length > 0) {
-          emitAction('commentary', `Read ${latestFragment.files.length} file${latestFragment.files.length === 1 ? '' : 's'}`)
-          for (const file of latestFragment.files.slice(0, 8)) {
-            if (file?.path && !emittedFilePaths.has(`read:${file.path}`)) {
-              emittedFilePaths.add(`read:${file.path}`)
-              emitAction('file_read', file.path)
-            }
+          emitAction('commentary', `Reading ${latestFragment.files.length} file${latestFragment.files.length === 1 ? '' : 's'}...`)
+          const filesToRead = latestFragment.files.filter((f: any) => f?.path && !emittedFilePaths.has(`read:${f.path}`)).slice(0, 8)
+          for (const file of filesToRead) {
+            emittedFilePaths.add(`read:${file.path}`)
+            await emitActionThrottled('file_read', file.path, undefined, 200)
           }
         }
 
@@ -426,7 +447,15 @@ async function runPipeline({
           emitFileWrite: (path, purpose) => {
             if (!emittedFilePaths.has(path)) {
               emittedFilePaths.add(path)
-              emitAction('file_write', path, purpose)
+              // Throttle file writes to max 2 per second
+              const now = Date.now()
+              if (now - lastFileWriteTime > 500) {
+                lastFileWriteTime = now
+                emitAction('file_write', path, purpose)
+              } else {
+                // Queue for later emission
+                pendingFileWrites.push({ path, purpose, emitAt: now + 500 })
+              }
             }
           },
           emitWebSearch: (query) => emitAction('web_search', query),
@@ -599,6 +628,13 @@ async function runPipeline({
         : `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`,
     }
 
+    // Flush any remaining pending file writes
+    clearInterval(flushPendingWrites)
+    while (pendingFileWrites.length > 0) {
+      const pw = pendingFileWrites.shift()!
+      emitAction('file_write', pw.path, pw.purpose)
+    }
+
     emitAction('commentary', `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`)
 
     // Emit a completion status so the UI knows we're done
@@ -607,6 +643,7 @@ async function runPipeline({
     // Emit final fragment
     emitFragment(finalFragment)
   } catch (error: any) {
+    clearInterval(flushPendingWrites)
     console.error('[Agentic] Pipeline error:', error)
     emitError(error.message || 'Pipeline failed')
 
