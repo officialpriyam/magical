@@ -299,7 +299,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
   const [result, setResult] = useState<ExecutionResult>()
   const [warmSandboxResult, setWarmSandboxResult] = useState<ExecutionResult>()
-  const [sessionStartTime] = useState(Date.now())
+  const sessionStartTimeRef = useRef(0)
+  useEffect(() => { sessionStartTimeRef.current = Date.now() }, [])
   const [fragmentsGenerated, setFragmentsGenerated] = useState(0)
   const [messagesCount, setMessagesCount] = useState(0)
   const [errorsEncountered, setErrorsEncountered] = useState(0)
@@ -318,6 +319,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const pendingNavigateRef = useRef<string | null>(null)
   const isLandingPagePromptRef = useRef(false)
   const initialTabSetRef = useRef(false)
+  const failedRestoresRef = useRef(new Set<string>())
   const [fragment, setFragment] = useState<DeepPartial<FragmentSchema>>();
   const [availableModels, setAvailableModels] = useState<LLMModel[]>([])
   const [currentTab, setCurrentTab] = useState<PreviewTab>('code');
@@ -1149,10 +1151,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     const r2Workspace = getProjectR2Workspace(project)
     const sandboxStorageWorkspace = getProjectSandboxStorageWorkspace(project)
 
-    // Skip if no template or already restoring
+    // Skip if no template, already restoring, or already failed for this project
     if (
       !savedFragment?.template ||
-      restoringProjectRef.current === project.id
+      restoringProjectRef.current === project.id ||
+      failedRestoresRef.current.has(project.id)
     ) {
       return
     }
@@ -1187,9 +1190,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
+        failedRestoresRef.current.add(project.id)
         console.warn('Workspace restore failed:', data.error)
         setAutoFixMessage('')
-        setErrorMessage(`Restore failed: ${data.error || `HTTP ${response.status}`}`)
         setIsPreviewLoading(false)
         return
       }
@@ -1204,10 +1207,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setCurrentTab('ide')
       setAutoFixMessage('')
     } catch (error) {
+      failedRestoresRef.current.add(project.id)
       console.warn('Workspace restore failed:', error)
       setAutoFixMessage('')
-      const msg = error instanceof Error ? error.message : 'Failed to restore project'
-      setErrorMessage(`Restore failed: ${msg}`)
     } finally {
       restoringProjectRef.current = ''
       setIsPreviewLoading(false)
@@ -1393,7 +1395,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   useEffect(() => {
     return () => {
       if (session?.user?.id) {
-        const sessionDuration = Date.now() - sessionStartTime
+        const sessionDuration = Date.now() - sessionStartTimeRef.current
         posthog.capture('session_end', {
           duration: sessionDuration,
           fragments_generated: fragmentsGenerated,
@@ -1402,7 +1404,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         })
       }
     }
-  }, [session?.user?.id, sessionStartTime, fragmentsGenerated, messagesCount, errorsEncountered])
+  }, [session?.user?.id, fragmentsGenerated, messagesCount, errorsEncountered])
 
   async function submitPlanResponse(updatedMessages: Message[], projectId?: string) {
     setIsPlanLoading(true)

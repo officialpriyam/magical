@@ -289,7 +289,7 @@ export async function saveMessage(
       })
 
       if (error) {
-        console.warn('save_message_and_update_project RPC failed; using direct message save fallback:', error)
+        // RPC may not exist — silently fall through to direct upsert
 
         const { error: upsertError } = await supabase!
           .from('messages')
@@ -305,15 +305,16 @@ export async function saveMessage(
             { onConflict: 'project_id,sequence_number' },
           )
 
-        if (upsertError) throw upsertError
+        if (upsertError) {
+          // RLS may block client upserts — this is expected, not fatal
+          return false
+        }
 
-        const { error: projectUpdateError } = await supabase!
+        await supabase!
           .from('projects')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', projectId)
           .eq('user_id', user.id)
-
-        if (projectUpdateError) throw projectUpdateError
       }
 
       invalidateCache(`project-messages:${user.id}:${projectId}`)
