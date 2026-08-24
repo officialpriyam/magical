@@ -264,65 +264,42 @@ export async function saveMessage(
   const { data: { user } } = await supabase!.auth.getUser()
   if (!user) return false
 
-  return safeApiCall(
-    supabase!,
-    async () => {
-      // Merge agentic state into object_data so it persists across refresh
-      const objectWithAgentic = message.object ? {
-        ...((typeof message.object === 'object' && message.object !== null) ? message.object : {}),
-        _agenticActions: message.agenticActions || [],
-        _agenticTodos: message.agenticTodos || [],
-        _agenticElapsed: message.agenticElapsed || 0,
-      } : (message.agenticActions?.length ? {
-        _agenticActions: message.agenticActions,
-        _agenticTodos: message.agenticTodos || [],
-        _agenticElapsed: message.agenticElapsed || 0,
-      } : message.object)
+  try {
+    // Merge agentic state into object_data so it persists across refresh
+    const objectWithAgentic = message.object ? {
+      ...((typeof message.object === 'object' && message.object !== null) ? message.object : {}),
+      _agenticActions: message.agenticActions || [],
+      _agenticTodos: message.agenticTodos || [],
+      _agenticElapsed: message.agenticElapsed || 0,
+    } : (message.agenticActions?.length ? {
+      _agenticActions: message.agenticActions,
+      _agenticTodos: message.agenticTodos || [],
+      _agenticElapsed: message.agenticElapsed || 0,
+    } : message.object)
 
-      const { error } = await supabase!.rpc('save_message_and_update_project', {
-        project_id_param: projectId,
-        role_param: message.role,
-        content_param: message.content,
-        object_data_param: objectWithAgentic,
-        result_data_param: message.result,
-        sequence_number_param: sequenceNumber,
-      })
+    // Use server-side API route to save (bypasses client-side RLS)
+    const response = await fetch('/api/messages/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId,
+        role: message.role,
+        content: message.content,
+        objectData: objectWithAgentic,
+        resultData: message.result,
+        sequenceNumber,
+      }),
+    })
 
-      if (error) {
-        // RPC may not exist — silently fall through to direct upsert
+    if (!response.ok) {
+      return false
+    }
 
-        const { error: upsertError } = await supabase!
-          .from('messages')
-          .upsert(
-            {
-              project_id: projectId,
-              role: message.role,
-              content: message.content,
-              object_data: objectWithAgentic ?? null,
-              result_data: message.result ?? null,
-              sequence_number: sequenceNumber,
-            },
-            { onConflict: 'project_id,sequence_number' },
-          )
-
-        if (upsertError) {
-          // RLS may block client upserts — this is expected, not fatal
-          return false
-        }
-
-        await supabase!
-          .from('projects')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', projectId)
-          .eq('user_id', user.id)
-      }
-
-      invalidateCache(`project-messages:${user.id}:${projectId}`)
-      return true
-    },
-    false,
-    'saveMessage',
-  )
+    invalidateCache(`project-messages:${user.id}:${projectId}`)
+    return true
+  } catch (error) {
+    return false
+  }
 }
 
 export async function getProjectMessages(
