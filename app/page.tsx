@@ -809,6 +809,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   })
   const isPromptLoading = isLoading || isPlanLoading || agenticStream.isStreaming
 
+  // Sync agentic stream errors to errorMessage so user can see them
+  useEffect(() => {
+    if (agenticStream.error) {
+      setErrorMessage(agenticStream.error)
+    }
+  }, [agenticStream.error])
+
   // Sync agentic stream fragment to existing state + update message object
   useEffect(() => {
     if (useAgentic && agenticStream.fragment) {

@@ -126,6 +126,20 @@ export async function runAgent(
       // Parse the response
       const parsed = parseAgentResponse(text, role)
 
+      // Check if we got meaningful output
+      const hasFragment = parsed.fragment && (
+        (parsed.fragment.files && parsed.fragment.files.length > 0) ||
+        (typeof parsed.fragment.code === 'string' && parsed.fragment.code.length > 10)
+      )
+
+      if (!hasFragment && (!text || text.length < 20)) {
+        console.warn(`[Agent] ${role} from ${candidate.id}: empty response (${text.length} chars)`)
+        lastError = new Error(`Empty response from ${candidate.id}`)
+        continue
+      }
+
+      console.log(`[Agent] ${role} from ${candidate.id}: success (${text.length} chars, fragment: ${hasFragment ? 'yes' : 'no'})`)
+
       onStatus?.({
         role,
         phase: 'completed',
