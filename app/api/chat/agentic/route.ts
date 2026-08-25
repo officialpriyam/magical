@@ -27,11 +27,9 @@ import { detectSkillsFromPrompt, buildSkillPrompt, getSkillById, type Skill } fr
 export const maxDuration = 300
 
 const STREAM_TEXT_PROVIDER_IDS = new Set([
-  'orcarouter',
-  'requesty',
-  'llm_gateway',
-  'deepseek',
-  'nvidia',
+  'orcarouter', 'requesty', 'llm_gateway', 'deepseek', 'nvidia',
+  'openrouter', 'google', 'vertex', 'mistral', 'groq', 'fireworks',
+  'togetherai', 'xai', 'ollama',
 ])
 
 // ─── Agent execution plans by complexity ──────────────────────
@@ -555,6 +553,7 @@ async function runPipeline({
           emitAction('status', `${AGENT_DISPLAY_NAMES[role]} completed${result.duration ? ` in ${(result.duration / 1000).toFixed(1)}s` : ''}`)
         } else {
           emitAction('status', `${AGENT_DISPLAY_NAMES[role]} failed: ${result.errors?.join(', ') || 'unknown error'}`)
+          emitAction('commentary', `${AGENT_DISPLAY_NAMES[role]} encountered an error: ${result.errors?.join('; ') || 'Unknown error'}. Continuing with remaining agents...`)
         }
 
         // Merge agent output into the fragment
@@ -840,6 +839,7 @@ async function generateTodosFromPrompt(
 
     console.log(`[Todos] Generating todos for: ${promptText.slice(0, 100)}...`)
 
+    const todoAbort = AbortSignal.timeout(30000) // 30s timeout for todo generation
     const result = streamText({
       model: modelClient as any,
       system: `You are a task planner. Given a user request, generate a concise list of specific tasks to accomplish it.
@@ -855,6 +855,7 @@ Rules:
 - Match the complexity: simple requests get fewer tasks, complex ones get more`,
       messages: [{ role: 'user', content: `Generate task list for: ${promptText.slice(0, 500)}` }],
       maxRetries: 0,
+      abortSignal: todoAbort,
       ...modelParams,
     })
 
@@ -947,12 +948,14 @@ async function analyzeComplexity(
 
     let text: string
 
+    const complexityAbort = AbortSignal.timeout(20000) // 20s timeout for complexity analysis
     if (useFallback) {
       const result = streamText({
         model: modelClient as any,
         system: COMPLEXITY_ANALYSIS_PROMPT + '\n\nRespond with ONLY a valid JSON object.',
         messages,
         maxRetries: 0,
+        abortSignal: complexityAbort,
         ...modelParams,
       })
       text = await readStream(result.textStream)
@@ -962,6 +965,7 @@ async function analyzeComplexity(
         system: COMPLEXITY_ANALYSIS_PROMPT,
         messages,
         maxRetries: 0,
+        abortSignal: complexityAbort,
         ...modelParams,
       })
       text = await readStream(result.textStream)

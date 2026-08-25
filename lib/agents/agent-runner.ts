@@ -18,12 +18,17 @@ import { streamObject, streamText, type LanguageModel } from 'ai'
 import { toPrompt, PromptContext } from '@/lib/prompt'
 import { Templates } from '@/lib/templates'
 
+// Providers that support streamObject (structured JSON output) reliably
+// All others default to streamText (plain text with JSON parsing)
+const STREAM_OBJECT_PROVIDER_IDS = new Set([
+  'openai',
+  'anthropic',
+])
+// Convenience: everything else uses streamText as fallback
 const STREAM_TEXT_PROVIDER_IDS = new Set([
-  'orcarouter',
-  'requesty',
-  'llm_gateway',
-  'deepseek',
-  'nvidia',
+  'orcarouter', 'requesty', 'llm_gateway', 'deepseek', 'nvidia',
+  'openrouter', 'google', 'vertex', 'mistral', 'groq', 'fireworks',
+  'togetherai', 'xai', 'ollama',
 ])
 
 // ─── Status Callback Type ───────────────────────────────────────
@@ -86,12 +91,14 @@ export async function runAgent(
 
       let text: string
 
+      const agentAbort = AbortSignal.timeout(120000) // 120s timeout per agent
       if (useFallback) {
         const result = streamText({
           model: modelClient as any,
           system: fullSystemPrompt + '\n\nYou MUST respond with ONLY a valid JSON object. No markdown, no explanation.',
           messages: input.messages,
           maxRetries: 0,
+          abortSignal: agentAbort,
           ...modelParams,
         })
 
@@ -109,6 +116,7 @@ export async function runAgent(
           system: fullSystemPrompt,
           messages: input.messages,
           maxRetries: 0,
+          abortSignal: agentAbort,
           ...modelParams,
         })
 
@@ -137,6 +145,8 @@ export async function runAgent(
       continue
     }
   }
+
+  console.error(`[Agent] ${AGENT_DISPLAY_NAMES[role]} FAILED after ${fallbackChain.length} model(s). Last error:`, lastError?.message)
 
   onStatus?.({
     role,
