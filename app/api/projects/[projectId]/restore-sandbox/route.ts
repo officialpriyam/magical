@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { type Sandbox as SandboxInstance } from '@e2b/code-interpreter'
 import { createE2BSandbox } from '@/lib/e2b-sandbox'
 import { FragmentSchema } from '@/lib/schema'
+import { getFragmentFiles } from '@/lib/fragment-files'
 import { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import { createServerClient } from '@/lib/supabase-server'
 import { getSupabaseProjectRuntimeEnv } from '@/lib/supabase-integration'
@@ -220,9 +221,16 @@ export async function POST(
       }
     }
 
+    // Fallback: use fragment files if no storage source has files
+    if (files.length === 0 && fragment?.files && fragment.files.length > 0) {
+      console.log('[Restore] Using fragment files as fallback (no storage files found)')
+      files = fragment.files.map((f: any) => ({ path: f.path, content: f.content }))
+      restoredFrom = 'fragment'
+    }
+
     if (files.length === 0) {
       return NextResponse.json(
-        { error: 'No saved files were found for this project in any storage source.' },
+        { error: 'No saved files were found for this project in any storage source or fragment.' },
         { status: 400 },
       )
     }

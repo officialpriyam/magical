@@ -491,10 +491,20 @@ async function runPipeline({
             emitAction('commentary', agentCommentary)
           }
 
-          // Emit thinking from the agent's actual reasoning
-          const thinkingText = extractThinking(result)
-          if (thinkingText) {
-            emitAction('thinking', thinkingText)
+          // Emit thinking from the agent's commentary paragraphs (rich reasoning)
+          const fragment = result.fragment as Record<string, any> | undefined
+          const commentarySource = fragment?.commentary || result.output || ''
+          if (commentarySource) {
+            const paragraphs = commentarySource.split(/\n\n+/).filter((p: string) => p.trim().length > 20)
+            for (const para of paragraphs.slice(0, 4)) {
+              const clean = para.replace(/\s+/g, ' ').trim()
+              if (clean.length > 20 && clean.length < 600) {
+                const isReasoning = !clean.startsWith('/') && !clean.startsWith('{') && !clean.startsWith('"')
+                if (isReasoning) {
+                  emitAction('thinking', clean)
+                }
+              }
+            }
           }
 
           // Emit REAL file paths from the agent's fragment (deduplicated)
@@ -664,16 +674,16 @@ function extractCommentary(result: AgentResult): string {
   // Use the agent's actual output/commentary, not hardcoded text
   const fragment = result.fragment as Record<string, any> | undefined
   if (fragment?.commentary) {
-    // Clean up and truncate
+    // Return full commentary — the user should see the AI's reasoning
     const text = fragment.commentary.replace(/\s+/g, ' ').trim()
-    return text.length > 300 ? `${text.slice(0, 297)}...` : text
+    return text.length > 600 ? `${text.slice(0, 597)}...` : text
   }
   // Fallback to output text (first meaningful paragraph)
   if (result.output) {
     const firstParagraph = result.output.split('\n').find(l => l.trim().length > 20)
     if (firstParagraph) {
       const text = firstParagraph.replace(/\s+/g, ' ').trim()
-      return text.length > 300 ? `${text.slice(0, 297)}...` : text
+      return text.length > 600 ? `${text.slice(0, 597)}...` : text
     }
   }
   return ''
@@ -691,7 +701,7 @@ function extractThinking(result: AgentResult): string {
     const trimmed = line.trim()
     // Skip JSON, code blocks, file paths, and short lines
     if (
-      trimmed.length < 20 ||
+      trimmed.length < 15 ||
       trimmed.startsWith('{') ||
       trimmed.startsWith('[') ||
       trimmed.startsWith('"') ||
@@ -705,12 +715,12 @@ function extractThinking(result: AgentResult): string {
     ) continue
 
     thinkingLines.push(trimmed)
-    if (thinkingLines.length >= 3) break
   }
 
   if (thinkingLines.length === 0) return ''
+  // Join all thinking lines as a full reasoning block
   const thinking = thinkingLines.join(' ').replace(/\s+/g, ' ').trim()
-  return thinking.length > 300 ? `${thinking.slice(0, 297)}...` : thinking
+  return thinking.length > 500 ? `${thinking.slice(0, 497)}...` : thinking
 }
 
 // ─── Extract real todos from planner output ─────────────────

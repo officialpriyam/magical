@@ -288,7 +288,7 @@ async function readStreamWithEvents(
         // For streamObject: extract reasoning from commentary field
         // For streamText: extract natural language paragraphs
         // Emit up to 3 thinking entries per agent (enough for real reasoning)
-        if (thinkingEmittedCount < 3 && text.length > 50) {
+        if (thinkingEmittedCount < 6 && text.length > 50) {
           // For streamObject: emit commentary text as thinking (it IS the reasoning)
           if (commentaryFieldFound && commentaryStartIdx >= 0 && commentaryStartIdx < text.length) {
             const raw = text.slice(commentaryStartIdx)
@@ -299,19 +299,25 @@ async function readStreamWithEvents(
               if (raw[i] === '\\') { escaped = true; continue }
               if (raw[i] === '"') { endIdx = i; break }
             }
-            const commentaryText = (endIdx >= 0 ? raw.slice(0, endIdx) : raw.slice(0, 300))
+            const commentaryText = (endIdx >= 0 ? raw.slice(0, endIdx) : raw.slice(0, 800))
               .replace(/\\n/g, '\n')
               .replace(/\\"/g, '"')
               .trim()
-            if (commentaryText.length > 30 && commentaryText.length < 500) {
-              // Only emit if it looks like natural language reasoning (not file paths or JSON)
-              const isNaturalLanguage = !commentaryText.startsWith('/')
-                && !commentaryText.startsWith('{')
-                && !commentaryText.match(/^[A-Z]:\\/)
-                && commentaryText.split(' ').length > 5
-              if (isNaturalLanguage) {
-                emitter.emitThinking(commentaryText)
-                thinkingEmittedCount++
+            if (commentaryText.length > 30) {
+              // Split into paragraphs and emit each as a thinking block
+              const paragraphs = commentaryText.split(/\n\n+/).filter(p => p.trim().length > 20)
+              for (const para of paragraphs) {
+                const clean = para.replace(/\s+/g, ' ').trim()
+                if (clean.length > 20 && clean.length < 600 && thinkingEmittedCount < 6) {
+                  const isNaturalLanguage = !clean.startsWith('/')
+                    && !clean.startsWith('{')
+                    && !clean.match(/^[A-Z]:\\/)
+                    && clean.split(' ').length > 3
+                  if (isNaturalLanguage) {
+                    emitter.emitThinking(clean)
+                    thinkingEmittedCount++
+                  }
+                }
               }
             }
           }
