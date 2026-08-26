@@ -3,5 +3,6 @@
 # Apps directory (desktop app deployed separately)
 apps/
 apps/**
-
+backup/
+backup/**
 # Only deploy Magical AI from root
