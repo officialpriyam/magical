@@ -114,16 +114,28 @@ export function IDE({
               setStorageSlow(Boolean(storageData.slow))
               setStorageStatus('ok')
               return
-            }
-
-            setFiles([])
-            setStorageSlow(false)
-            setStorageStatus('degraded')
-            setLoadError(
-              storageData.error ||
-                'Sandbox storage returned no files. Save a file to sync the workspace, then refresh.',
-            )
-            return
+            }            // Fallback: use fragmentFiles if sandbox-storage returned empty
+              if (fragmentFiles.length > 0) {
+                const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
+                  name: f.path.split('/').pop() || f.path,
+                  path: f.path,
+                  content: f.content,
+                  type: 'file' as const,
+                  isDirectory: false,
+                }))
+                setFiles(fsNodes)
+                setStorageStatus('ok')
+                setLoadError(null)
+                return
+              }
+              setFiles([])
+              setStorageSlow(false)
+              setStorageStatus('degraded')
+              setLoadError(
+                storageData.error ||
+                  'Sandbox storage returned no files. Save a file to sync the workspace, then refresh.',
+              )
+              return
           }
 
           setFiles([])
@@ -140,9 +152,23 @@ export function IDE({
         if (error?.name === 'AbortError') {
           setLoadError('Sandbox storage took too long to respond. Check the storage server and retry.')
         } else {
-          setLoadError('Could not reach sandbox storage. Check that the storage server is running.')
+          // Fallback to fragmentFiles if sandbox-storage is unreachable
+          if (fragmentFiles.length > 0) {
+            const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
+              name: f.path.split('/').pop() || f.path,
+              path: f.path,
+              content: f.content,
+              type: 'file' as const,
+              isDirectory: false,
+            }))
+            setFiles(fsNodes)
+            setStorageStatus('ok')
+            setLoadError(null)
+          } else {
+            setLoadError('Could not reach sandbox storage. Check that the storage server is running.')
+            setStorageStatus('error')
+          }
         }
-        setStorageStatus('error')
       } finally {
         fetchInFlightRef.current = false
         setIsRefreshing(false)
@@ -290,6 +316,22 @@ export function IDE({
       }
     }
   }, [persistFile])
+
+  // Auto-load fragmentFiles when they arrive and IDE has no files yet
+  useEffect(() => {
+    if (fragmentFiles.length > 0 && files.length === 0 && storageStatus !== 'loading') {
+      const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
+        name: f.path.split('/').pop() || f.path,
+        path: f.path,
+        content: f.content,
+        type: 'file' as const,
+        isDirectory: false,
+      }))
+      setFiles(fsNodes)
+      setStorageStatus('ok')
+      setLoadError(null)
+    }
+  }, [fragmentFiles, files.length, storageStatus])
 
   const handleSelectFile = useCallback(async (path: string) => {
     const cached = fileContentCacheRef.current.get(path)

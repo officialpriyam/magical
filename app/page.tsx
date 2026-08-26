@@ -922,11 +922,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
     // Auto-deploy sandbox when agentic stream ends with a fragment
     const finalFrag = agenticStream.fragment || fragment
+    console.log('[Agentic] Stream ended. fragment:', !!finalFrag, 'code:', !!finalFrag?.code, 'files:', finalFrag?.files?.length || 0, 'actions:', agenticStream.actions.length)
     if (finalFrag && (finalFrag.code || (finalFrag.files && finalFrag.files.length > 0))) {
       console.log('[Agentic] Auto-deploying sandbox for generated fragment')
       setIsPreviewLoading(true)
       setIsPreviewPanelOpen(true)
       setCurrentTab('fragment')
+      console.log('[Agentic] Preview panel opened, tab set to fragment')
       void (async () => {
         try {
           const response = await fetch('/api/sandbox', {
