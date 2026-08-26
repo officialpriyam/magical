@@ -5,7 +5,7 @@ node_modules/
 
 # Testing
 coverage/
-
+backup/
 # Next.js
 .next/
 out/
