@@ -1,0 +1,66 @@
+import 'server-only';
+
+import { Sandbox } from '@e2b/code-interpreter';
+import { createE2BSandbox } from '@/lib/e2b-sandbox';
+
+const E2B_API_KEY = process.env.E2B_API_KEY;
+
+const sandboxTimeout = 10 * 60 * 1000;
+
+export async function evaluateCode(
+  sessionID: string,
+  code: string,
+) {
+  if (!E2B_API_KEY) {
+    throw new Error('E2B_API_KEY environment variable not found');
+  }
+
+  const sandbox = await getSandbox(sessionID);
+
+  const execution = await sandbox.runCode(code, {});
+
+  return {
+    results: execution.results,
+    stdout: execution.logs.stdout,
+    stderr: execution.logs.stderr,
+    error: execution.error,
+  };
+}
+
+
+async function getSandbox(sessionID: string) {
+  if (!E2B_API_KEY) {
+    throw new Error('E2B_API_KEY environment variable not found');
+  }
+
+  const sandboxes = Sandbox.list();
+
+  while (sandboxes.hasNext) {
+    const sandboxInfos = await sandboxes.nextItems({ apiKey: E2B_API_KEY })
+
+    for (const sandboxInfo of sandboxInfos) {
+      const sandboxID =
+        sandboxInfo.metadata?.sessionID === sessionID
+          ? sandboxInfo.sandboxId
+          : undefined
+
+      if (sandboxID) {
+        const sandbox = await Sandbox.connect(sandboxID, {
+          apiKey: E2B_API_KEY,
+        })
+        await sandbox.setTimeout(sandboxTimeout);
+        return sandbox;
+      }
+    }
+  }
+
+  const sandbox = await createE2BSandbox(undefined, {
+    apiKey: E2B_API_KEY,
+    metadata: {
+      sessionID,
+    },
+    timeoutMs: sandboxTimeout
+  });
+  return sandbox;
+}
+
