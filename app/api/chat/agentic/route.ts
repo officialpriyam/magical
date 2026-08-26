@@ -503,7 +503,7 @@ async function runPipeline({
                 if (file?.path && !emittedFilePaths.has(file.path)) {
                   emittedFilePaths.add(file.path)
                   const isEdit = existingFiles.has(file.path)
-                  emitAction(isEdit ? 'file_edit' : 'file_write', file.path, file.purpose || undefined)
+                  await emitActionThrottled(isEdit ? 'file_edit' : 'file_write', file.path, file.purpose || undefined, 100)
                 }
               }
             }

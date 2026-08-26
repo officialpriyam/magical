@@ -307,7 +307,15 @@ async function readStreamWithEvents(
             .trim()
 
           if (decoded.length > lastCommentaryEmitLen && decoded.length > 5) {
-            emitter.emitCommentary(decoded.slice(0, 600))
+            // Filter out lines that look like JSON data
+            const cleanLines = decoded.split('\n').filter((line: string) => {
+              const t = line.trim()
+              return t.length > 0 && !t.match(/^"?[\w_]+"?\s*:/) && !t.startsWith('{') && !t.startsWith('[')
+            })
+            const cleanText = cleanLines.join('\n').trim()
+            if (cleanText.length > 5) {
+              emitter.emitCommentary(cleanText.slice(0, 600))
+            }
             lastCommentaryEmitLen = decoded.length
           }
 
@@ -318,11 +326,17 @@ async function readStreamWithEvents(
         }
 
         // ── streamText path: emit meaningful lines as commentary chunks ──
+        // Filter out JSON lines, code, and raw data — only emit human-readable text
         if (!commentaryFieldFound && lastCommentaryEmitLen === 0) {
           const lines = text.split('\n').filter(l => l.trim().length > 10)
           const lastLine = lines[lines.length - 1]
-          if (lastLine && !lastLine.startsWith('{') && !lastLine.startsWith('"') && lastLine !== lastEmittedLine) {
-            const trimmed = lastLine.trim()
+          const trimmed = lastLine?.trim() || ''
+          const isJsonOrCode = trimmed.startsWith('{') || trimmed.startsWith('"') || trimmed.startsWith('[')
+            || trimmed.startsWith('import ') || trimmed.startsWith('export ')
+            || trimmed.startsWith('const ') || trimmed.startsWith('function ')
+            || trimmed.startsWith('```') || trimmed.match(/^"[\w_]+":/)
+            || trimmed.match(/^\s*"[\w_]+"\s*:/)
+          if (lastLine && !isJsonOrCode && trimmed !== lastEmittedLine && trimmed.split(' ').length > 3) {
             emitter.emitCommentary(trimmed.slice(0, 400))
             lastEmittedLine = lastLine
           }
