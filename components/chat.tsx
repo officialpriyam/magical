@@ -11,6 +11,7 @@ import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Glo
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { ActivityFeed } from '@/components/activity-feed'
 
 /** Simple markdown renderer for bold/italic in streaming commentary */
 function renderMarkdownText(text: string): React.ReactNode[] {
@@ -207,7 +208,7 @@ export function Chat({
           })}
           {/* Persisted agentic timeline — always render inline with each assistant message */}
           {message.role === 'assistant' && message.agenticActions && message.agenticActions.length > 0 && (
-            <LiveStreamingMessage
+            <ActivityFeed
               key={`persisted-${index}`}
               actions={message.agenticActions}
               todos={message.agenticTodos || []}
@@ -235,7 +236,7 @@ export function Chat({
 
       {/* Live streaming message — during active streaming */}
       {agenticStreaming && agenticActions.length > 0 && (
-        <LiveStreamingMessage
+        <ActivityFeed
           key="live-stream"
           actions={agenticActions}
           todos={agenticTodos}

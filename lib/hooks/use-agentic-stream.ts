@@ -5,7 +5,7 @@ import { DeepPartial } from 'ai'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type ToolAction = {
-  type: 'thinking' | 'file_write' | 'file_edit' | 'file_read' | 'web_search' | 'web_fetch' | 'todo' | 'commentary' | 'commentary_chunk' | 'status'
+  type: 'thinking' | 'file_write' | 'file_edit' | 'file_read' | 'web_search' | 'web_fetch' | 'run_command' | 'todo' | 'commentary' | 'commentary_chunk' | 'status'
   content: string
   detail?: string
   timestamp: number

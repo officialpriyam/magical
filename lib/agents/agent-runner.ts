@@ -14,7 +14,8 @@ import {
   getFallbackChain,
 } from '@/lib/models'
 import { fragmentSchema as schema } from '@/lib/schema'
-import { streamObject, streamText, type LanguageModel } from 'ai'
+import { streamObject, streamText, isStepCount, type LanguageModel } from 'ai'
+import { agentTools } from './tools'
 import { toPrompt, PromptContext } from '@/lib/prompt'
 import { Templates } from '@/lib/templates'
 
@@ -39,6 +40,7 @@ export type AgentEventEmitter = {
   emitThinking: (content: string) => void
   emitFileRead: (path: string) => void
   emitFileWrite: (path: string, purpose?: string) => void
+  emitCommand: (command: string, detail?: string) => void
   emitWebSearch: (query: string) => void
   emitCommentary: (content: string) => void
 }
@@ -97,12 +99,29 @@ export async function runAgent(
           model: modelClient as any,
           system: fullSystemPrompt + '\n\nYou MUST respond with ONLY a valid JSON object. No markdown, no explanation.',
           messages: input.messages,
+          tools: agentTools,
+          stopWhen: isStepCount(10),
           maxRetries: 0,
           abortSignal: agentAbort,
           ...modelParams,
         })
 
         text = await readStreamWithEvents(result.textStream, eventEmitter, role)
+        // Process tool invocations from the stream
+        try {
+          const toolCalls = await result.toolCalls
+          for (const tc of toolCalls) {
+            if (eventEmitter && 'input' in tc) {
+              const input = tc.input as any
+              if (tc.toolName === 'read_file') eventEmitter.emitFileRead(input.path)
+              if (tc.toolName === 'create_file') eventEmitter.emitFileWrite(input.path, 'Created')
+              if (tc.toolName === 'edit_file') eventEmitter.emitFileWrite(input.path, 'Edited')
+              if (tc.toolName === 'run_command') eventEmitter.emitCommand(input.command)
+            }
+          }
+        } catch {
+          // Tool calls may not be available for all providers
+        }
       } else {
         onStatus?.({
           role,

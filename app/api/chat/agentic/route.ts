@@ -458,6 +458,7 @@ async function runPipeline({
           },
           emitWebSearch: (query) => emitAction('web_search', query),
           emitCommentary: (content) => emitAction('commentary_chunk', content),
+          emitCommand: (command, detail) => emitAction('run_command', command, detail),
         }
 
         const result = await runAgent({
@@ -599,6 +600,7 @@ async function runPipeline({
 
           if (fragment.install_dependencies_command) {
             latestFragment.install_dependencies_command = fragment.install_dependencies_command
+            emitAction('run_command', fragment.install_dependencies_command, 'Installing dependencies')
           }
           if (fragment.port !== undefined && fragment.port !== null) {
             latestFragment.port = fragment.port

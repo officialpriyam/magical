@@ -66,27 +66,26 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
     }
   }
 
-  if (chain.length === 0) {
-    const fallbackIds = [
-      'models/gemini-2.0-flash',
-      'qwen/qwen3-coder',
-      'anthropic/claude-haiku-4.5',
-      'claude-3-5-haiku-latest',
-      'gpt-4o-mini',
-      'deepseek/deepseek-chat',
-      'mistralai/mistral-small-latest',
-      'groq/llama-3.1-8b-instant',
-      'togetherai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo',
-      'fireworks/accounts/fireworks/models/llama-v3p1-8b-instruct',
-    ]
+  // Always append reliable fallback models (even if chain has other models)
+  // This ensures working models are tried when configured ones fail
+  const fallbackIds = [
+    'deepseek/deepseek-chat',
+    'gpt-4o-mini',
+    'anthropic/claude-haiku-4.5',
+    'models/gemini-2.0-flash',
+    'mistralai/mistral-small-latest',
+    'groq/llama-3.1-8b-instant',
+  ]
 
-    for (const fallbackId of fallbackIds) {
+  for (const fallbackId of fallbackIds) {
+    if (chain.length >= 20) break
+    if (!seenIds.has(fallbackId)) {
       const fallbackModel = (bundledModels.models as LLMModel[]).find(
         (candidate) => candidate.id === fallbackId,
       )
-
       if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, config)) {
         chain.push(fallbackModel)
+        seenIds.add(fallbackId)
       }
     }
   }
@@ -153,7 +152,7 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       createOpenAI({
         apiKey: apiKey || process.env.OPENAI_API_KEY,
         baseURL,
-      })(modelNameString),
+      }).chat(modelNameString),
     google: () =>
       createGoogleGenerativeAI({
         apiKey: apiKey || process.env.GOOGLE_AI_API_KEY,
@@ -168,12 +167,12 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       createOpenAI({
         apiKey: apiKey || process.env.GROQ_API_KEY,
         baseURL: baseURL || 'https://api.groq.com/openai/v1',
-      })(modelNameString),
+      }).chat(modelNameString),
     togetherai: () =>
       createOpenAI({
         apiKey: apiKey || process.env.TOGETHER_API_KEY,
         baseURL: baseURL || 'https://api.together.xyz/v1',
-      })(modelNameString),
+      }).chat(modelNameString),
     ollama: () => createOllama({ baseURL })(modelNameString),
     fireworks: () =>
       createFireworks({
@@ -208,12 +207,12 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       createOpenAI({
         apiKey: apiKey || process.env.XAI_API_KEY,
         baseURL: baseURL || 'https://api.x.ai/v1',
-      })(modelNameString),
+      }).chat(modelNameString),
     deepseek: () =>
       createOpenAI({
         apiKey: apiKey || process.env.DEEPSEEK_API_KEY,
         baseURL: baseURL || 'https://api.deepseek.com/v1',
-      })(modelNameString),
+      }).chat(modelNameString),
     openrouter: () =>
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
@@ -223,22 +222,22 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       createOpenAI({
         apiKey: apiKey || process.env.NVIDIA_API_KEY,
         baseURL: baseURL || process.env.NVIDIA_BASE_URL || NVIDIA_BASE_URL,
-      })(modelNameString),
+      }).chat(modelNameString),
     llm_gateway: () =>
       createOpenAI({
         apiKey: apiKey || process.env.LLM_GATEWAY_API_KEY,
         baseURL: baseURL || 'https://api.llmgateway.ai/v1',
-      })(modelNameString),
+      }).chat(modelNameString),
     orcarouter: () =>
       createOpenAI({
         apiKey: apiKey || process.env.ORCAROUTER_API_KEY,
         baseURL: baseURL || 'https://api.orcarouter.ai/v1',
-      })(modelNameString),
+      }).chat(modelNameString),
     requesty: () =>
       createOpenAI({
         apiKey: apiKey || process.env.REQUESTY_API_KEY,
         baseURL: baseURL || 'https://router.requesty.ai/v1',
-      })(modelNameString),
+      }).chat(modelNameString),
   }
 
   const createClient =

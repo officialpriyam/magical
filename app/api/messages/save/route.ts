@@ -1,34 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase-server'
+import { createClient } from '@supabase/supabase-js'
+import { supabaseUrl, supabaseServiceRoleKey } from '@/lib/supabase-credentials'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
  * Server-side message save route.
- * The client-side save fails because:
- * 1. save_message_and_update_project RPC doesn't exist in Supabase
- * 2. Direct upsert fails with RLS (403) — client can't write to messages table
- *
- * This route uses the server-side Supabase client (service_role) to bypass RLS.
+ * Uses admin Supabase client (service_role) to bypass RLS.
+ * The @supabase/ssr client with service_role doesn't bypass RLS
+ * because auth.uid() returns NULL for service_role JWTs.
+ * Using @supabase/supabase-js directly bypasses RLS entirely.
  */
 export async function POST(request: NextRequest) {
   try {
+    // Guard: service_role key must be configured, otherwise RLS blocks the upsert
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      console.error('[Messages Save] SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL is not set — cannot bypass RLS.')
+      return NextResponse.json(
+        { error: 'Server misconfigured: SUPABASE_SERVICE_ROLE_KEY is required for message saving.' },
+        { status: 503 },
+      )
+    }
+
     const { projectId, role, content, objectData, resultData, sequenceNumber } = await request.json()
 
     if (!projectId || !role || sequenceNumber === undefined) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const supabase = await createServerClient(true) // service_role bypasses RLS
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Create admin client with service_role to bypass RLS
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    const { data: project, error: projectError } = await adminClient
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .maybeSingle()
+
+    if (projectError || !project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    // Upsert the message (server-side bypasses RLS)
-    const { error: upsertError } = await supabase
+    const { error: upsertError } = await adminClient
       .from('messages')
       .upsert(
         {
@@ -46,13 +62,6 @@ export async function POST(request: NextRequest) {
       console.error('[Messages Save] Upsert failed:', upsertError)
       return NextResponse.json({ error: upsertError.message }, { status: 500 })
     }
-
-    // Touch the project's updated_at
-    await supabase
-      .from('projects')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', projectId)
-      .eq('user_id', user.id)
 
     return NextResponse.json({ saved: true })
   } catch (error) {
