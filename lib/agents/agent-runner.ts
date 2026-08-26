@@ -255,6 +255,7 @@ async function readStreamWithEvents(
   let lastEmitTime = Date.now()
   let lastCommentaryEmitLen = 0
   let thinkingEmittedCount = 0
+  const emittedThinkingTexts = new Set<string>()
   const EMIT_INTERVAL = 250 // Emit commentary every 250ms for live streaming feel
 
   // Track commentary extraction state across chunks
@@ -331,7 +332,7 @@ async function readStreamWithEvents(
         // For streamObject: extract reasoning from commentary field
         // For streamText: extract natural language paragraphs
         // Emit up to 3 thinking entries per agent (enough for real reasoning)
-        if (thinkingEmittedCount < 6 && text.length > 50) {
+        if (thinkingEmittedCount < 3 && text.length > 50) {
           // For streamObject: emit commentary text as thinking (it IS the reasoning)
           if (commentaryFieldFound && commentaryStartIdx >= 0 && commentaryStartIdx < text.length) {
             const raw = text.slice(commentaryStartIdx)
@@ -351,12 +352,13 @@ async function readStreamWithEvents(
               const paragraphs = commentaryText.split(/\n\n+/).filter(p => p.trim().length > 20)
               for (const para of paragraphs) {
                 const clean = para.replace(/\s+/g, ' ').trim()
-                if (clean.length > 20 && clean.length < 600 && thinkingEmittedCount < 6) {
+                if (clean.length > 20 && clean.length < 600 && thinkingEmittedCount < 3) {
                   const isNaturalLanguage = !clean.startsWith('/')
                     && !clean.startsWith('{')
                     && !clean.match(/^[A-Z]:\\/)
                     && clean.split(' ').length > 3
-                  if (isNaturalLanguage) {
+                  if (isNaturalLanguage && !emittedThinkingTexts.has(clean)) {
+                    emittedThinkingTexts.add(clean)
                     emitter.emitThinking(clean)
                     thinkingEmittedCount++
                   }
@@ -386,7 +388,8 @@ async function readStreamWithEvents(
                 })
               for (const para of paragraphs) {
                 const clean = para.replace(/\s+/g, ' ').trim()
-                if (clean.length > 30 && clean.length < 500) {
+                if (clean.length > 30 && clean.length < 500 && !emittedThinkingTexts.has(clean)) {
+                  emittedThinkingTexts.add(clean)
                   emitter.emitThinking(clean)
                   thinkingEmittedCount++
                   break

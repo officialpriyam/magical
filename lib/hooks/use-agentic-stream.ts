@@ -222,6 +222,11 @@ export function useAgenticStream(storageKey?: string) {
             if (event.type === 'action') {
               const actionType = event.action_type as ToolAction['type']
 
+              // Yield to browser between events so React can render each one individually
+              if (actionType !== 'commentary_chunk') {
+                await new Promise(r => setTimeout(r, 15))
+              }
+
               if (actionType === 'commentary_chunk') {
                 // Append to the last commentary action for streaming text effect
                 setState(prev => {

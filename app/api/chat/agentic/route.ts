@@ -490,21 +490,8 @@ async function runPipeline({
             emitAction('commentary', agentCommentary)
           }
 
-          // Emit thinking from the agent's commentary paragraphs (rich reasoning)
-          const fragment = result.fragment as Record<string, any> | undefined
-          const commentarySource = fragment?.commentary || result.output || ''
-          if (commentarySource) {
-            const paragraphs = commentarySource.split(/\n\n+/).filter((p: string) => p.trim().length > 20)
-            for (const para of paragraphs.slice(0, 4)) {
-              const clean = para.replace(/\s+/g, ' ').trim()
-              if (clean.length > 20 && clean.length < 600) {
-                const isReasoning = !clean.startsWith('/') && !clean.startsWith('{') && !clean.startsWith('"')
-                if (isReasoning) {
-                  emitAction('thinking', clean)
-                }
-              }
-            }
-          }
+          // NOTE: Thinking is already emitted by agent-runner during streaming.
+          // Do NOT re-emit thinking here — it causes duplicates.
 
           // Emit REAL file paths from the agent's fragment (deduplicated)
           // Distinguish edits from new writes based on whether the file already existed
