@@ -537,11 +537,11 @@ async function runPipeline({
             }
           }
 
-          // Emit completion status
-          emitAction('status', `${AGENT_DISPLAY_NAMES[role]} completed${result.duration ? ` in ${(result.duration / 1000).toFixed(1)}s` : ''}`)
+          // Emit completion status with delay for streaming feel
+          await emitActionThrottled('status', `${AGENT_DISPLAY_NAMES[role]} completed${result.duration ? ` in ${(result.duration / 1000).toFixed(1)}s` : ''}`)
         } else {
-          emitAction('status', `${AGENT_DISPLAY_NAMES[role]} failed: ${result.errors?.join(', ') || 'unknown error'}`)
-          emitAction('commentary', `${AGENT_DISPLAY_NAMES[role]} encountered an error: ${result.errors?.join('; ') || 'Unknown error'}. Continuing with remaining agents...`)
+          await emitActionThrottled('status', `${AGENT_DISPLAY_NAMES[role]} failed: ${result.errors?.join(', ') || 'unknown error'}`)
+          await emitActionThrottled('commentary', `${AGENT_DISPLAY_NAMES[role]} encountered an error: ${result.errors?.join('; ') || 'Unknown error'}. Continuing with remaining agents...`)
         }
 
         // Merge agent output into the fragment
@@ -664,8 +664,8 @@ async function runPipeline({
       emitAction('file_write', pw.path, pw.purpose)
     }
 
-    emitAction('commentary', `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`)
-    emitAction('status', `Pipeline complete — ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s`)
+    await emitActionThrottled('commentary', `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`, undefined, 200)
+    await emitActionThrottled('status', `Pipeline complete — ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s`, undefined, 200)
     emitFragment(finalFragment)
   } catch (error: any) {
     clearInterval(flushPendingWrites)

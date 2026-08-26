@@ -1076,7 +1076,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
     messagesRef.current = updatedMessages
     setMessages(updatedMessages)
-    setErrorMessage('')
+    // Keep error visible so user can see what went wrong
     setAutoFixMessage(`Auto-fixing code (${attempt}/${MAX_AUTO_FIX_ATTEMPTS}) — analyzing the error and regenerating...`)
     setCurrentTab('code')
 
