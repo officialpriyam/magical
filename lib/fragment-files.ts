@@ -47,9 +47,74 @@ export function getFragmentFileCount(fragment?: DeepPartial<FragmentSchema> | nu
  * These are the scaffolding files that every project needs but are NOT user-generated.
  * Used to persist full project structure to sandbox-storage.
  */
+function getCommonFiles(template: string, readmeContent: string): GeneratedFile[] {
+  return [
+    {
+      path: 'README.md',
+      content: readmeContent,
+    },
+    {
+      path: '.gitignore',
+      content: getGitignoreContent(template),
+    },
+  ]
+}
+
+function getGitignoreContent(template: string): string {
+  const lines = [
+    '# dependencies',
+    'node_modules/',
+    '.pnp',
+    '.pnp.js',
+    '',
+    '# build output',
+    'dist/',
+    'build/',
+    '.next/',
+    '',
+    '# environment',
+    '.env',
+    '.env.local',
+    '.env.development.local',
+    '.env.test.local',
+    '.env.production.local',
+    '',
+    '# misc',
+    '.DS_Store',
+    '*.tsbuildinfo',
+    'next-env.d.ts',
+  ]
+  if (template === 'python' || template === 'streamlit' || template === 'gradio') {
+    return [
+      '# Python',
+      '__pycache__/',
+      '*.py[cod]',
+      '*$py.class',
+      '*.so',
+      '',
+      '# Virtual environment',
+      'venv/',
+      '.venv/',
+      'env/',
+      '',
+      '# Environment',
+      '.env',
+      '',
+      '# IDE',
+      '.idea/',
+      '.vscode/',
+      '*.swp',
+      '*.swo',
+    ].join('\n')
+  }
+  return lines.join('\n')
+}
+
 export function getTemplateFiles(template?: string): GeneratedFile[] {
   if (template === 'nextjs-developer') {
     return [
+      ...getCommonFiles('nextjs', `# ${'{'}APP_NAME{'}'}\n\nA modern web application built with Next.js, React, and Tailwind CSS.\n\n## Tech Stack\n\n- **Framework:** Next.js 14\n- **UI:** React 18 + TypeScript\n- **Styling:** Tailwind CSS\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`
+\nOpen [http://localhost:3000](http://localhost:3000) to view the app.\n\n## Available Scripts\n\n| Command | Description |\n|---------|-------------|\n| \`npm run dev\` | Start development server |\n| \`npm run build\` | Build for production |\n| \`npm start\` | Start production server |\n`),
       {
         path: 'package.json',
         content: JSON.stringify({
@@ -120,6 +185,7 @@ export function getTemplateFiles(template?: string): GeneratedFile[] {
 
   if (template === 'vue-developer') {
     return [
+      ...getCommonFiles('vue', `# Vue App\n\nA Vue.js application built with Nuxt 3 and Tailwind CSS.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\nOpen [http://localhost:3000](http://localhost:3000) to view the app.`),
       {
         path: 'package.json',
         content: JSON.stringify({
@@ -167,6 +233,7 @@ export function getTemplateFiles(template?: string): GeneratedFile[] {
 
   if (template === 'react-developer') {
     return [
+      ...getCommonFiles('react', `# React App\n\nA React application built with Vite and Tailwind CSS.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\nOpen [http://localhost:3000](http://localhost:3000) to view the app.`),
       {
         path: 'package.json',
         content: JSON.stringify({
@@ -241,6 +308,7 @@ export function getTemplateFiles(template?: string): GeneratedFile[] {
 
   if (template === 'vite-developer') {
     return [
+      ...getCommonFiles('vite', `# Vite React App\n\nA React application built with Vite and Tailwind CSS.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\nOpen [http://localhost:3000](http://localhost:3000) to view the app.`),
       {
         path: 'package.json',
         content: JSON.stringify({
@@ -315,6 +383,7 @@ export function getTemplateFiles(template?: string): GeneratedFile[] {
 
   if (template === 'html-developer') {
     return [
+      ...getCommonFiles('html', `# HTML App\n\nA simple HTML application.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\nOpen [http://localhost:3000](http://localhost:3000) to view the app.`),
       {
         path: 'package.json',
         content: JSON.stringify({
@@ -335,6 +404,7 @@ export function getTemplateFiles(template?: string): GeneratedFile[] {
 
   if (template === 'svelte-developer') {
     return [
+      ...getCommonFiles('svelte', `# Svelte App\n\nA Svelte application built with Vite and Tailwind CSS.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\nOpen [http://localhost:3000](http://localhost:3000) to view the app.`),
       {
         path: 'package.json',
         content: JSON.stringify({
@@ -385,6 +455,7 @@ export function getTemplateFiles(template?: string): GeneratedFile[] {
 
   if (template === 'expo-mobile') {
     return [
+      ...getCommonFiles('expo', `# Expo Mobile App\n\nA React Native mobile application built with Expo.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm start\n\`\`\`\n\nScan the QR code with Expo Go (iOS/Android) to view the app.`),
       {
         path: 'package.json',
         content: JSON.stringify({
@@ -452,6 +523,7 @@ export function getTemplateFiles(template?: string): GeneratedFile[] {
 
   if (template === 'pwa-mobile') {
     return [
+      ...getCommonFiles('pwa', `# PWA App\n\nA Progressive Web App built with Next.js.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\nOpen [http://localhost:3000](http://localhost:3000) to view the app.`),
       {
         path: 'package.json',
         content: JSON.stringify({

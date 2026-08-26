@@ -51,34 +51,37 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
   const chain: LLMModel[] = []
   const seenIds = new Set<string>()
 
+  // 1. Always start with the user's selected model
   if (model.id !== 'auto' && hasProviderCredentials(model.providerId, config)) {
     chain.push(model)
     seenIds.add(model.id)
   }
 
-  const allModels = getAllConfiguredModels(config)
-
-  for (const candidate of allModels) {
-    if (chain.length >= 20) break
-    if (!seenIds.has(candidate.id)) {
-      chain.push(candidate)
-      seenIds.add(candidate.id)
+  // 2. If model is 'auto', add configured models from the same provider first
+  if (model.id === 'auto') {
+    const allModels = getAllConfiguredModels(config)
+    for (const candidate of allModels) {
+      if (chain.length >= 5) break
+      if (!seenIds.has(candidate.id)) {
+        chain.push(candidate)
+        seenIds.add(candidate.id)
+      }
     }
   }
 
-  // Always append reliable fallback models (even if chain has other models)
-  // This ensures working models are tried when configured ones fail
+  // 3. Append only curated, proven fallback models for code generation
+  //    NEVER add all configured models — small vision/instruct models
+  //    (like qwen3-vl-8b) return empty responses on code generation tasks
   const fallbackIds = [
-    'deepseek/deepseek-chat',
     'gpt-4o-mini',
-    'anthropic/claude-haiku-4.5',
+    'anthropic/claude-3-5-haiku-latest',
     'models/gemini-2.0-flash',
-    'mistralai/mistral-small-latest',
-    'groq/llama-3.1-8b-instant',
+    'deepseek-chat',
+    'claude-3-5-haiku-latest',
   ]
 
   for (const fallbackId of fallbackIds) {
-    if (chain.length >= 20) break
+    if (chain.length >= 10) break
     if (!seenIds.has(fallbackId)) {
       const fallbackModel = (bundledModels.models as LLMModel[]).find(
         (candidate) => candidate.id === fallbackId,

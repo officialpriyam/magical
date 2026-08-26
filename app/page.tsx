@@ -2958,6 +2958,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       setCurrentTab('ide')
                       window.dispatchEvent(new CustomEvent('open-file', { detail: { path: filePath } }))
                     }}
+                    sandboxSbxId={result?.sbxId}
                   />
                 )}
               </div>

@@ -23,6 +23,12 @@ import {
 } from '@/lib/agents/prompts'
 import { runAgent, type AgentEventEmitter } from '@/lib/agents/agent-runner'
 import { detectSkillsFromPrompt, buildSkillPrompt, getSkillById, type Skill } from '@/lib/skills/registry'
+import {
+  detectResumeRequest,
+  buildResumeContext,
+  buildConversationContext,
+} from '@/lib/chat-memory'
+import { createServerClient } from '@/lib/supabase-server'
 
 export const maxDuration = 300
 
@@ -258,6 +264,50 @@ export async function POST(req: Request) {
         content: `The user shared the following URL(s). Use the fetched content below as context:\n\n${urlContext}`,
       },
     ]
+  }
+
+  // ── Chat Memory: detect resume and inject context ──────────
+  const resumeCheck = detectResumeRequest(messages)
+  if (resumeCheck.isResume) {
+    emitAction('commentary', 'Resuming previous task...')
+    // Try to load previous fragment from the project's latest preview
+    try {
+      if (projectID && userID) {
+        const supabase = await createServerClient(true)
+        const { data: project } = await supabase
+          .from('projects')
+          .select('id, preview')
+          .eq('id', projectID)
+          .eq('user_id', userID)
+          .single()
+        if (project?.preview?.fragment) {
+          const prevFragment = project.preview.fragment
+          const resumeContext = buildResumeContext(prevFragment, messages, resumeCheck.originalPrompt)
+          enrichedMessages = [
+            ...enrichedMessages,
+            {
+              role: 'user' as const,
+              content: resumeContext,
+            },
+          ]
+          emitAction('commentary', `Found previous project: ${prevFragment.title || 'Untitled'} with ${(prevFragment.files || []).length} files`)
+        }
+      }
+    } catch (err) {
+      console.error('[Resume] Failed to load previous state:', err)
+    }
+  } else {
+    // Inject conversation memory for non-resume requests
+    const memoryContext = buildConversationContext(messages)
+    if (memoryContext) {
+      enrichedMessages = [
+        ...enrichedMessages,
+        {
+          role: 'user' as const,
+          content: memoryContext,
+        },
+      ]
+    }
   }
 
   // Run the pipeline in background and stream events

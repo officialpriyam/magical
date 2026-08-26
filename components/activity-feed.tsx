@@ -167,17 +167,48 @@ function FileWriteRow({
   )
 }
 
-// ─── Command Row (expandable output) ────────────────────────
-function CommandRow({ action }: { action: ToolAction }) {
+// ─── Command Row (expandable output, click to run) ──────────
+function CommandRow({ action, sbxId }: { action: ToolAction; sbxId?: string }) {
   const [expanded, setExpanded] = useState(false)
+  const [output, setOutput] = useState(action.detail || '')
+  const [isRunning, setIsRunning] = useState(false)
   const command = action.content
-  const output = action.detail || ''
+
+  const runCommand = async () => {
+    if (!sbxId || isRunning) return
+    setIsRunning(true)
+    setExpanded(true)
+    try {
+      const response = await fetch('/api/terminal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          command,
+          sbxId,
+          workingDirectory: '/home/user',
+        }),
+      })
+      const data = await response.json()
+      const result = data.stdout || data.stderr || data.error || ''
+      setOutput(result)
+    } catch (err) {
+      setOutput(`Failed to run: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setIsRunning(false)
+    }
+  }
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          if (!output && sbxId) {
+            runCommand()
+          } else {
+            setExpanded(!expanded)
+          }
+        }}
         className="flex items-center gap-2 py-1 px-1 -mx-1 rounded-md hover:bg-white/[0.04] transition-colors w-full text-left text-[13px]"
       >
         {expanded ? (
@@ -186,28 +217,56 @@ function CommandRow({ action }: { action: ToolAction }) {
           <ChevronRight className="h-3.5 w-3.5 text-white/40 shrink-0" />
         )}
         <Terminal className="h-3.5 w-3.5 text-blue-400/60 shrink-0" />
-        <span className="text-white/50">Ran</span>
+        <span className="text-white/50">
+          {isRunning ? 'Running' : output ? 'Ran' : sbxId ? 'Run' : 'Planned'}
+        </span>
         <code className="text-[11px] font-mono text-white/65 bg-white/[0.06] px-1.5 py-0.5 rounded">
           {command.length > 60 ? command.slice(0, 60) + '...' : command}
         </code>
-        {output && (
+        {isRunning && (
+          <Loader2 className="h-3 w-3 animate-spin text-blue-400/60 shrink-0" />
+        )}
+        {!isRunning && output && (
           <span className="text-[10px] text-white/30 ml-auto">
             {output.split('\n').length} lines
           </span>
         )}
+        {!isRunning && !output && sbxId && (
+          <span className="text-[10px] text-blue-400/50 ml-auto">click to run</span>
+        )}
       </button>
 
       <AnimatePresence>
-        {expanded && output && (
+        {expanded && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <pre className="ml-7 mb-2 p-3 rounded-lg bg-black/30 border border-white/[0.06] text-[11px] font-mono leading-[1.6] text-white/55 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap">
-              {output}
-            </pre>
+            {output ? (
+              <pre className="ml-7 mb-2 p-3 rounded-lg bg-black/30 border border-white/[0.06] text-[11px] font-mono leading-[1.6] text-white/55 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap">
+                {output}
+              </pre>
+            ) : isRunning ? (
+              <div className="ml-7 mb-2 p-3 rounded-lg bg-black/30 border border-white/[0.06] text-[11px] font-mono text-white/40">
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Executing...
+                </span>
+              </div>
+            ) : sbxId ? (
+              <div className="ml-7 mb-2">
+                <button
+                  type="button"
+                  onClick={runCommand}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-blue-400/20 bg-blue-400/10 px-2.5 py-1 text-[11px] font-medium text-blue-300/80 transition hover:bg-blue-400/20"
+                >
+                  <Play className="h-2.5 w-2.5" />
+                  Run in sandbox
+                </button>
+              </div>
+            ) : null}
           </motion.div>
         )}
       </AnimatePresence>
@@ -389,6 +448,7 @@ export function ActivityFeed({
   onStop,
   onFileClick,
   elapsed: initialElapsed,
+  sbxId,
 }: {
   actions: ToolAction[]
   todos: TodoItem[]
@@ -396,6 +456,7 @@ export function ActivityFeed({
   onStop?: () => void
   onFileClick?: (path: string) => void
   elapsed?: number
+  sbxId?: string
 }) {
   const [expandedThinking, setExpandedThinking] = useState<Set<number>>(new Set())
   const [elapsed, setElapsed] = useState(initialElapsed || 0)
@@ -558,6 +619,7 @@ export function ActivityFeed({
                 <CommandRow
                   key={`cmd-${i}-${action.timestamp}`}
                   action={action}
+                  sbxId={sbxId}
                 />
               )
 

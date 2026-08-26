@@ -60,6 +60,7 @@ export function Chat({
   agenticTodos = [],
   agenticStreaming = false,
   onFileClick,
+  sandboxSbxId,
 }: {
   messages: Message[]
   isLoading: boolean
@@ -77,6 +78,7 @@ export function Chat({
   agenticActions?: ToolAction[]
   agenticTodos?: TodoItem[]
   agenticStreaming?: boolean
+  sandboxSbxId?: string
 }) {
 
   useEffect(() => {
@@ -215,6 +217,7 @@ export function Chat({
               isStreaming={false}
               elapsed={message.agenticElapsed}
               onFileClick={onFileClick}
+              sbxId={sandboxSbxId}
             />
           )}
         </motion.div>
@@ -243,6 +246,7 @@ export function Chat({
           isStreaming={true}
           onStop={onStop}
           onFileClick={onFileClick}
+          sbxId={sandboxSbxId}
         />
       )}
       {/* Status card — only during loading, NOT after generation (artifact card handles that) */}
