@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import {
+  deleteProjectFileFromSandboxStorage,
   getProjectFileFromSandboxStorage,
   getProjectFileTreeFromSandboxStorage,
-  getSandboxStorageMetadata,
   getRustFSConfigurationError,
   hasSandboxStorageConfig,
+  renameProjectFileInSandboxStorage,
   saveProjectFileToSandboxStorage,
 } from '@/lib/sandbox-storage'
 import type { FileSystemNode } from '@/components/file-tree'
@@ -52,16 +53,6 @@ export async function GET(
 
   if (!project) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-  }
-
-  const sandboxStorage = getSandboxStorageMetadata(project.metadata)
-
-  if (!sandboxStorage) {
-    return NextResponse.json({
-      files: [],
-      degraded: true,
-      error: 'This project has not been saved to external sandbox storage yet. Files are only listed once they are saved.',
-    })
   }
 
   if (!hasSandboxStorageConfig()) {
@@ -209,6 +200,129 @@ export async function POST(
           ? 'RustFS storage write timed out.'
           : `Failed to save file (${error?.message || 'unknown error'})`,
         saved: false,
+      },
+      { status: isTimeout ? 504 : 500 },
+    )
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> },
+) {
+  const { projectId } = await params
+
+  if (!projectId) {
+    return NextResponse.json({ error: 'Missing project ID' }, { status: 400 })
+  }
+
+  const supabase = await createServerClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
+  if (!hasSandboxStorageConfig()) {
+    return NextResponse.json(
+      { error: getRustFSConfigurationError(), deleted: false },
+      { status: 503 },
+    )
+  }
+
+  try {
+    const { path: filePath } = await req.json()
+
+    if (!filePath || typeof filePath !== 'string') {
+      return NextResponse.json({ error: 'Missing file path', deleted: false }, { status: 400 })
+    }
+
+    const result = await raceWithTimeout(
+      deleteProjectFileFromSandboxStorage({
+        userId: user.id,
+        projectId,
+        path: filePath,
+      }),
+      7000,
+      'sandbox_storage_delete_timeout',
+    )
+
+    return NextResponse.json({ deleted: result.saved, path: filePath })
+  } catch (error: any) {
+    const isTimeout = /timeout/i.test(String(error?.message || ''))
+    console.error('Failed to delete file from RustFS:', error)
+
+    return NextResponse.json(
+      {
+        error: isTimeout
+          ? 'RustFS storage delete timed out.'
+          : `Failed to delete file (${error?.message || 'unknown error'})`,
+        deleted: false,
+      },
+      { status: isTimeout ? 504 : 500 },
+    )
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> },
+) {
+  const { projectId } = await params
+
+  if (!projectId) {
+    return NextResponse.json({ error: 'Missing project ID' }, { status: 400 })
+  }
+
+  const supabase = await createServerClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
+  if (!hasSandboxStorageConfig()) {
+    return NextResponse.json(
+      { error: getRustFSConfigurationError(), renamed: false },
+      { status: 503 },
+    )
+  }
+
+  try {
+    const { oldPath, newPath } = await req.json()
+
+    if (!oldPath || !newPath || typeof oldPath !== 'string' || typeof newPath !== 'string') {
+      return NextResponse.json({ error: 'Missing old path or new path', renamed: false }, { status: 400 })
+    }
+
+    const result = await raceWithTimeout(
+      renameProjectFileInSandboxStorage({
+        userId: user.id,
+        projectId,
+        oldPath,
+        newPath,
+      }),
+      7000,
+      'sandbox_storage_rename_timeout',
+    )
+
+    return NextResponse.json({ renamed: result.saved, oldPath, newPath })
+  } catch (error: any) {
+    const isTimeout = /timeout/i.test(String(error?.message || ''))
+    console.error('Failed to rename file in RustFS:', error)
+
+    return NextResponse.json(
+      {
+        error: isTimeout
+          ? 'RustFS storage rename timed out.'
+          : `Failed to rename file (${error?.message || 'unknown error'})`,
+        renamed: false,
       },
       { status: isTimeout ? 504 : 500 },
     )

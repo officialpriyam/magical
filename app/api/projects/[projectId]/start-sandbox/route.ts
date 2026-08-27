@@ -78,7 +78,7 @@ export async function POST(
       userId: user.id,
       projectId,
     }).catch((error) => {
-      console.warn('External sandbox storage warm start hydrate failed:', error)
+      console.warn('RustFS warm start hydrate failed:', error)
       return []
     })
 

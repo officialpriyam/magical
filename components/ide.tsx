@@ -84,13 +84,7 @@ export function IDE({
       return
     }
 
-    if (isSandboxMode && sandboxId) {
-      if (!projectId) {
-        setLoadError('Sandbox mode requires a project ID to fetch files from storage.')
-        setStorageStatus('error')
-        return
-      }
-
+    if (projectId) {
       fetchInFlightRef.current = true
       setIsRefreshing(true)
       setStorageStatus('loading')
@@ -114,33 +108,36 @@ export function IDE({
               setStorageSlow(Boolean(storageData.slow))
               setStorageStatus('ok')
               return
-            }            // Fallback: use fragmentFiles if sandbox-storage returned empty
-              if (fragmentFiles.length > 0) {
-                const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
-                  name: f.path.split('/').pop() || f.path,
-                  path: f.path,
-                  content: f.content,
-                  type: 'file' as const,
-                  isDirectory: false,
-                }))
-                setFiles(fsNodes)
-                setStorageStatus('ok')
-                setLoadError(null)
-                return
-              }
-              setFiles([])
-              setStorageSlow(false)
-              setStorageStatus('degraded')
-              setLoadError(
-                storageData.error ||
-                  'Sandbox storage returned no files. Save a file to sync the workspace, then refresh.',
-              )
+            }
+
+            // Fallback: use fragmentFiles if RustFS returned empty
+            if (fragmentFiles.length > 0) {
+              const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
+                name: f.path.split('/').pop() || f.path,
+                path: f.path,
+                content: f.content,
+                type: 'file' as const,
+                isDirectory: false,
+              }))
+              setFiles(fsNodes)
+              setStorageStatus('ok')
+              setLoadError(null)
               return
+            }
+
+            setFiles([])
+            setStorageSlow(false)
+            setStorageStatus('degraded')
+            setLoadError(
+              storageData.error ||
+                'RustFS returned no files. Save a file to sync the workspace, then refresh.',
+            )
+            return
           }
 
           setFiles([])
           setStorageStatus('error')
-          setLoadError('Sandbox storage returned an unexpected response.')
+          setLoadError('RustFS returned an unexpected response.')
         } else {
           const errorData = await storageResponse.json().catch(() => null)
           const message =
@@ -150,9 +147,9 @@ export function IDE({
         }
       } catch (error: any) {
         if (error?.name === 'AbortError') {
-          setLoadError('Sandbox storage took too long to respond. Check the storage server and retry.')
+          setLoadError('RustFS took too long to respond. Check the storage server and retry.')
         } else {
-          // Fallback to fragmentFiles if sandbox-storage is unreachable
+          // Fallback to fragmentFiles if RustFS is unreachable
           if (fragmentFiles.length > 0) {
             const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
               name: f.path.split('/').pop() || f.path,
@@ -165,7 +162,7 @@ export function IDE({
             setStorageStatus('ok')
             setLoadError(null)
           } else {
-            setLoadError('Could not reach sandbox storage. Check that the storage server is running.')
+            setLoadError('Could not reach RustFS storage. Check the storage connection.')
             setStorageStatus('error')
           }
         }
@@ -201,7 +198,7 @@ export function IDE({
         setIsRefreshing(false)
       }
     }
-  }, [session, isSandboxMode, sandboxId, projectId])
+  }, [session, projectId, fragmentFiles])
 
   const persistFile = useCallback(async (path: string, content: string) => {
     if (isGitHubSaveBlocked) {
@@ -214,6 +211,48 @@ export function IDE({
     if (onSave) {
       await onSave(path, content)
       saved = true
+    } else if (projectId) {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/sandbox-storage-files`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ path, content }),
+        })
+        saved = response.ok
+
+        if (!saved) {
+          const errorData = await response.json().catch(() => null)
+          setLoadError(
+            errorData?.error || `Failed to save "${path}" to RustFS (HTTP ${response.status}).`,
+          )
+        }
+      } catch (error: any) {
+        setLoadError(
+          error?.name === 'AbortError'
+            ? `Saving "${path}" to RustFS timed out.`
+            : `Could not save "${path}" to RustFS. Check the storage connection.`,
+        )
+      }
+
+      if (saved && sandboxId) {
+        try {
+          const response = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path, content, projectID: projectId }),
+          })
+
+          if (!response.ok) {
+            console.warn('Live sandbox save failed after RustFS save:', response.statusText)
+          }
+        } catch (error) {
+          console.warn('Live sandbox save failed after RustFS save:', error)
+        }
+      }
     } else if (isSandboxMode && sandboxId) {
       try {
         const response = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
@@ -298,10 +337,10 @@ export function IDE({
   }, [flushPendingSave])
 
   useEffect(() => {
-    if (isSandboxMode || session) {
+    if (projectId || isSandboxMode || session) {
       fetchFiles()
     }
-  }, [session, isSandboxMode, fetchFiles])
+  }, [session, projectId, isSandboxMode, fetchFiles])
 
   useEffect(() => {
     return () => {
@@ -352,7 +391,7 @@ export function IDE({
     setIsOpeningFile(true)
     setOpeningPath(path)
     try {
-      if (isSandboxMode && projectId) {
+      if (projectId) {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 8000)
 
@@ -371,17 +410,17 @@ export function IDE({
             const errorData = await response.json().catch(() => null)
             setLoadError(
               errorData?.error ||
-                `"${path}" could not be loaded from sandbox storage.`,
+                `"${path}" could not be loaded from RustFS.`,
             )
           }
         } catch (error: any) {
           if (error?.name === 'AbortError') {
             setLoadError(
-              `Loading "${path}" timed out. Sandbox storage may be unreachable.`,
+              `Loading "${path}" timed out. RustFS may be unreachable.`,
             )
           } else {
             setLoadError(
-              `Could not reach sandbox storage to load "${path}". Check the storage connection.`,
+              `Could not reach RustFS to load "${path}". Check the storage connection.`,
             )
           }
         } finally {
@@ -419,7 +458,7 @@ export function IDE({
       setIsOpeningFile(false)
       setOpeningPath(null)
     }
-  }, [isSandboxMode, projectId, session, flushPendingSave])
+  }, [projectId, session, flushPendingSave])
 
   useEffect(() => {
     return () => {
@@ -474,17 +513,21 @@ export function IDE({
       return
     }
 
-    if (isSandboxMode) {
-      console.log('File creation in sandbox mode not supported')
+    if (isDirectory && projectId) {
+      setLoadError('RustFS stores files, not empty folders. Create a file inside the folder to persist it.')
       return
     }
 
-    if (!session) return
+    if (!session && !projectId) return
     try {
       const content = isDirectory ? '' : '// New file\n'
 
-      if (onSave && !isDirectory) {
-        await onSave(path, content)
+      if (!isDirectory && (projectId || onSave)) {
+        const saved = await persistFile(path, content)
+        if (saved) {
+          fileContentCacheRef.current.set(path, content)
+          setSelectedFile({ path, content })
+        }
         await fetchFiles()
         return
       }
@@ -511,6 +554,51 @@ export function IDE({
   async function handleDeleteFile(path: string) {
     if (isGitHubSaveBlocked) {
       blockGitHubSave()
+      return
+    }
+
+    if (projectId) {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/sandbox-storage-files`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ path }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null)
+          setLoadError(errorData?.error || `Failed to delete "${path}" from RustFS.`)
+          return
+        }
+
+        if (sandboxId) {
+          try {
+            const sandboxResponse = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ path, projectID: projectId }),
+            })
+
+            if (!sandboxResponse.ok) {
+              console.warn('Live sandbox delete failed after RustFS delete:', sandboxResponse.statusText)
+            }
+          } catch (error) {
+            console.warn('Live sandbox delete failed after RustFS delete:', error)
+          }
+        }
+
+        fileContentCacheRef.current.delete(path)
+        await fetchFiles()
+        if (selectedFile?.path === path || selectedFile?.path.startsWith(`${path}/`)) {
+          setSelectedFile(null)
+        }
+      } catch (error) {
+        console.error('Error deleting RustFS file:', error)
+      }
       return
     }
 
@@ -561,6 +649,61 @@ export function IDE({
   async function handleRenameFile(oldPath: string, newPath: string) {
     if (isGitHubSaveBlocked) {
       blockGitHubSave()
+      return
+    }
+
+    if (projectId) {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/sandbox-storage-files`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ oldPath, newPath }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null)
+          setLoadError(errorData?.error || `Failed to rename "${oldPath}" in RustFS.`)
+          return
+        }
+
+        if (sandboxId) {
+          try {
+            const sandboxResponse = await fetch(`/api/sandbox/${sandboxId}/files/content`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ oldPath, newPath, projectID: projectId }),
+            })
+
+            if (!sandboxResponse.ok) {
+              console.warn('Live sandbox rename failed after RustFS rename:', sandboxResponse.statusText)
+            }
+          } catch (error) {
+            console.warn('Live sandbox rename failed after RustFS rename:', error)
+          }
+        }
+
+        const cachedContent = fileContentCacheRef.current.get(oldPath)
+        if (cachedContent !== undefined) {
+          fileContentCacheRef.current.delete(oldPath)
+          fileContentCacheRef.current.set(newPath, cachedContent)
+        }
+
+        await fetchFiles()
+        if (selectedFile?.path === oldPath) {
+          setSelectedFile({ path: newPath, content: selectedFile.content })
+        } else if (selectedFile?.path.startsWith(`${oldPath}/`)) {
+          setSelectedFile({
+            path: `${newPath}/${selectedFile.path.slice(oldPath.length + 1)}`,
+            content: selectedFile.content,
+          })
+        }
+      } catch (error) {
+        console.error('Error renaming RustFS file:', error)
+      }
       return
     }
 
@@ -707,8 +850,8 @@ export function IDE({
               variant="ghost"
               size="icon"
               className="h-8 w-8 shrink-0 text-white/70 hover:bg-white/10 hover:text-white"
-              title={isSandboxMode ? 'Refresh sandbox files' : 'Refresh files'}
-              aria-label={isSandboxMode ? 'Refresh sandbox files' : 'Refresh files'}
+              title={projectId ? 'Refresh RustFS files' : isSandboxMode ? 'Refresh sandbox files' : 'Refresh files'}
+              aria-label={projectId ? 'Refresh RustFS files' : isSandboxMode ? 'Refresh sandbox files' : 'Refresh files'}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
@@ -733,7 +876,7 @@ export function IDE({
               <div className="space-y-1">
                 <p className="text-sm font-medium text-red-300">Storage Unavailable</p>
                 <p className="text-xs text-white/40 max-w-[200px]">
-                  Cannot connect to sandbox storage. Files may still be available in the live sandbox.
+                  Cannot connect to RustFS. Files may still be available in the live sandbox.
                 </p>
               </div>
               <Button
@@ -750,7 +893,7 @@ export function IDE({
             <FileTree
               files={visibleFiles}
               onSelectFile={handleSelectFile}
-              onCreateFile={isSandboxMode ? undefined : handleCreateFile}
+              onCreateFile={handleCreateFile}
               onDeleteFile={handleDeleteFile}
               onRenameFile={handleRenameFile}
             />
@@ -776,7 +919,7 @@ export function IDE({
         )}
         {storageSlow && !loadError && (
           <div className="shrink-0 border-t border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200/80">
-            Sandbox storage is responding slowly. Files may take a moment to refresh.
+            RustFS storage is responding slowly. Files may take a moment to refresh.
           </div>
         )}
       </aside>

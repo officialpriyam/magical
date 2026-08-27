@@ -14,7 +14,6 @@ import {
 } from '@/lib/r2-workspace'
 import {
   getProjectFilesFromSandboxStorage,
-  getSandboxStorageMetadata,
   hasSandboxStorageConfig,
 } from '@/lib/sandbox-storage'
 import {
@@ -119,35 +118,29 @@ export async function POST(
       )
     }
 
-    const sandboxStorage = getSandboxStorageMetadata(project.metadata)
     const workspace = getGitHubWorkspace(project.metadata)
     let files: GitHubFile[] = []
     let restoredFrom = 'saved workspace'
 
-    if (sandboxStorage) {
-      if (!hasSandboxStorageConfig()) {
-        console.warn('RustFS storage is not configured for this deployment')
-        // Fall through to try GitHub or R2 instead of failing
-      } else {
-        try {
-          files = await getProjectFilesFromSandboxStorage({
-            userId: user.id,
-            projectId,
-            project,
-          })
-          restoredFrom = 'rustfs'
+    if (!hasSandboxStorageConfig()) {
+      console.warn('RustFS storage is not configured for this deployment')
+      // Fall through to try GitHub or R2 instead of failing
+    } else {
+      try {
+        files = await getProjectFilesFromSandboxStorage({
+          userId: user.id,
+          projectId,
+          project,
+        })
+        restoredFrom = 'rustfs'
 
-          if (files.length === 0) {
-            console.warn('No files found in RustFS, will try other sources')
-            files = []
-          } else {
-            // Successfully got files from RustFS, proceed
-            files = files
-          }
-        } catch (error) {
-          console.warn('Failed to fetch from RustFS:', error)
-          // Fall through to try GitHub or R2
+        if (files.length === 0) {
+          console.warn('No files found in RustFS, will try other sources')
+          files = []
         }
+      } catch (error) {
+        console.warn('Failed to fetch from RustFS:', error)
+        // Fall through to try GitHub or R2
       }
     }
 

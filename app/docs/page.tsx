@@ -81,7 +81,7 @@ const DOC_CONTENT: Record<string, { title: string; content: string }> = {
   },
   ide: {
     title: 'Built-in IDE',
-    content: `## Code Editor\n\nThe built-in IDE lets you edit generated code directly in the browser.\n\n### Features\n- **File Tree:** Browse and navigate all generated files\n- **Syntax Highlighting:** Full syntax highlighting for all supported languages\n- **Inline Editing:** Click any file to open and edit it\n- **Save & Redeploy:** Save changes and instantly redeploy the preview\n\n### How to Use\n1. Click the IDE button in the top-right corner\n2. Browse the file tree on the left\n3. Click a file to open it in the editor\n4. Make your changes\n5. Click Save (or Ctrl+S) to persist changes\n\n### File Persistence\nFiles are saved to sandbox storage. When you reopen a project, your changes are restored automatically.`,
+    content: `## Code Editor\n\nThe built-in IDE lets you edit generated code directly in the browser.\n\n### Features\n- **File Tree:** Browse and navigate all generated files\n- **Syntax Highlighting:** Full syntax highlighting for all supported languages\n- **Inline Editing:** Click any file to open and edit it\n- **Save & Redeploy:** Save changes and instantly redeploy the preview\n\n### How to Use\n1. Click the IDE button in the top-right corner\n2. Browse the file tree on the left\n3. Click a file to open it in the editor\n4. Make your changes\n5. Click Save (or Ctrl+S) to persist changes\n\n### File Persistence\nFiles are saved to RustFS project storage. When you reopen a project, your changes are restored automatically.`,
   },
   supabase: {
     title: 'Supabase Integration',

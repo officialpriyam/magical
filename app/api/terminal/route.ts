@@ -1,7 +1,6 @@
-import { Sandbox } from '@e2b/code-interpreter'
 import { NextRequest, NextResponse } from 'next/server'
-import { decodeSandboxId } from '@/lib/sandbox-provider'
-import { getVercelSandbox, runVercelShellCommand, VERCEL_WORKDIR } from '@/lib/vercel-sandbox'
+import { runSandboxCommand } from '@/lib/sandbox-command'
+import { createServerClient } from '@/lib/supabase-server'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -14,6 +13,7 @@ export async function POST(req: NextRequest) {
     const {
       command,
       sbxId,
+      projectID,
       workingDirectory: wd = '/home/user',
       teamID,
       accessToken
@@ -21,78 +21,43 @@ export async function POST(req: NextRequest) {
 
     workingDirectory = wd
 
-    if (!command || !sbxId) {
+    if (!command || !sbxId || !projectID) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
       )
     }
 
-    const sandboxRef = decodeSandboxId(sbxId)
+    const supabase = await createServerClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    // Replace pnpm with npm in commands since pnpm isn't available in E2B sandboxes
-    const sanitizedCommand = command.replace(/\bpnpm\b/g, 'npm')
-
-    if (sandboxRef.provider === 'vercel') {
-      const sandbox = await getVercelSandbox(sandboxRef.id)
-      const result = await runVercelShellCommand(sandbox, sanitizedCommand, {
-        cwd: toVercelWorkingDirectory(workingDirectory),
-        timeoutMs: 30000,
-      }) as {
-        exitCode: number
-        stdout(): Promise<string>
-        stderr(): Promise<string>
-      }
-      const [stdout, stderr] = await Promise.all([
-        result.stdout().catch(() => ''),
-        result.stderr().catch(() => ''),
-      ])
-
-      if (result.exitCode === 127) {
-        const commandName = sanitizedCommand.split(' ')[0]
-        return NextResponse.json({
-          stdout,
-          stderr: stderr || `Command '${commandName}' not found. Available commands: ls, cd, pwd, cat, echo, node, npm, python3, git`,
-          exitCode: result.exitCode,
-          workingDirectory,
-        })
-      }
-
-      return NextResponse.json({
-        stdout,
-        stderr,
-        exitCode: result.exitCode,
-        workingDirectory,
-      })
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const sandbox = await Sandbox.connect(sandboxRef.id, {
-      ...(teamID && accessToken
-        ? {
-            headers: {
-              'X-Supabase-Team': teamID,
-              'X-Supabase-Token': accessToken,
-            },
-          }
-        : {}),
-    })
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', projectID)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .maybeSingle()
 
-    const fullCommand = `cd "${workingDirectory}" && ${sanitizedCommand}`
-
-    const result = await sandbox.commands.run(fullCommand, {
-      timeoutMs: 30000,
-    })
-
-    // If command failed with 127 (command not found), provide helpful message
-    if (result.exitCode === 127) {
-      const commandName = sanitizedCommand.split(' ')[0]
-      return NextResponse.json({
-        stdout: result.stdout,
-        stderr: result.stderr || `Command '${commandName}' not found. Available commands: ls, cd, pwd, cat, echo, node, npm, python3, git`,
-        exitCode: result.exitCode,
-        workingDirectory,
-      })
+    if (projectError || !project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
+
+    const result = await runSandboxCommand({
+      command,
+      sbxId,
+      workingDirectory,
+      teamID,
+      accessToken,
+      timeoutMs: 30_000,
+    })
 
     return NextResponse.json({
       stdout: result.stdout,
@@ -125,24 +90,4 @@ export async function POST(req: NextRequest) {
       { status: 200 } // Return 200 so the UI can display the error properly
     )
   }
-}
-
-function toVercelWorkingDirectory(value: string) {
-  if (!value || value === '/home/user') {
-    return VERCEL_WORKDIR
-  }
-
-  if (value.startsWith(VERCEL_WORKDIR)) {
-    return value
-  }
-
-  if (value.startsWith('/home/user/')) {
-    return `${VERCEL_WORKDIR}/${value.slice('/home/user/'.length)}`
-  }
-
-  if (value.startsWith('/')) {
-    return `${VERCEL_WORKDIR}${value}`
-  }
-
-  return `${VERCEL_WORKDIR}/${value}`
 }

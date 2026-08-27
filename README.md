@@ -187,7 +187,9 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 
 ## RustFS sandbox storage
 
-RustFS is the permanent source of truth for sandbox projects. Each project's files live under `projects/{userId}/{projectId}/`; disposable sandboxes restore those source files and reinstall dependencies. `node_modules`, build output, and caches are deliberately excluded.
+RustFS is the permanent source of truth for sandbox projects. Each project gets a deterministic private `storageId`; metadata is stored in `workspaces/{storageId}/.project.json` and project files live under `workspaces/{storageId}/files/`. Disposable sandboxes restore those source files and reinstall dependencies. `node_modules`, build output, and caches are deliberately excluded.
+
+The `.project.json` manifest records the storage id, owner user id, project id, file count, timestamps, and file list. The same manifest snapshot is also stored in the project's database metadata under `metadata.sandboxStorage.manifest`. The server checks the authenticated Supabase project owner, the DB manifest snapshot, and the RustFS `.project.json` before reading or writing any RustFS object, so one user cannot load another user's project files by guessing a path.
 
 For local development, start RustFS with an S3 bucket named by `RUSTFS_BUCKET`, then set the variables above (the standard local endpoint is `http://localhost:9000`). The backend uses the AWS S3 SDK with path-style addressing, so no RustFS credentials reach the browser.
 

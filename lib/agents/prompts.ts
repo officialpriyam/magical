@@ -396,6 +396,10 @@ export function getAgentPrompt(role: AgentRole, context?: Record<string, any>): 
     prompt += `\n\n${context.skills}`
   }
 
+  if (context?.todos) {
+    prompt += `\n\nRequired implementation todos:\n${context.todos}\n\nYou must satisfy every unchecked todo in the generated files. Do not treat these as display-only progress labels.`
+  }
+
   if (context?.existingCode) {
     prompt += `\n\nExisting code to work with:\n\`\`\`\n${context.existingCode}\n\`\`\``
   }

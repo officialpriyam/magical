@@ -19,11 +19,12 @@ interface TerminalEntry {
 
 interface FragmentTerminalProps {
   result: ExecutionResult
+  projectId?: string
   teamID?: string
   accessToken?: string
 }
 
-export function FragmentTerminal({ result, teamID, accessToken }: FragmentTerminalProps) {
+export function FragmentTerminal({ result, projectId, teamID, accessToken }: FragmentTerminalProps) {
   const [entries, setEntries] = useState<TerminalEntry[]>([])
   const [currentCommand, setCurrentCommand] = useState('')
   const [isExecuting, setIsExecuting] = useState(false)
@@ -70,6 +71,7 @@ export function FragmentTerminal({ result, teamID, accessToken }: FragmentTermin
         body: JSON.stringify({
           command: command.trim(),
           sbxId: result.sbxId,
+          projectID: projectId,
           workingDirectory,
           teamID,
           accessToken,
@@ -99,6 +101,7 @@ export function FragmentTerminal({ result, teamID, accessToken }: FragmentTermin
           body: JSON.stringify({
             command: 'pwd',
             sbxId: result.sbxId,
+            projectID: projectId,
             workingDirectory,
             teamID,
             accessToken,

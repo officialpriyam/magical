@@ -505,7 +505,7 @@ async function persistProjectFile(projectID: unknown, filePath: unknown, content
       })
     }
   } catch (error) {
-    console.warn('External sandbox storage file backup failed:', error)
+    console.warn('RustFS file backup failed:', error)
     await saveProjectFileToR2({
       userId,
       projectId: projectID,
@@ -541,7 +541,7 @@ async function persistProjectDelete(projectID: unknown, filePath: unknown) {
       })
     }
   } catch (error) {
-    console.warn('External sandbox storage delete backup failed:', error)
+    console.warn('RustFS delete backup failed:', error)
     await deleteProjectFileFromR2({
       userId,
       projectId: projectID,
@@ -582,7 +582,7 @@ async function persistProjectRename(projectID: unknown, oldPath: unknown, newPat
       })
     }
   } catch (error) {
-    console.warn('External sandbox storage rename backup failed:', error)
+    console.warn('RustFS rename backup failed:', error)
     await renameProjectFileInR2({
       userId,
       projectId: projectID,

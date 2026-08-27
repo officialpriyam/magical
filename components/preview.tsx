@@ -270,6 +270,7 @@ export function Preview({
                 <FragmentTerminal
                   teamID={teamID}
                   accessToken={accessToken}
+                  projectId={projectId}
                   result={result as ExecutionResult}
                 />
               ) : (

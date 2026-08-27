@@ -1178,7 +1178,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       workspace
         ? 'Restoring files from GitHub...'
         : sandboxStorageWorkspace
-          ? 'Restoring files from sandbox storage...'
+          ? 'Restoring files from RustFS...'
           : 'Restoring files from private storage...'
     )
     setIsPreviewLoading(true)
@@ -1281,7 +1281,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             agenticStream.submit({
               userID: session?.user?.id,
               teamID: userTeam?.id,
+              accessToken: session?.access_token,
               projectID: currentProjectId,
+              sandboxID: result?.sbxId || warmSandboxResult?.sbxId,
               messages: toAISDKMessages(projectMessages),
               template: getTemplateForSubmission(),
               model: currentModel,
@@ -1313,7 +1315,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                 agenticStream.submit({
                   userID: session?.user?.id,
                   teamID: userTeam?.id,
+                  accessToken: session?.access_token,
                   projectID: currentProjectId,
+                  sandboxID: result?.sbxId || warmSandboxResult?.sbxId,
                   messages: toAISDKMessages(projectMessages),
                   template: getTemplateForSubmission(),
                   model: currentModel,
@@ -1748,7 +1752,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         agenticStream.submit({
           userID: session?.user?.id,
           teamID: userTeam?.id,
+          accessToken: session?.access_token,
           projectID: projectForPrompt.id,
+          sandboxID: result?.sbxId || warmSandboxResult?.sbxId,
           messages: toAISDKMessages(updatedMessages),
           template: getTemplateForSubmission(),
           model: currentModel,
@@ -2083,6 +2089,8 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     if (!session) return
 
     try {
+      const liveSandboxId = result?.sbxId || warmSandboxResult?.sbxId
+
       // 1. Save to RustFS directly (no live sandbox required)
       if (currentProject?.id) {
         try {
@@ -2097,9 +2105,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       }
 
       // 2. Try to save to the live sandbox (optional, may fail if sandbox is dead)
-      if (result?.sbxId) {
+      if (liveSandboxId) {
         try {
-          const response = await fetch(`/api/sandbox/${result.sbxId}/files/content`, {
+          const response = await fetch(`/api/sandbox/${liveSandboxId}/files/content`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ path, content, projectID: currentProject?.id }),

@@ -22,6 +22,7 @@ import {
   AGENT_DISPLAY_NAMES,
 } from '@/lib/agents/prompts'
 import { runAgent, type AgentEventEmitter } from '@/lib/agents/agent-runner'
+import { runSandboxCommand } from '@/lib/sandbox-command'
 import { detectSkillsFromPrompt, buildSkillPrompt, getSkillById, type Skill } from '@/lib/skills/registry'
 import {
   detectResumeRequest,
@@ -54,6 +55,12 @@ const PARALLEL_GROUPS: Record<TaskComplexity, AgentRole[][]> = {
 }
 
 // No hardcoded descriptions — real data emitted from agent output
+
+type AgentCommandContext = {
+  sbxId: string
+  teamID?: string
+  accessToken?: string
+}
 
 function createSSEStream() {
   let controller: ReadableStreamDefaultController<Uint8Array> | null = null
@@ -127,23 +134,65 @@ function createSSEStream() {
   return { stream, emit, emitAction, emitActionThrottled, emitTodos, emitProgress, emitFragment, emitError, close }
 }
 
+async function resolveAgentCommandContext({
+  sandboxID,
+  projectID,
+  teamID,
+  accessToken,
+}: {
+  sandboxID?: string
+  projectID?: string
+  teamID?: string
+  accessToken?: string
+}): Promise<AgentCommandContext | null> {
+  if (!sandboxID || !projectID) return null
+
+  const supabase = await createServerClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) return null
+
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('id', projectID)
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (projectError || !project) return null
+
+  return {
+    sbxId: sandboxID,
+    teamID,
+    accessToken,
+  }
+}
+
 export async function POST(req: Request) {
   const {
     messages,
     userID,
     teamID,
     projectID,
+    sandboxID,
     template,
     model,
     config,
+    accessToken,
   }: {
     messages: ModelMessage[]
     userID: string | undefined
     teamID: string | undefined
     projectID: string | undefined
+    sandboxID: string | undefined
     template: Templates
     model: LLMModel
     config: LLMModelConfig
+    accessToken?: string
   } = await req.json()
 
   if (!model?.id || !model?.providerId) {
@@ -177,6 +226,16 @@ export async function POST(req: Request) {
 
   // Emit connected event immediately so the frontend knows the stream is alive
   emit({ type: 'connected', timestamp: Date.now() })
+
+  const commandContext = await resolveAgentCommandContext({
+    sandboxID,
+    projectID,
+    teamID,
+    accessToken,
+  })
+  if (sandboxID && !commandContext) {
+    emitAction('commentary', 'Sandbox command execution is unavailable for this request.')
+  }
 
   // Detect agent skill from message prefix
   const detectedAgent = detectAgentFromMessage(messages)
@@ -320,6 +379,7 @@ export async function POST(req: Request) {
     fallbackChain,
     detectedAgent,
     detectedSkills,
+    commandContext,
     emitAction,
     emitActionThrottled,
     emitTodos,
@@ -351,6 +411,7 @@ async function runPipeline({
   fallbackChain,
   detectedAgent,
   detectedSkills,
+  commandContext,
   emitAction,
   emitActionThrottled,
   emitTodos,
@@ -366,6 +427,7 @@ async function runPipeline({
   fallbackChain: any[]
   detectedAgent?: string | null
   detectedSkills?: Skill[]
+  commandContext?: AgentCommandContext | null
   emitAction: (type: string, content: string, detail?: string) => void
   emitActionThrottled: (type: string, content: string, detail?: string, delayMs?: number) => Promise<void>
   emitTodos: (todos: { id: string; text: string; completed: boolean }[]) => void
@@ -410,9 +472,12 @@ async function runPipeline({
     emitAction('commentary', `Task complexity: ${complexity}. Dispatching ${agentsNeeded.length} agents...`)
     emitProgress(0, totalSteps)
 
+    let currentTodos: { id: string; text: string; completed: boolean }[] = []
+
     // Generate initial todo list from the user prompt using LLM
     const initialTodos = await generateTodosFromPrompt(messages, model, config, agentsNeeded)
     if (initialTodos.length > 0) {
+      currentTodos = initialTodos
       emitTodos(initialTodos)
     }
 
@@ -435,9 +500,40 @@ async function runPipeline({
 
     let completedAgents = 0
     const emittedFilePaths = new Set<string>()
-    let currentTodos: { id: string; text: string; completed: boolean }[] = []
     let lastFileWriteTime = 0
     const pendingFileWrites: { path: string; purpose?: string; emitAt: number }[] = []
+    const pendingCommandRuns: Promise<void>[] = []
+    const queueSandboxCommand = (command: string, detail?: string) => {
+      const cleanCommand = command.trim()
+      if (!cleanCommand) return
+
+      emitAction('run_command', cleanCommand, commandContext ? detail || 'Running in sandbox' : detail)
+
+      if (!commandContext) return
+
+      const run = runSandboxCommand({
+        command: cleanCommand,
+        sbxId: commandContext.sbxId,
+        teamID: commandContext.teamID,
+        accessToken: commandContext.accessToken,
+        timeoutMs: 60_000,
+      })
+        .then((result) => {
+          const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
+          emitAction(
+            result.exitCode === 0 ? 'status' : 'commentary',
+            result.exitCode === 0
+              ? `Sandbox command completed: ${cleanCommand}`
+              : `Sandbox command failed (${result.exitCode}): ${cleanCommand}`,
+            output.slice(0, 2000),
+          )
+        })
+        .catch((error) => {
+          emitAction('commentary', `Sandbox command failed: ${cleanCommand}`, error?.message || 'Unknown error')
+        })
+
+      pendingCommandRuns.push(run)
+    }
 
     // Flush pending file writes periodically
     flushPendingWrites = setInterval(() => {
@@ -454,6 +550,7 @@ async function runPipeline({
       const context: Record<string, any> = {
         supabase: supabaseContext,
         skills: detectedSkills && detectedSkills.length > 0 ? buildSkillPrompt(detectedSkills) : '',
+        todos: formatTodoContext(currentTodos),
       }
 
       const plannerResult = agentResults.find(r => r.role === 'planner')
@@ -508,7 +605,7 @@ async function runPipeline({
           },
           emitWebSearch: (query) => emitAction('web_search', query),
           emitCommentary: (content) => emitAction('commentary_chunk', content),
-          emitCommand: (command, detail) => emitAction('run_command', command, detail),
+          emitCommand: (command, detail) => queueSandboxCommand(command, detail),
         }
 
         const result = await runAgent({
@@ -645,7 +742,7 @@ async function runPipeline({
 
           if (fragment.install_dependencies_command) {
             latestFragment.install_dependencies_command = fragment.install_dependencies_command
-            emitAction('run_command', fragment.install_dependencies_command, 'Installing dependencies')
+            queueSandboxCommand(fragment.install_dependencies_command, 'Installing dependencies')
           }
           if (fragment.port !== undefined && fragment.port !== null) {
             latestFragment.port = fragment.port
@@ -721,9 +818,12 @@ async function runPipeline({
       const pw = pendingFileWrites.shift()!
       emitAction('file_write', pw.path, pw.purpose)
     }
+    if (pendingCommandRuns.length > 0) {
+      await Promise.allSettled(pendingCommandRuns)
+    }
 
     // Mark all remaining todos as complete on successful pipeline finish
-    if (currentTodos.length > 0) {
+    if (currentTodos.length > 0 && (hasFiles || hasCode)) {
       const hasIncomplete = currentTodos.some(t => !t.completed)
       if (hasIncomplete) {
         currentTodos = currentTodos.map(t => ({ ...t, completed: true }))
@@ -750,6 +850,14 @@ async function runPipeline({
 }
 
 // ─── Extract real commentary from agent result ─────────────
+function formatTodoContext(todos: { text: string; completed: boolean }[]) {
+  if (todos.length === 0) return ''
+
+  return todos
+    .map((todo, index) => `${index + 1}. ${todo.completed ? '[done]' : '[todo]'} ${todo.text}`)
+    .join('\n')
+}
+
 function extractCommentary(result: AgentResult): string {
   // Use the agent's actual output/commentary, not hardcoded text
   const fragment = result.fragment as Record<string, any> | undefined

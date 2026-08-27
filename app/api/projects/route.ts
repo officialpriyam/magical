@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         projectId: project.id,
       })
     } catch (storageError) {
-      console.warn('Failed to create external sandbox storage workspace:', storageError)
+      console.warn('Failed to create RustFS storage workspace:', storageError)
     }
 
     return NextResponse.json({ project })
