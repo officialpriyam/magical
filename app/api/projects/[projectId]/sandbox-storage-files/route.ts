@@ -4,6 +4,7 @@ import {
   getProjectFileFromSandboxStorage,
   getProjectFileTreeFromSandboxStorage,
   getSandboxStorageMetadata,
+  getRustFSConfigurationError,
   hasSandboxStorageConfig,
   saveProjectFileToSandboxStorage,
 } from '@/lib/sandbox-storage'
@@ -45,7 +46,7 @@ export async function GET(
     .maybeSingle()
 
   if (projectError) {
-    console.error('Failed to load project for sandbox-storage file listing:', projectError)
+    console.error('Failed to load project for RustFS file listing:', projectError)
     return NextResponse.json({ error: 'Failed to load project' }, { status: 500 })
   }
 
@@ -66,7 +67,7 @@ export async function GET(
   if (!hasSandboxStorageConfig()) {
     return NextResponse.json(
       {
-        error: 'External sandbox storage is not configured for this deployment.',
+        error: getRustFSConfigurationError() || 'RustFS storage is not configured for this deployment.',
         files: [],
         degraded: true,
       },
@@ -85,14 +86,14 @@ export async function GET(
   } catch (error: any) {
     const isTimeout = /timeout/i.test(String(error?.message || ''))
     console.error(
-      isTimeout ? 'Sandbox-storage request timed out:' : 'Failed to list sandbox-storage files:',
+      isTimeout ? 'RustFS request timed out:' : 'Failed to list RustFS files:',
       error,
     )
 
     const status = isTimeout ? 504 : 500
     const message = isTimeout
-      ? 'Sandbox storage is taking too long to respond. The storage server may be overloaded or unreachable.'
-      : `Failed to fetch sandbox-storage files (${error?.message || error || 'unknown error'})`
+      ? 'RustFS storage is taking too long to respond. The storage server may be overloaded or unreachable.'
+      : `Failed to fetch RustFS files (${error?.message || error || 'unknown error'})`
 
     return NextResponse.json(
       {
@@ -135,7 +136,7 @@ async function handleFileTree(userId: string, projectId: string, startedAt: numb
     files,
     latencyMs,
     slow: latencyMs > SLOW_STORAGE_THRESHOLD_MS,
-    source: 'sandbox-storage',
+    source: 'rustfs',
   }, { status: 200 })
 }
 
@@ -150,7 +151,7 @@ function raceWithTimeout<T>(promise: Promise<T>, timeoutMs: number, reason: stri
 
 /**
  * POST /api/projects/[projectId]/sandbox-storage-files
- * Save a file directly to sandbox-storage (no live sandbox required)
+ * Save a file directly to RustFS (no live sandbox required)
  */
 export async function POST(
   req: NextRequest,
@@ -170,6 +171,13 @@ export async function POST(
 
   if (authError || !user) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
+  if (!hasSandboxStorageConfig()) {
+    return NextResponse.json(
+      { error: getRustFSConfigurationError(), saved: false },
+      { status: 503 },
+    )
   }
 
   try {
@@ -193,12 +201,12 @@ export async function POST(
     return NextResponse.json({ saved: result.saved, path: filePath })
   } catch (error: any) {
     const isTimeout = /timeout/i.test(String(error?.message || ''))
-    console.error('Failed to save file to sandbox-storage:', error)
+    console.error('Failed to save file to RustFS:', error)
 
     return NextResponse.json(
       {
         error: isTimeout
-          ? 'Sandbox storage write timed out.'
+          ? 'RustFS storage write timed out.'
           : `Failed to save file (${error?.message || 'unknown error'})`,
         saved: false,
       },

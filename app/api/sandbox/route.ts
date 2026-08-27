@@ -3,7 +3,6 @@ import { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import { createE2BSandbox } from '@/lib/e2b-sandbox'
 import { getFragmentFiles, getTemplateFiles } from '@/lib/fragment-files'
 import { getSupabaseProjectRuntimeEnv } from '@/lib/supabase-integration'
-import { saveProjectFilesToR2 } from '@/lib/r2-workspace'
 import { saveProjectFilesToSandboxStorage } from '@/lib/sandbox-storage'
 import { createServerClient } from '@/lib/supabase-server'
 import {
@@ -558,36 +557,6 @@ function cleanCommand(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-async function saveGeneratedFilesToR2({
-  userID,
-  projectID,
-  files,
-}: {
-  userID?: string
-  projectID?: string
-  files: ReturnType<typeof getFragmentFiles>
-}) {
-  if (!projectID || files.length === 0) {
-    return
-  }
-
-  const authenticatedUserId = await getAuthenticatedUserId()
-
-  if (!authenticatedUserId || (userID && userID !== authenticatedUserId)) {
-    return
-  }
-
-  try {
-    await saveProjectFilesToR2({
-      userId: authenticatedUserId,
-      projectId: projectID,
-      files,
-    })
-  } catch (error) {
-    console.warn('Cloudflare R2 workspace backup failed:', error)
-  }
-}
-
 async function saveGeneratedFilesToSandboxStorage({
   userID,
   projectID,
@@ -619,12 +588,12 @@ async function saveGeneratedFilesToSandboxStorage({
       files: allFiles,
     })
 
-    if (!result.saved && result.reason === 'not_configured') {
-      await saveGeneratedFilesToR2({ userID, projectID, files: allFiles })
+    if (!result.saved) {
+      throw new Error(`RustFS project persistence failed: ${result.reason}`)
     }
   } catch (error) {
-    console.warn('External sandbox storage backup failed:', error)
-    await saveGeneratedFilesToR2({ userID, projectID, files: allFiles })
+    console.error('RustFS project persistence failed:', error)
+    throw error
   }
 }
 

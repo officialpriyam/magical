@@ -85,6 +85,13 @@ OPEN_WEBSEARCH_URL=https://your-instance.onrender.com
 
 # Optional — sandbox
 E2B_API_KEY=...
+
+# Durable sandbox project storage (RustFS S3 API)
+RUSTFS_ENDPOINT=http://localhost:9000
+RUSTFS_ACCESS_KEY=your-access-key
+RUSTFS_SECRET_KEY=your-secret-key
+RUSTFS_BUCKET=sandbox-storage
+RUSTFS_REGION=us-east-1
 ```
 
 ### 4. Run the development server
@@ -173,7 +180,17 @@ See [`.env.example`](.env.example) for the full list. Key variables:
 | `OPEN_WEBSEARCH_URL` | No | Self-hosted web search (primary, no API key) |
 | `EXA_API_KEY` | No | Exa web search (fallback) |
 | `E2B_API_KEY` | No | E2B sandbox provider |
+| `RUSTFS_ENDPOINT` | Yes* | RustFS S3-compatible endpoint for durable project files |
 | `MORPH_API_KEY` | No | Morph code editing |
+
+\*Set all `RUSTFS_*` variables when using sandboxes. The backend fails storage operations with a clear list of missing variables; credentials are server-only.
+
+## RustFS sandbox storage
+
+RustFS is the permanent source of truth for sandbox projects. Each project's files live under `projects/{userId}/{projectId}/`; disposable sandboxes restore those source files and reinstall dependencies. `node_modules`, build output, and caches are deliberately excluded.
+
+For local development, start RustFS with an S3 bucket named by `RUSTFS_BUCKET`, then set the variables above (the standard local endpoint is `http://localhost:9000`). The backend uses the AWS S3 SDK with path-style addressing, so no RustFS credentials reach the browser.
+
 
 ---
 

@@ -221,6 +221,16 @@ export async function deleteProject(
   if (!user) return false
 
   return safeApiCall(supabase, async () => {
+    // Durable sandbox files are server-side only. Purge them before hiding or
+    // deleting the project so a failed storage deletion cannot silently orphan data.
+    const storageResponse = await fetch(`/api/projects/${encodeURIComponent(id)}/storage`, {
+      method: 'DELETE',
+    })
+    if (!storageResponse.ok && storageResponse.status !== 404) {
+      const payload = await storageResponse.json().catch(() => ({}))
+      throw new Error(payload.error || 'Failed to delete durable project storage')
+    }
+
     if (permanent) {
       const { data, error } = await supabase
         .from('projects')

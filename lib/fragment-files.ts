@@ -45,7 +45,7 @@ export function getFragmentFileCount(fragment?: DeepPartial<FragmentSchema> | nu
 /**
  * Returns template base files (package.json, config files, etc.) for a given template.
  * These are the scaffolding files that every project needs but are NOT user-generated.
- * Used to persist full project structure to sandbox-storage.
+ * Used to persist full project structure to RustFS.
  */
 function getCommonFiles(template: string, readmeContent: string): GeneratedFile[] {
   return [

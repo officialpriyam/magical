@@ -126,7 +126,7 @@ export async function POST(
 
     if (sandboxStorage) {
       if (!hasSandboxStorageConfig()) {
-        console.warn('Sandbox storage is not configured for this deployment')
+        console.warn('RustFS storage is not configured for this deployment')
         // Fall through to try GitHub or R2 instead of failing
       } else {
         try {
@@ -135,23 +135,23 @@ export async function POST(
             projectId,
             project,
           })
-          restoredFrom = 'sandbox-storage'
+          restoredFrom = 'rustfs'
 
           if (files.length === 0) {
-            console.warn('No files found in sandbox-storage, will try other sources')
+            console.warn('No files found in RustFS, will try other sources')
             files = []
           } else {
-            // Successfully got files from sandbox storage, proceed
+            // Successfully got files from RustFS, proceed
             files = files
           }
         } catch (error) {
-          console.warn('Failed to fetch from sandbox-storage:', error)
+          console.warn('Failed to fetch from RustFS:', error)
           // Fall through to try GitHub or R2
         }
       }
     }
 
-    // If sandbox-storage didn't work or isn't configured, try GitHub or R2
+    // If RustFS didn't work or isn't configured, try GitHub or R2
     if (files.length === 0 && workspace) {
       const owner = workspace.owner
       const repo = workspace.repo

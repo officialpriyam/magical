@@ -1168,7 +1168,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     ) {
       return
     }
-    // Allow restore if any storage source is available (GitHub, R2, or sandbox-storage)
+    // Allow restore if any storage source is available (GitHub, R2, or RustFS)
     if (!workspace && !r2Workspace && !sandboxStorageWorkspace) {
       return
     }
@@ -2083,7 +2083,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     if (!session) return
 
     try {
-      // 1. Save to sandbox-storage directly (always works, no live sandbox needed)
+      // 1. Save to RustFS directly (no live sandbox required)
       if (currentProject?.id) {
         try {
           await fetch(`/api/projects/${currentProject.id}/sandbox-storage-files`, {
@@ -3078,8 +3078,9 @@ function getProjectSandboxStorageWorkspace(project: Project | null) {
   if (
     !workspace ||
     typeof workspace !== 'object' ||
-    workspace.provider !== 'sandbox-storage' ||
-    typeof workspace.storageId !== 'string'
+    workspace.provider !== 'rustfs' ||
+    typeof workspace.bucket !== 'string' ||
+    typeof workspace.keyPrefix !== 'string'
   ) {
     return null
   }
