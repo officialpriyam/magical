@@ -568,21 +568,29 @@ async function runPipeline({
           // Emit a commentary summary of what this agent did
           emitAction('commentary', `${agentName} completed — ${result.fragment ? `generated ${((result.fragment as any).files || []).length || 1} file(s)` : 'analysis done'}${result.duration ? ` in ${(result.duration / 1000).toFixed(1)}s` : ''}`)
 
-          // Extract real todos from planner output
+          // Extract real todos from planner output — only use as fallback
+          // if we don't already have initial todos from generateTodosFromPrompt
           if (role === 'planner' && result.output) {
             const realTodos = extractTodosFromPlan(result.output)
-            if (realTodos.length > 0) {
-              emitTodos(realTodos)
-              // Store todos so we can mark them complete as agents finish
+            if (realTodos.length > 0 && currentTodos.length === 0) {
               currentTodos = realTodos
+              emitTodos(currentTodos)
             }
           }
 
-          // Mark the next incomplete todo as completed (sequential — agents run in order)
+          // Mark proportional number of todos as completed for this agent
+          // Distribute todos across agents so all are marked by pipeline end
           if (currentTodos.length > 0) {
-            const nextIncomplete = currentTodos.findIndex(t => !t.completed)
-            if (nextIncomplete >= 0) {
-              currentTodos[nextIncomplete] = { ...currentTodos[nextIncomplete], completed: true }
+            const totalAgentsInPlan = plan.flat().length
+            const todosPerAgent = Math.ceil(currentTodos.length / totalAgentsInPlan)
+            let marked = 0
+            for (let ti = 0; ti < currentTodos.length && marked < todosPerAgent; ti++) {
+              if (!currentTodos[ti].completed) {
+                currentTodos[ti] = { ...currentTodos[ti], completed: true }
+                marked++
+              }
+            }
+            if (marked > 0) {
               emitTodos(currentTodos)
             }
           }
@@ -712,6 +720,15 @@ async function runPipeline({
     while (pendingFileWrites.length > 0) {
       const pw = pendingFileWrites.shift()!
       emitAction('file_write', pw.path, pw.purpose)
+    }
+
+    // Mark all remaining todos as complete on successful pipeline finish
+    if (currentTodos.length > 0) {
+      const hasIncomplete = currentTodos.some(t => !t.completed)
+      if (hasIncomplete) {
+        currentTodos = currentTodos.map(t => ({ ...t, completed: true }))
+        emitTodos(currentTodos)
+      }
     }
 
     await emitActionThrottled('commentary', `Completed using ${agentsUsed.length} agents in ${(totalDuration / 1000).toFixed(1)}s.`, undefined, 200)
@@ -928,7 +945,7 @@ Rules:
     const todos: { id: string; text: string; completed: boolean }[] = []
 
     // Parse JSON array from response
-    const jsonMatch = text.match(/\[\s\S]*\]/)
+    const jsonMatch = text.match(/\[[\s\S]*\]/)
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0])
