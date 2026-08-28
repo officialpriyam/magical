@@ -6,7 +6,7 @@ import { CodeEditor } from '@/components/code-editor'
 import { GitHubImport } from '@/components/github-import'
 import { useAuth } from '@/lib/auth'
 import { Button } from './ui/button'
-import { GitBranch, RefreshCw, Search, AlertTriangle, Wifi, WifiOff, Save, Download, RotateCcw } from 'lucide-react'
+import { GitBranch, RefreshCw, Search, AlertTriangle, Wifi, WifiOff, Save, Download, RotateCcw, X } from 'lucide-react'
 import Spinner from './ui/spinner'
 
 type StorageStatus = 'idle' | 'loading' | 'ok' | 'error' | 'degraded'
@@ -40,6 +40,10 @@ export function IDE({
     path: string
     content: string
   } | null>(null)
+  const [openFiles, setOpenFiles] = useState<Array<{
+    path: string
+    content: string
+  }>>([])
   const [fileSearchQuery, setFileSearchQuery] = useState('')
   const [showGitHubImport, setShowGitHubImport] = useState(false)
   const [isOpeningFile, setIsOpeningFile] = useState(false)
@@ -78,6 +82,22 @@ export function IDE({
   useEffect(() => {
     selectedFileRef.current = selectedFile
   }, [selectedFile])
+
+  const openFileInTab = useCallback((file: { path: string; content: string }) => {
+    fileContentCacheRef.current.set(file.path, file.content)
+    setOpenFiles((current) => {
+      const existingIndex = current.findIndex((openFile) => openFile.path === file.path)
+
+      if (existingIndex === -1) {
+        return [...current, file]
+      }
+
+      return current.map((openFile, index) =>
+        index === existingIndex ? file : openFile,
+      )
+    })
+    setSelectedFile(file)
+  }, [])
 
   const fetchFiles = useCallback(async () => {
     if (fetchInFlightRef.current) {
@@ -292,6 +312,11 @@ export function IDE({
       setSelectedFile((current) =>
         current?.path === path ? { path, content } : current,
       )
+      setOpenFiles((current) =>
+        current.map((file) =>
+          file.path === path ? { path, content } : file,
+        ),
+      )
       setLoadError((current) => (current?.startsWith(`Could not save "${path}"`) ? null : current))
     }
 
@@ -375,7 +400,7 @@ export function IDE({
   const handleSelectFile = useCallback(async (path: string) => {
     const cached = fileContentCacheRef.current.get(path)
     if (cached !== undefined) {
-      setSelectedFile({ path, content: cached })
+      openFileInTab({ path, content: cached })
       return
     }
 
@@ -403,8 +428,7 @@ export function IDE({
 
           if (response.ok) {
             const { content } = await response.json()
-            fileContentCacheRef.current.set(path, content)
-            setSelectedFile({ path, content })
+            openFileInTab({ path, content })
             setLoadError(null)
           } else {
             const errorData = await response.json().catch(() => null)
@@ -443,8 +467,7 @@ export function IDE({
             return
           }
           const { content } = await response.json()
-          fileContentCacheRef.current.set(path, content)
-          setSelectedFile({ path, content })
+          openFileInTab({ path, content })
         } catch (error: any) {
           if (error?.name === 'AbortError') {
             setLoadError(`Loading "${path}" timed out. The workspace server may be slow.`)
@@ -458,7 +481,7 @@ export function IDE({
       setIsOpeningFile(false)
       setOpeningPath(null)
     }
-  }, [projectId, session, flushPendingSave])
+  }, [projectId, session, flushPendingSave, openFileInTab])
 
   useEffect(() => {
     return () => {
@@ -492,6 +515,11 @@ export function IDE({
 
     selectedFileRef.current = { path, content: nextContent }
     fileContentCacheRef.current.set(path, nextContent)
+    setOpenFiles((current) =>
+      current.map((file) =>
+        file.path === path ? { path, content: nextContent } : file,
+      ),
+    )
     scheduleFileSave(path, nextContent)
   }
 
@@ -503,8 +531,33 @@ export function IDE({
     const path = currentFile.path
     selectedFileRef.current = { path, content }
     fileContentCacheRef.current.set(path, content)
+    setOpenFiles((current) =>
+      current.map((file) =>
+        file.path === path ? { path, content } : file,
+      ),
+    )
     scheduleFileSave(path, content)
     void flushPendingSave()
+  }
+
+  function handleActivateOpenFile(file: { path: string; content: string }) {
+    if (pendingSaveRef.current) {
+      void flushPendingSave()
+    }
+
+    fileContentCacheRef.current.set(file.path, file.content)
+    setSelectedFile(file)
+  }
+
+  function handleCloseFileTab(path: string) {
+    const closingIndex = openFiles.findIndex((file) => file.path === path)
+    const nextOpenFiles = openFiles.filter((file) => file.path !== path)
+
+    setOpenFiles(nextOpenFiles)
+
+    if (selectedFileRef.current?.path === path) {
+      setSelectedFile(nextOpenFiles[Math.min(closingIndex, nextOpenFiles.length - 1)] || null)
+    }
   }
 
   async function handleCreateFile(path: string, isDirectory: boolean) {
@@ -526,7 +579,7 @@ export function IDE({
         const saved = await persistFile(path, content)
         if (saved) {
           fileContentCacheRef.current.set(path, content)
-          setSelectedFile({ path, content })
+          openFileInTab({ path, content })
         }
         await fetchFiles()
         return
@@ -592,6 +645,9 @@ export function IDE({
         }
 
         fileContentCacheRef.current.delete(path)
+        setOpenFiles((current) =>
+          current.filter((file) => file.path !== path && !file.path.startsWith(`${path}/`)),
+        )
         await fetchFiles()
         if (selectedFile?.path === path || selectedFile?.path.startsWith(`${path}/`)) {
           setSelectedFile(null)
@@ -617,6 +673,9 @@ export function IDE({
           if (selectedFile?.path === path) {
             setSelectedFile(null)
           }
+          setOpenFiles((current) =>
+            current.filter((file) => file.path !== path && !file.path.startsWith(`${path}/`)),
+          )
         }
       } catch (error) {
         console.error('Error deleting sandbox file:', error)
@@ -640,6 +699,9 @@ export function IDE({
         if (selectedFile?.path === path) {
           setSelectedFile(null)
         }
+        setOpenFiles((current) =>
+          current.filter((file) => file.path !== path && !file.path.startsWith(`${path}/`)),
+        )
       }
     } catch (error) {
       console.error('Error deleting file:', error)
@@ -692,6 +754,23 @@ export function IDE({
           fileContentCacheRef.current.set(newPath, cachedContent)
         }
 
+        setOpenFiles((current) =>
+          current.map((file) => {
+            if (file.path === oldPath) {
+              return { ...file, path: newPath }
+            }
+
+            if (file.path.startsWith(`${oldPath}/`)) {
+              return {
+                ...file,
+                path: `${newPath}/${file.path.slice(oldPath.length + 1)}`,
+              }
+            }
+
+            return file
+          }),
+        )
+
         await fetchFiles()
         if (selectedFile?.path === oldPath) {
           setSelectedFile({ path: newPath, content: selectedFile.content })
@@ -722,6 +801,11 @@ export function IDE({
           if (selectedFile?.path === oldPath) {
             setSelectedFile({ path: newPath, content: selectedFile.content })
           }
+          setOpenFiles((current) =>
+            current.map((file) =>
+              file.path === oldPath ? { ...file, path: newPath } : file,
+            ),
+          )
         }
       } catch (error) {
         console.error('Error renaming sandbox file:', error)
@@ -745,6 +829,11 @@ export function IDE({
         if (selectedFile?.path === oldPath) {
           setSelectedFile({ path: newPath, content: selectedFile.content })
         }
+        setOpenFiles((current) =>
+          current.map((file) =>
+            file.path === oldPath ? { ...file, path: newPath } : file,
+          ),
+        )
       }
     } catch (error) {
       console.error('Error renaming file:', error)
@@ -925,9 +1014,40 @@ export function IDE({
       </aside>
       <section className="flex min-h-0 flex-1 flex-col bg-[#1e1e1e]">
         <div className="flex h-9 shrink-0 items-center border-b border-[#2b2b2b] bg-[#252526]">
-          {selectedFile ? (
-            <div className="flex h-full max-w-full items-center border-r border-[#2b2b2b] bg-[#1e1e1e] px-3 text-xs font-medium text-white">
-              <span className="truncate">{selectedFile.path}</span>
+          {openFiles.length > 0 ? (
+            <div className="flex h-full min-w-0 flex-1 overflow-x-auto">
+              {openFiles.map((file) => {
+                const active = selectedFile?.path === file.path
+                return (
+                  <div
+                    key={file.path}
+                    className={`group flex h-full max-w-[220px] shrink-0 items-center border-r border-[#2b2b2b] text-xs ${
+                      active ? 'bg-[#1e1e1e] text-white' : 'bg-[#252526] text-white/55 hover:bg-[#2d2d2d] hover:text-white/80'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleActivateOpenFile(file)}
+                      className="min-w-0 flex-1 px-3 text-left"
+                      title={file.path}
+                    >
+                      <span className="block truncate">{file.path.split('/').pop() || file.path}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        handleCloseFileTab(file.path)
+                      }}
+                      className="mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded text-white/35 opacity-70 transition hover:bg-white/10 hover:text-white group-hover:opacity-100"
+                      title={`Close ${file.path}`}
+                      aria-label={`Close ${file.path}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <div className="px-3 text-xs text-white/45">IDE</div>

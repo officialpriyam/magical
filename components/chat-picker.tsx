@@ -49,7 +49,7 @@ export function ChatPicker({
       <div className="flex flex-col">
         <Select
           name="template"
-          defaultValue={selectedTemplate}
+          value={selectedTemplate}
           onValueChange={onSelectedTemplateChange}
         >
           <SelectTrigger className="whitespace-nowrap border-none shadow-none focus:ring-0 px-0 py-0 h-6 text-xs bg-transparent">

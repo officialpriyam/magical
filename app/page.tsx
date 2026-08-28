@@ -274,7 +274,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const projectIdFromUrl = urlParams?.projectId as string | undefined
   const activeProjectId = projectIdFromUrl || initialProjectId
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
-  const [selectedTemplate, setSelectedTemplate] = useState<'auto' | TemplateId>('auto')
+  const [selectedTemplate, setSelectedTemplate] = useLocalStorage<'auto' | TemplateId>(
+    'selectedTemplate',
+    'auto',
+  )
   const [languageModel, setLanguageModel] = useLocalStorage<LLMModelConfig>(
     'languageModel',
     {
@@ -296,6 +299,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
 
   const posthog = usePostHog()
+
+  useEffect(() => {
+    if (selectedTemplate !== 'auto' && !isTemplateId(selectedTemplate)) {
+      setSelectedTemplate('auto')
+    }
+  }, [selectedTemplate, setSelectedTemplate])
 
   const [result, setResult] = useState<ExecutionResult>()
   const [warmSandboxResult, setWarmSandboxResult] = useState<ExecutionResult>()
