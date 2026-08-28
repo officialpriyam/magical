@@ -94,6 +94,13 @@ export function getResolvedSandboxPort(
 
   if (template === 'streamlit-developer') return 8501
   if (template === 'gradio-developer') return 7860
+  if (
+    template === 'react-developer' ||
+    template === 'vite-developer' ||
+    template === 'vue-developer' ||
+    template === 'svelte-developer' ||
+    template === 'pwa-mobile'
+  ) return 5173
 
   return 3000
 }

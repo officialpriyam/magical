@@ -1,5 +1,6 @@
 import { DeepPartial } from 'ai'
 import type { FragmentSchema } from '@/lib/schema'
+import { getStarterTemplateFiles } from '@/lib/starter-templates'
 
 export type GeneratedFile = {
   path: string
@@ -111,6 +112,11 @@ function getGitignoreContent(template: string): string {
 }
 
 export function getTemplateFiles(template?: string): GeneratedFile[] {
+  const starterFiles = getStarterTemplateFiles(template)
+  if (starterFiles) {
+    return starterFiles
+  }
+
   if (template === 'nextjs-developer') {
     return [
       ...getCommonFiles('nextjs', `# ${'{'}APP_NAME{'}'}\n\nA modern web application built with Next.js, React, and Tailwind CSS.\n\n## Tech Stack\n\n- **Framework:** Next.js 14\n- **UI:** React 18 + TypeScript\n- **Styling:** Tailwind CSS\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`

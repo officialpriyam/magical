@@ -8,23 +8,29 @@
   },
   "nextjs-developer": {
     "name": "Next.js",
-    "lib": ["nextjs@14.2.5", "typescript", "@types/node", "@types/react", "@types/react-dom", "postcss", "tailwindcss", "shadcn"],
-    "file": "pages/index.tsx",
-    "instructions": "A Next.js 14+ app that reloads automatically. Using the pages router.",
+    "lib": ["next@latest", "react@latest", "react-dom@latest", "typescript", "@types/node", "@types/react", "@types/react-dom", "postcss", "tailwindcss"],
+    "file": "app/page.tsx",
+    "instructions": "A Next.js App Router TypeScript app with Tailwind CSS. Use the official create-next-app app-tw-empty TypeScript starter shape, then edit/create/delete files to build the requested app.",
+    "starterRepository": "https://github.com/vercel/next.js/tree/canary/packages/create-next-app/templates/app-tw-empty/ts",
+    "cliInit": "npx create-next-app@latest my-app --typescript --tailwind --app",
     "port": 3000
   },
   "react-developer": {
     "name": "React",
     "lib": ["react@latest", "react-dom@latest", "typescript", "@types/react", "@types/react-dom", "vite", "@vitejs/plugin-react", "tailwindcss"],
     "file": "src/App.tsx",
-    "instructions": "A React app with Vite that reloads automatically. Modern React with hooks and functional components.",
+    "instructions": "A React TypeScript app with Vite and Tailwind CSS. Use the official create-vite react-ts starter shape, then edit/create/delete files to build the requested app.",
+    "starterRepository": "https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts",
+    "cliInit": "npm create vite@latest my-app -- --template react-ts",
     "port": 5173
   },
   "vite-developer": {
     "name": "Vite React",
     "lib": ["react@latest", "react-dom@latest", "vite", "@vitejs/plugin-react", "typescript", "tailwindcss"],
     "file": "src/App.tsx",
-    "instructions": "A Vite-powered React app with TypeScript and Tailwind CSS. Fast development server.",
+    "instructions": "A Vite-powered React TypeScript app with Tailwind CSS. Use the official create-vite react-ts starter shape, then edit/create/delete files to build the requested app.",
+    "starterRepository": "https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts",
+    "cliInit": "npm create vite@latest my-app -- --template react-ts",
     "port": 5173
   },
   "html-developer": {
@@ -36,16 +42,20 @@
   },
   "vue-developer": {
     "name": "Vue.js",
-    "lib": ["vue@latest", "nuxt@3.13.0", "tailwindcss"],
-    "file": "app.vue",
-    "instructions": "A Vue.js 3+ app that reloads automatically. Only when asked specifically for a Vue app.",
-    "port": 3000
+    "lib": ["vue@latest", "vite", "@vitejs/plugin-vue", "typescript", "tailwindcss"],
+    "file": "src/App.vue",
+    "instructions": "A Vue 3 TypeScript app using the official create-vue/Vite starter shape with Tailwind CSS. Only use when asked specifically for Vue.",
+    "starterRepository": "https://github.com/vuejs/create-vue",
+    "cliInit": "npm create vue@latest",
+    "port": 5173
   },
   "svelte-developer": {
     "name": "Svelte",
-    "lib": ["svelte", "vite", "@sveltejs/vite-plugin-svelte", "tailwindcss"],
-    "file": "src/App.svelte",
-    "instructions": "A Svelte app with Vite. Lightweight and reactive UI components.",
+    "lib": ["@sveltejs/kit", "@sveltejs/adapter-auto", "svelte", "vite", "typescript", "tailwindcss"],
+    "file": "src/routes/+page.svelte",
+    "instructions": "A SvelteKit TypeScript app with Tailwind CSS. Use the official create-svelte/SvelteKit starter shape, then edit/create/delete files to build the requested app.",
+    "starterRepository": "https://github.com/sveltejs/kit/tree/main/packages/create-svelte",
+    "cliInit": "npm create svelte@latest my-app",
     "port": 5173
   },
   "expo-mobile": {

@@ -155,6 +155,7 @@ export async function POST(req: Request) {
 
     const supabaseRuntimeEnv = await getSupabaseProjectRuntimeEnv(userID, projectID)
     const generatedFiles = getFragmentFiles(fragment)
+    const sandboxFiles = mergeTemplateAndGeneratedFiles(fragment.template, generatedFiles)
 
     if (generatedFiles.length === 0) {
       return new Response(
@@ -261,7 +262,7 @@ export async function POST(req: Request) {
       } else {
         await Promise.all([
           Promise.all(
-            generatedFiles.map(async (file) => {
+            sandboxFiles.map(async (file) => {
               await (sbx as Sandbox).files.write(file.path, file.content)
             }),
           ),
@@ -555,6 +556,23 @@ function getNoSandboxProviderMessage(
 
 function cleanCommand(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function mergeTemplateAndGeneratedFiles(
+  template: string | undefined,
+  files: ReturnType<typeof getFragmentFiles>,
+) {
+  const merged = new Map<string, ReturnType<typeof getFragmentFiles>[number]>()
+
+  for (const file of getTemplateFiles(template)) {
+    merged.set(file.path, file)
+  }
+
+  for (const file of files) {
+    merged.set(file.path, file)
+  }
+
+  return Array.from(merged.values())
 }
 
 async function saveGeneratedFilesToSandboxStorage({

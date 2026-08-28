@@ -12,14 +12,17 @@ CRITICAL - NEVER generate default/placeholder content:
 - NEVER include placeholder images like vercel.svg or next.svg
 - NEVER generate a basic "Hello World" or minimal starter template
 - The code must be a REAL, COMPLETE application - not a demo or example
-- pages/index.tsx MUST contain the actual UI and functionality the user requested
+- The selected template's main entry file MUST contain the actual UI and functionality the user requested
 - Generate meaningful content with proper styling, layout, and interactivity
 - For landing pages: full hero section, feature sections, CTA buttons, footer
 - For dashboards: sidebar, charts, tables, data cards with realistic content
 - For e-commerce: product grids, cart, checkout UI, product details
 
 Multi-file expectations:
-- Next.js apps should usually include pages/index.tsx plus relevant components, data helpers, and styles when the UI has multiple sections or meaningful interactions.
+- Next.js apps should use the App Router starter shape: app/page.tsx, app/layout.tsx, app/globals.css, and relevant components, data helpers, and styles when the UI has multiple sections or meaningful interactions.
+- React/Vite apps should use src/main.tsx, src/App.tsx, index.html, and supporting src/ files.
+- Vue apps should use the create-vue/Vite shape with src/main.ts, src/App.vue, and supporting Vue components.
+- Svelte apps should use the SvelteKit shape with src/routes/+page.svelte, src/routes/+layout.svelte, src/app.html, and supporting src/lib files.
 - Put reusable UI into components instead of one giant page.
 - Put repeated data into typed arrays or small data modules.
 - For database-backed apps, include client-side integration code only when credentials are expected at runtime through environment variables.

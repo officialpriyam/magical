@@ -2,7 +2,7 @@ import 'server-only'
 
 import { Daytona, type Sandbox as DaytonaSandbox } from '@daytona/sdk'
 import type { FragmentSchema } from '@/lib/schema'
-import type { GeneratedFile } from '@/lib/fragment-files'
+import { getTemplateFiles, type GeneratedFile } from '@/lib/fragment-files'
 import type { TemplateId } from '@/lib/templates'
 import type { FileSystemNode } from '@/components/file-tree'
 
@@ -64,11 +64,20 @@ export async function writeDaytonaProjectFiles(
   template: TemplateId,
 ) {
   const workdir = '/workspace'
+  const mergedFiles = new Map<string, GeneratedFile>()
+
+  for (const file of getTemplateFiles(template)) {
+    mergedFiles.set(file.path, file)
+  }
+
+  for (const file of files) {
+    mergedFiles.set(file.path, file)
+  }
 
   // Ensure workspace directory exists
   await sandbox.process.executeCommand(`mkdir -p ${workdir}`)
 
-  for (const file of files) {
+  for (const file of mergedFiles.values()) {
     if (SKIP_PATH_RE.test(file.path)) continue
     const fullPath = `${workdir}/${file.path}`
     const dir = fullPath.substring(0, fullPath.lastIndexOf('/'))
@@ -147,7 +156,15 @@ function getStartCommand(template: string): string | null {
   if (template === 'nextjs-developer' || template === 'remix-developer') {
     return 'npm run dev'
   }
-  if (template === 'vite-react-developer' || template === 'vite-vue-developer') {
+  if (
+    template === 'react-developer' ||
+    template === 'vite-developer' ||
+    template === 'vue-developer' ||
+    template === 'svelte-developer' ||
+    template === 'pwa-mobile' ||
+    template === 'vite-react-developer' ||
+    template === 'vite-vue-developer'
+  ) {
     return 'npm run dev'
   }
   if (template === 'streamlit-developer') {

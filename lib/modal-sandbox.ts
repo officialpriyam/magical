@@ -3,7 +3,7 @@ import 'server-only'
 import path from 'node:path'
 import { ModalClient, type Sandbox, type Image } from 'modal'
 import type { FragmentSchema } from '@/lib/schema'
-import type { GeneratedFile } from '@/lib/fragment-files'
+import { getTemplateFiles, type GeneratedFile } from '@/lib/fragment-files'
 import type { TemplateId } from '@/lib/templates'
 import type { FileSystemNode } from '@/components/file-tree'
 
@@ -299,6 +299,11 @@ async function writeSingleFileToModal(
 }
 
 function getModalTemplateFiles(template: TemplateId): GeneratedFile[] {
+  const centralizedFiles = getTemplateFiles(template)
+  if (centralizedFiles.length > 0) {
+    return centralizedFiles
+  }
+
   if (template === 'nextjs-developer') {
     return [
       {
@@ -444,7 +449,14 @@ function getModalBaseInstallCommand(template: TemplateId) {
     return 'python -m pip install --upgrade pip && python -m pip install -r requirements.txt'
   }
 
-  if (template === 'nextjs-developer' || template === 'vue-developer') {
+  if (
+    template === 'nextjs-developer' ||
+    template === 'react-developer' ||
+    template === 'vite-developer' ||
+    template === 'vue-developer' ||
+    template === 'svelte-developer' ||
+    template === 'pwa-mobile'
+  ) {
     return 'npm install --no-audit --no-fund'
   }
 
@@ -457,6 +469,15 @@ function getModalStartCommand(template: TemplateId, port: number) {
   }
 
   if (template === 'vue-developer') {
+    return `npm run dev -- --host 0.0.0.0 --port ${port}`
+  }
+
+  if (
+    template === 'react-developer' ||
+    template === 'vite-developer' ||
+    template === 'svelte-developer' ||
+    template === 'pwa-mobile'
+  ) {
     return `npm run dev -- --host 0.0.0.0 --port ${port}`
   }
 
@@ -474,6 +495,14 @@ function getModalStartCommand(template: TemplateId, port: number) {
 function getDefaultPort(template: TemplateId) {
   if (template === 'streamlit-developer') return 8501
   if (template === 'gradio-developer') return 7860
+  if (
+    template === 'react-developer' ||
+    template === 'vite-developer' ||
+    template === 'vue-developer' ||
+    template === 'svelte-developer' ||
+    template === 'pwa-mobile'
+  ) return 5173
+
   return 3000
 }
 
