@@ -27,6 +27,7 @@ import { StyleSelector, type StylePreset, STYLE_PRESETS } from '@/components/sty
 import { useAgenticStream, type ToolAction, type TodoItem } from '@/lib/hooks/use-agentic-stream';
 import { useUserTeam } from '@/lib/user-team-provider';
 import { HeroPillSecond } from '@/components/announcement';
+import { ChatSkeleton, DashboardSkeleton } from '@/components/loading-skeletons';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { invalidateCache } from '@/lib/caching';
 import type { GitHubWorkspace } from '@/components/github-save';
@@ -2822,7 +2823,9 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                   </div>
                   <div className="max-h-[480px] overflow-y-auto overscroll-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {dashboardProjects.length > 0 ? dashboardProjects.slice(0, 6).map((project) => {
+                      {recentProjects.length === 0 && session ? (
+                        <DashboardSkeleton />
+                      ) : dashboardProjects.length > 0 ? dashboardProjects.slice(0, 6).map((project) => {
                       const workspace = getProjectGitHubWorkspace(project)
                       const r2Workspace = getProjectR2Workspace(project)
                       const preview = getProjectPreviewCard(project, projectPreviews[project.id])
@@ -2954,45 +2957,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
             <>
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-1 sm:px-3 sm:py-2 md:px-3 md:py-2">
                 {isLoadingProject ? (
-                  <div className="flex h-full flex-col items-center justify-center gap-4">
-                    {/* Animated Magical logo */}
-                    <div className="relative h-16 w-16">
-                      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-600/20 animate-ping" style={{ animationDuration: '2s' }} />
-                      <div className="absolute inset-1 rounded-full bg-gradient-to-br from-blue-500/30 to-purple-600/30 animate-pulse" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <svg className="h-8 w-8 text-blue-400 animate-spin" style={{ animationDuration: '3s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                        </svg>
-                      </div>
-                    </div>
-                    {/* Animated steps */}
-                    <div className="flex flex-col items-center gap-2">
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="text-sm font-medium text-white/70"
-                      >
-                        Setting up environment
-                      </motion.div>
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 }}
-                        className="text-xs text-white/35"
-                      >
-                        Enhancing your prompt with AI
-                      </motion.div>
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.8 }}
-                        className="text-xs text-white/35"
-                      >
-                        Preparing workspace
-                      </motion.div>
-                    </div>
-                  </div>
+                  <ChatSkeleton />
                 ) : (
                   <Chat
                     messages={messages}

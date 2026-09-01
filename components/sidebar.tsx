@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { MessageCircle, Search, Home, LayoutGrid, PanelLeftClose, PanelLeft, MoreHorizontal, Trash2, CornerUpLeft, Plus, Link as LinkIcon, FolderOpen, GitBranch } from 'lucide-react';
+import { SidebarChatSkeleton } from '@/components/loading-skeletons';
 import type { User as SupabaseUser, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import {
   DropdownMenu,
@@ -75,6 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isPricingModalOpen, setIsPricingModalOpen] = React.useState(false);
   const [user, setUser] = React.useState<SupabaseUser | null>(null);
   const [chatHistory, setChatHistory] = React.useState<ChatHistoryItem[]>([]);
+  const [chatHistoryLoading, setChatHistoryLoading] = React.useState(true);
   const [credits, setCredits] = React.useState<number>(0);
   const [deleteTarget, setDeleteTarget] = React.useState<ChatHistoryItem | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = React.useState('');
@@ -178,6 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     const fetchChatHistory = async () => {
+      setChatHistoryLoading(true);
       const projects = await getProjects(supabase);
       const history = projects.map((project: Project) => ({
         id: project.id,
@@ -185,6 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         date: formatDistanceToNow(new Date(project.updated_at), { addSuffix: true }),
       }));
       setChatHistory(history);
+      setChatHistoryLoading(false);
     };
 
     const getUser = async () => {
@@ -341,7 +345,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Recents Section */}
             <div className="flex-1 overflow-y-auto px-2 py-2">
               <h3 className="px-3 text-xs font-medium text-white/40 uppercase tracking-wider mb-1">Recents</h3>
-              {recentChats.length === 0 ? (
+              {chatHistoryLoading ? (
+                <SidebarChatSkeleton />
+              ) : recentChats.length === 0 ? (
                 <p className="px-3 text-xs text-white/30">No recent projects</p>
               ) : (
                 <div className="space-y-0.5">
