@@ -2681,22 +2681,29 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
                     >
                       <div className="mb-4">
-                        <div className="flex items-center justify-center">
-                          <div className="flex -space-x-2">
-                            {[
-                              'bg-gradient-to-br from-blue-400 to-blue-600',
-                              'bg-gradient-to-br from-purple-400 to-purple-600',
-                              'bg-gradient-to-br from-pink-400 to-pink-600',
-                              'bg-gradient-to-br from-cyan-400 to-cyan-600',
-                              'bg-gradient-to-br from-emerald-400 to-emerald-600',
-                            ].map((gradient, i) => (
-                              <div key={i} className={`relative h-8 w-8 rounded-full ${gradient} ring-2 ring-[#0a0b0a] flex items-center justify-center text-[10px] font-bold text-white/80`} style={{ zIndex: 5 - i }}>
-                                {['A', 'B', 'C', 'D', 'E'][i]}
-                              </div>
-                            ))}
-                          </div>
+                        {/* Floating framework logos around the hero */}
+                        <div className="relative h-16 w-full flex items-center justify-center">
+                          {[
+                            { label: 'Next.js', color: 'from-white/20 to-white/5', icon: '▲' },
+                            { label: 'React', color: 'from-cyan-400/20 to-cyan-600/5', icon: '⚛' },
+                            { label: 'Vue', color: 'from-emerald-400/20 to-emerald-600/5', icon: '◆' },
+                            { label: 'TypeScript', color: 'from-blue-400/20 to-blue-600/5', icon: 'TS' },
+                            { label: 'Node.js', color: 'from-green-400/20 to-green-600/5', icon: '⬡' },
+                            { label: 'Tailwind', color: 'from-teal-400/20 to-teal-600/5', icon: '◎' },
+                          ].map((fw, i) => (
+                            <div
+                              key={i}
+                              className={`absolute h-8 w-8 rounded-full bg-gradient-to-br ${fw.color} border border-white/10 backdrop-blur-sm flex items-center justify-center text-[10px] font-bold text-white/70 shadow-lg hero-float-circle`}
+                              style={{
+                                animationDelay: `${i * -3}s`,
+                                ['--angle' as string]: `${i * 60}deg`,
+                              }}
+                            >
+                              {fw.icon}
+                            </div>
+                          ))}
                         </div>
-                        <p className="mt-3 text-sm text-white/40">Thousands of builders turning ideas into full-stack web apps with Magical AI</p>
+                        <p className="mt-1 text-sm text-white/40">Thousands of builders turning ideas into full-stack web apps with Magical AI</p>
                       </div>
                       <h1 className="mb-5 max-w-3xl text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl leading-tight">
                         Build Full-Stack Web Apps & Sites<br />with Simple AI Prompts

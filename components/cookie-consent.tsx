@@ -62,7 +62,7 @@ export function CookieConsent() {
           <button
             type="button"
             onClick={accept}
-            className="rounded-xl bg-gradient-to-r from-primary to-primary/80 px-4 py-2 text-xs font-semibold text-white transition hover:from-primary/80 hover:to-[#dc2626]"
+            className="rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:from-purple-500 hover:to-blue-500"
           >
             Accept all cookies
           </button>

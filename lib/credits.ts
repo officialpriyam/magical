@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase-server'
 
-const SIGNUP_CREDIT_AMOUNT = 500
+const SIGNUP_CREDIT_AMOUNT = 50000
 const DAILY_CREDIT_AMOUNT = 50
 const CHAT_CREDIT_COST = 1
 

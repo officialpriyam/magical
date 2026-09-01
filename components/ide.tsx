@@ -79,25 +79,48 @@ export function IDE({
     [files, fileSearchQuery],
   )
 
+  const toIdePath = useCallback((path: string) =>
+    path.replace(/\\/g, '/').replace(/^\/+/, '').trim(),
+  [])
+
+  const fragmentFilesToNodes = useCallback(() => {
+    return fragmentFiles.map(f => {
+      const path = toIdePath(f.path)
+      fileContentCacheRef.current.set(path, f.content)
+      fileContentCacheRef.current.set(`/${path}`, f.content)
+
+      return {
+        name: path.split('/').pop() || path,
+        path,
+        content: f.content,
+        type: 'file' as const,
+        isDirectory: false,
+      }
+    })
+  }, [fragmentFiles, toIdePath])
+
   useEffect(() => {
     selectedFileRef.current = selectedFile
   }, [selectedFile])
 
   const openFileInTab = useCallback((file: { path: string; content: string }) => {
-    fileContentCacheRef.current.set(file.path, file.content)
+    const path = toIdePath(file.path)
+    fileContentCacheRef.current.set(path, file.content)
+    fileContentCacheRef.current.set(`/${path}`, file.content)
+    const normalizedFile = { path, content: file.content }
     setOpenFiles((current) => {
-      const existingIndex = current.findIndex((openFile) => openFile.path === file.path)
+      const existingIndex = current.findIndex((openFile) => openFile.path === path)
 
       if (existingIndex === -1) {
-        return [...current, file]
+        return [...current, normalizedFile]
       }
 
       return current.map((openFile, index) =>
-        index === existingIndex ? file : openFile,
+        index === existingIndex ? normalizedFile : openFile,
       )
     })
-    setSelectedFile(file)
-  }, [])
+    setSelectedFile(normalizedFile)
+  }, [toIdePath])
 
   const fetchFiles = useCallback(async () => {
     if (fetchInFlightRef.current) {
@@ -132,14 +155,7 @@ export function IDE({
 
             // Fallback: use fragmentFiles if RustFS returned empty
             if (fragmentFiles.length > 0) {
-              const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
-                name: f.path.split('/').pop() || f.path,
-                path: f.path,
-                content: f.content,
-                type: 'file' as const,
-                isDirectory: false,
-              }))
-              setFiles(fsNodes)
+              setFiles(fragmentFilesToNodes())
               setStorageStatus('ok')
               setLoadError(null)
               return
@@ -171,14 +187,7 @@ export function IDE({
         } else {
           // Fallback to fragmentFiles if RustFS is unreachable
           if (fragmentFiles.length > 0) {
-            const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
-              name: f.path.split('/').pop() || f.path,
-              path: f.path,
-              content: f.content,
-              type: 'file' as const,
-              isDirectory: false,
-            }))
-            setFiles(fsNodes)
+            setFiles(fragmentFilesToNodes())
             setStorageStatus('ok')
             setLoadError(null)
           } else {
@@ -218,7 +227,7 @@ export function IDE({
         setIsRefreshing(false)
       }
     }
-  }, [session, projectId, fragmentFiles])
+  }, [session, projectId, fragmentFiles, fragmentFilesToNodes])
 
   const persistFile = useCallback(async (path: string, content: string) => {
     if (isGitHubSaveBlocked) {
@@ -384,23 +393,17 @@ export function IDE({
   // Auto-load fragmentFiles when they arrive and IDE has no files yet
   useEffect(() => {
     if (fragmentFiles.length > 0 && files.length === 0 && storageStatus !== 'loading') {
-      const fsNodes: FileSystemNode[] = fragmentFiles.map(f => ({
-        name: f.path.split('/').pop() || f.path,
-        path: f.path,
-        content: f.content,
-        type: 'file' as const,
-        isDirectory: false,
-      }))
-      setFiles(fsNodes)
+      setFiles(fragmentFilesToNodes())
       setStorageStatus('ok')
       setLoadError(null)
     }
-  }, [fragmentFiles, files.length, storageStatus])
+  }, [fragmentFiles, files.length, storageStatus, fragmentFilesToNodes])
 
   const handleSelectFile = useCallback(async (path: string) => {
-    const cached = fileContentCacheRef.current.get(path)
+    const cleanPath = toIdePath(path)
+    const cached = fileContentCacheRef.current.get(cleanPath) ?? fileContentCacheRef.current.get(`/${cleanPath}`)
     if (cached !== undefined) {
-      openFileInTab({ path, content: cached })
+      openFileInTab({ path: cleanPath, content: cached })
       return
     }
 
@@ -422,29 +425,43 @@ export function IDE({
 
         try {
           const response = await fetch(
-            `/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(path)}`,
+            `/api/projects/${projectId}/sandbox-storage-files?path=${encodeURIComponent(cleanPath)}`,
             { signal: controller.signal },
           )
 
           if (response.ok) {
             const { content } = await response.json()
-            openFileInTab({ path, content })
+            openFileInTab({ path: cleanPath, content })
             setLoadError(null)
           } else {
+            const fallback = fragmentFiles.find((file) => toIdePath(file.path) === cleanPath)
+            if (fallback) {
+              openFileInTab({ path: cleanPath, content: fallback.content })
+              setLoadError(null)
+              return
+            }
+
             const errorData = await response.json().catch(() => null)
             setLoadError(
               errorData?.error ||
-                `"${path}" could not be loaded from RustFS.`,
+                `"${cleanPath}" could not be loaded from RustFS.`,
             )
           }
         } catch (error: any) {
           if (error?.name === 'AbortError') {
             setLoadError(
-              `Loading "${path}" timed out. RustFS may be unreachable.`,
+              `Loading "${cleanPath}" timed out. RustFS may be unreachable.`,
             )
           } else {
+            const fallback = fragmentFiles.find((file) => toIdePath(file.path) === cleanPath)
+            if (fallback) {
+              openFileInTab({ path: cleanPath, content: fallback.content })
+              setLoadError(null)
+              return
+            }
+
             setLoadError(
-              `Could not reach RustFS to load "${path}". Check the storage connection.`,
+              `Could not reach RustFS to load "${cleanPath}". Check the storage connection.`,
             )
           }
         } finally {
@@ -467,10 +484,10 @@ export function IDE({
             return
           }
           const { content } = await response.json()
-          openFileInTab({ path, content })
+          openFileInTab({ path: cleanPath, content })
         } catch (error: any) {
           if (error?.name === 'AbortError') {
-            setLoadError(`Loading "${path}" timed out. The workspace server may be slow.`)
+            setLoadError(`Loading "${cleanPath}" timed out. The workspace server may be slow.`)
           }
         } finally {
           clearTimeout(timeout)
@@ -481,7 +498,7 @@ export function IDE({
       setIsOpeningFile(false)
       setOpeningPath(null)
     }
-  }, [projectId, session, flushPendingSave, openFileInTab])
+  }, [projectId, session, flushPendingSave, openFileInTab, fragmentFiles, toIdePath])
 
   useEffect(() => {
     return () => {

@@ -4,12 +4,17 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Check, Plus, Settings, HelpCircle, CreditCard, LogOut, User } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { HelpModal } from '@/components/help-center'
+import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
+
+const CREDITS_MAX = 50000
 
 interface WorkspaceDropdownProps {
   onSignOut?: () => void
   onOpenPricing?: () => void
   onCreate?: (name: string) => void
+  credits?: number
 }
 
 interface Workspace {
@@ -24,16 +29,34 @@ const demoWorkspaces: Workspace[] = [
   { id: '1', name: "Priyam's Workspace", plan: 'Free', isCurrent: true, memberCount: 1 },
 ]
 
-export function WorkspaceDropdown({ onSignOut, onOpenPricing, onCreate }: WorkspaceDropdownProps) {
+export function WorkspaceDropdown({ onSignOut, onOpenPricing, onCreate, credits: creditsProp }: WorkspaceDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [workspaces] = useState<Workspace[]>(demoWorkspaces)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const [fetchedCredits, setFetchedCredits] = useState<number | null>(null)
 
   const currentWorkspace = workspaces.find((w) => w.isCurrent)
-  const creditsUsed = 47
-  const creditsTotal = 50
-  const creditsPercent = (creditsUsed / creditsTotal) * 100
+  const creditsUsed = creditsProp ?? fetchedCredits ?? 0
+  const creditsTotal = CREDITS_MAX
+  const creditsPercent = creditsTotal > 0 ? (creditsUsed / creditsTotal) * 100 : 0
+
+  useEffect(() => {
+    if (creditsProp !== undefined) return
+    const supabase = createSupabaseBrowserClient()
+    if (!supabase) return
+    supabase.auth.getUser().then(({ data: { user: authUser } }: { data: { user: { id: string } | null } }) => {
+      if (!authUser) return
+      supabase
+        .from('profiles')
+        .select('credits')
+        .eq('user_id', authUser.id)
+        .single()
+        .then(({ data: profileData }: { data: { credits: number | null } | null }) => {
+          if (profileData) setFetchedCredits(profileData.credits ?? 0)
+        })
+    })
+  }, [creditsProp])
 
   const close = useCallback(() => setIsOpen(false), [])
 
@@ -100,7 +123,7 @@ export function WorkspaceDropdown({ onSignOut, onOpenPricing, onCreate }: Worksp
             <div className="mb-2 px-1">
               <div className="mb-1.5 flex items-center justify-between">
                 <span className="text-xs font-medium text-white/60">Credits</span>
-                <span className="text-xs text-white/40">{creditsTotal - creditsUsed} left ›</span>
+                <span className="text-xs text-white/40">{creditsTotal - creditsUsed >= 0 ? creditsTotal - creditsUsed : 0} left ›</span>
               </div>
               <div className="relative h-2 overflow-hidden rounded-full bg-white/10">
                 <div
@@ -211,12 +234,8 @@ function CreateWorkspaceModal({ onClose, onCreate }: { onClose: () => void; onCr
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-white/40 hover:bg-white/10 hover:text-white">
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
-        </div>
-
-        <div className="mb-6 flex justify-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80">
-            <span className="text-xl font-bold text-white">M</span>
-          </div>
+        </div>          <div className="mb-6 flex justify-center">
+          <Image src="/icon.png" alt="Magical AI" width={48} height={48} className="rounded-2xl" />
         </div>
 
         <h2 className="mb-2 text-center text-xl font-semibold text-white">Create a Workspace</h2>

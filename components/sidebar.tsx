@@ -255,6 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onSignOut={onSignOut}
                     onOpenPricing={() => setIsPricingModalOpen(true)}
                     onCreate={() => onStartNewChat()}
+                    credits={credits}
                   />
                 </div>
                 <Button

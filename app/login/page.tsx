@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { Check, ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -138,9 +139,7 @@ export default function LoginPage() {
 
           {/* Logo */}
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80">
-              <span className="text-lg font-bold text-white">M</span>
-            </div>
+            <Image src="/icon.png" alt="Magical AI" width={40} height={40} className="rounded-xl" />
             <span className="text-xl font-semibold text-white">Magical AI</span>
           </div>
 
@@ -304,7 +303,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || (mode === 'register' && !agreed)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-4 py-3 text-sm font-semibold text-white transition hover:from-primary/80 hover:to-[#dc2626] disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:from-purple-500 hover:to-blue-500 disabled:opacity-50"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {mode === 'login' ? 'Sign in' : 'Create account'}
@@ -328,31 +327,38 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right side - Feature showcase */}
-      <div className="hidden w-[480px] flex-col justify-center bg-gradient-to-br from-primary/20 via-primary/80/10 to-[#0a0a0a] p-12 lg:flex">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80">
-            <span className="text-xl font-bold text-white">M</span>
+      {/* Right side - Floating feature showcase (Claude-style) */}
+      <div className="hidden w-[520px] items-center justify-center bg-gradient-to-br from-[#1a1025] via-[#0f0a18] to-[#0a0a0a] p-12 lg:flex">
+        <div className="relative w-full max-w-sm">
+          {/* Floating card */}
+          <div className="rounded-3xl border border-white/[0.08] bg-[#131316]/90 p-10 shadow-2xl backdrop-blur-xl">
+            <div className="mb-8 flex items-center gap-3">
+              <Image src="/icon.png" alt="Magical AI" width={44} height={44} className="rounded-xl" />
+              <span className="text-2xl font-bold text-white">Magical AI</span>
+            </div>
+
+            <h2 className="mb-6 text-3xl font-bold leading-snug text-white">
+              Turn ideas into
+              <br />
+              production apps
+            </h2>
+
+            <ul className="space-y-3.5">
+              {features.map((feature) => (
+                <li key={feature} className="flex items-center gap-3">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-500/20">
+                    <Check className="h-3 w-3 text-purple-400" />
+                  </div>
+                  <span className="text-sm text-white/60">{feature}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <span className="text-2xl font-bold text-white">Magical AI</span>
+
+          {/* Decorative glow behind card */}
+          <div className="pointer-events-none absolute -inset-10 -z-10 rounded-full bg-purple-500/[0.07] blur-3xl" />
+          <div className="pointer-events-none absolute -inset-6 -z-10 rounded-full bg-blue-500/[0.05] blur-2xl" />
         </div>
-
-        <h2 className="mb-6 text-3xl font-bold leading-tight text-white">
-          Turn ideas into
-          <br />
-          production apps
-        </h2>
-
-        <ul className="space-y-4">
-          {features.map((feature) => (
-            <li key={feature} className="flex items-center gap-3">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20">
-                <Check className="h-3 w-3 text-primary" />
-              </div>
-              <span className="text-sm text-white/70">{feature}</span>
-            </li>
-          ))}
-        </ul>
       </div>
     </div>
   )
