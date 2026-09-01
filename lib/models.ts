@@ -75,7 +75,7 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
   const fallbackIds = [
     'gpt-4o-mini',
     'anthropic/claude-3-5-haiku-latest',
-    'models/gemini-2.0-flash',
+    'models/gemini-2.5-flash-preview-05-20',
     'deepseek-chat',
     'claude-3-5-haiku-latest',
   ]

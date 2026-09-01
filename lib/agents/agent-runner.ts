@@ -151,7 +151,11 @@ export async function runAgent(
         (typeof parsed.fragment.code === 'string' && parsed.fragment.code.length > 10)
       )
 
-      if (!hasFragment && (!text || text.length < 20)) {
+      // Planners produce short structured output — accept if JSON parsed successfully
+      const isPlanner = role === 'planner'
+      const minChars = isPlanner ? 10 : 20
+
+      if (!hasFragment && (!text || text.length < minChars)) {
         console.warn(`[Agent] ${role} from ${candidate.id}: empty response (${text.length} chars)`)
         lastError = new Error(`Empty response from ${candidate.id}`)
         continue
