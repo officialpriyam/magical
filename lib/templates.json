@@ -8,11 +8,11 @@
   },
   "nextjs-developer": {
     "name": "Next.js",
-    "lib": ["next@latest", "react@latest", "react-dom@latest", "typescript", "@types/node", "@types/react", "@types/react-dom", "postcss", "tailwindcss"],
+    "lib": ["next@latest", "react@latest", "react-dom@latest", "typescript", "@types/node", "@types/react", "@types/react-dom", "postcss", "tailwindcss", "@tailwindcss/postcss", "tailwind-merge", "clsx", "class-variance-authority", "lucide-react", "@radix-ui/react-slot", "@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-tabs", "@radix-ui/react-tooltip", "@radix-ui/react-avatar", "@radix-ui/react-select", "@radix-ui/react-separator"],
     "file": "app/page.tsx",
-    "instructions": "A Next.js App Router TypeScript app with Tailwind CSS. Use the official create-next-app app-tw-empty TypeScript starter shape, then edit/create/delete files to build the requested app.",
-    "starterRepository": "https://github.com/vercel/next.js/tree/canary/packages/create-next-app/templates/app-tw-empty/ts",
-    "cliInit": "npx create-next-app@latest my-app --typescript --tailwind --app",
+    "instructions": "A Next.js App Router TypeScript app with Tailwind CSS v4 and shadcn/ui components. Use the shadcn-ui/next-template as the base starter (includes pre-configured shadcn/ui, cn utility, and component library). Clone the starter repository, then edit/create/delete files on top of it to build the requested app. Use shadcn/ui components (Button, Card, Input, Dialog, etc.) from '@/components/ui' instead of raw HTML elements. Use the cn() utility from '@/lib/utils' for className merging.",
+    "starterRepository": "https://github.com/shadcn-ui/next-template",
+    "cliInit": "npx shadcn@latest init && npx shadcn@latest add button card input dialog tabs avatar select separator tooltip",
     "port": 3000
   },
   "react-developer": {

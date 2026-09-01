@@ -11,7 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   if (!result.admin) {
     if (result.reason === 'unauthenticated') {
-      redirect('/login')
+      redirect('/auth/login')
     }
     notFound()
   }

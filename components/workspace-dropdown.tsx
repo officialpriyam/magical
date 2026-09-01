@@ -37,12 +37,12 @@ export function WorkspaceDropdown({ onSignOut, onOpenPricing, onCreate, credits:
   const [fetchedCredits, setFetchedCredits] = useState<number | null>(null)
 
   const currentWorkspace = workspaces.find((w) => w.isCurrent)
-  const creditsUsed = creditsProp ?? fetchedCredits ?? 0
+  const creditsUsed = fetchedCredits ?? creditsProp ?? 0
   const creditsTotal = CREDITS_MAX
   const creditsPercent = creditsTotal > 0 ? (creditsUsed / creditsTotal) * 100 : 0
 
   useEffect(() => {
-    if (creditsProp !== undefined) return
+    // Always fetch fresh credits from DB on mount
     const supabase = createSupabaseBrowserClient()
     if (!supabase) return
     supabase.auth.getUser().then(({ data: { user: authUser } }: { data: { user: { id: string } | null } }) => {
@@ -56,9 +56,27 @@ export function WorkspaceDropdown({ onSignOut, onOpenPricing, onCreate, credits:
           if (profileData) setFetchedCredits(profileData.credits ?? 0)
         })
     })
-  }, [creditsProp])
+  }, [])
 
   const close = useCallback(() => setIsOpen(false), [])
+
+  // Refresh credits when dropdown opens
+  useEffect(() => {
+    if (!isOpen) return
+    const supabase = createSupabaseBrowserClient()
+    if (!supabase) return
+    supabase.auth.getUser().then(({ data: { user: authUser } }: { data: { user: { id: string } | null } }) => {
+      if (!authUser) return
+      supabase
+        .from('profiles')
+        .select('credits')
+        .eq('user_id', authUser.id)
+        .single()
+        .then(({ data: profileData }: { data: { credits: number | null } | null }) => {
+          if (profileData) setFetchedCredits(profileData.credits ?? 0)
+        })
+    })
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return

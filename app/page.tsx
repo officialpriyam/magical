@@ -2683,25 +2683,30 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
                       <div className="mb-4">
                         {/* Floating framework logos around the hero */}
                         <div className="relative h-16 w-full flex items-center justify-center">
-                          {[
-                            { label: 'Next.js', color: 'from-white/20 to-white/5', icon: '▲' },
-                            { label: 'React', color: 'from-cyan-400/20 to-cyan-600/5', icon: '⚛' },
-                            { label: 'Vue', color: 'from-emerald-400/20 to-emerald-600/5', icon: '◆' },
-                            { label: 'TypeScript', color: 'from-blue-400/20 to-blue-600/5', icon: 'TS' },
-                            { label: 'Node.js', color: 'from-green-400/20 to-green-600/5', icon: '⬡' },
-                            { label: 'Tailwind', color: 'from-teal-400/20 to-teal-600/5', icon: '◎' },
-                          ].map((fw, i) => (
-                            <div
-                              key={i}
-                              className={`absolute h-8 w-8 rounded-full bg-gradient-to-br ${fw.color} border border-white/10 backdrop-blur-sm flex items-center justify-center text-[10px] font-bold text-white/70 shadow-lg hero-float-circle`}
-                              style={{
-                                animationDelay: `${i * -3}s`,
-                                ['--angle' as string]: `${i * 60}deg`,
-                              }}
-                            >
-                              {fw.icon}
-                            </div>
-                          ))}
+                          {/* Next.js */}
+                          <div className="absolute h-8 w-8 rounded-full bg-gradient-to-br from-white/20 to-white/5 border border-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg hero-float-circle" style={{ animationDelay: '0s' }}>
+                            <svg className="h-4 w-4 text-white/80" viewBox="0 0 180 180" fill="none"><mask id="a" width="180" height="180" x="0" y="0" maskUnits="userSpaceOnUse" style={{maskType:'alpha'}}><circle cx="90" cy="90" r="90" fill="black"/></mask><g mask="url(#a)"><circle cx="90" cy="90" r="90" fill="black"/><path fill="url(#b)" d="M149.508 157.52L69.142 54H54v71.97h12.114V69.384l73.885 95.461a90.304 90.304 0 005.509-7.325z"/><defs><linearGradient id="b" x1="109" x2="144.5" y1="116.5" y2="160.5" gradientUnits="userSpaceOnUse"><stop stopColor="white"/><stop offset="1" stopColor="white" stopOpacity="0"/></linearGradient></defs></g></svg>
+                          </div>
+                          {/* React */}
+                          <div className="absolute h-8 w-8 rounded-full bg-gradient-to-br from-cyan-400/20 to-cyan-600/5 border border-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg hero-float-circle" style={{ animationDelay: '-3s' }}>
+                            <svg className="h-4 w-4 text-cyan-400" viewBox="0 0 24 24" fill="currentColor"><path d="M12 10.11c1.03 0 1.87.84 1.87 1.89 0 1-.84 1.85-1.87 1.85S10.13 13 10.13 12c0-1.05.84-1.89 1.87-1.89M7.37 20c.63.38 2.01-.2 3.6-1.7-.52-.59-1.03-1.23-1.51-1.9a22.7 22.7 0 01-2.4-.36c-.51 2.14-.32 3.61.31 3.96m.71-5.74l-.29-.51c-.11.29-.22.58-.29.86.27.06.57.11.88.16l-.3-.51m6.54-.76l.81-1.5-.81-1.5c-.3-.53-.62-1-.91-1.47C13.17 9 12.6 9 12 9c-.6 0-1.17 0-1.71.03-.29.47-.61.94-.91 1.47L8.57 12l.81 1.5c.3.53.62 1 .91 1.47.54.03 1.11.03 1.71.03.6 0 1.17 0 1.71-.03.29-.47.61-.94.91-1.47M12 6.78c-.19.22-.39.45-.59.72h1.18c-.2-.27-.4-.5-.59-.72m0 10.44c.19-.22.39-.45.59-.72h-1.18c.2.27.4.5.59.72M16.62 4c-.62-.38-2 .2-3.6 1.7.52.59 1.03 1.23 1.51 1.9.82.08 1.63.2 2.4.36.51-2.14.32-3.61-.31-3.96m-.71 5.74l.29.51c.11-.29.22-.58.29-.86-.27-.06-.57-.11-.88-.16l.3.51m1.45-7.05c1.47.84 1.63 3.05 1.01 5.63 2.54.75 4.37 1.99 4.37 3.68s-1.83 2.93-4.37 3.68c.62 2.58.46 4.79-1.01 5.63-1.46.84-3.45-.12-5.37-1.95-1.92 1.83-3.91 2.79-5.38 1.95-1.46-.84-1.62-3.05-1-5.63-2.54-.75-4.37-1.99-4.37-3.68s1.83-2.93 4.37-3.68c-.62-2.58-.46-4.79 1-5.63 1.47-.84 3.46.12 5.38 1.95 1.92-1.83 3.91-2.79 5.37-1.95M17.08 12c.34.75.62 1.45.84 2.12 2.1-.63 3.28-1.53 3.28-2.12s-1.18-1.49-3.28-2.12c-.22.67-.5 1.37-.84 2.12M6.92 12c-.34-.75-.62-1.45-.84-2.12-2.1.63-3.28 1.53-3.28 2.12s1.18 1.49 3.28 2.12c.22-.67.5-1.37.84-2.12M12 17.22c.19.22.39.45.59.72h-1.18c.2-.27.4-.5.59-.72M8.26 5.81C6.79 4.97 6.63 2.76 7.24.8c1.47-.84 3.46.12 5.38 1.95C14.56.92 16.55-.04 18.02.8c1.46.84 1.62 3.05 1 5.63-2.54.75-4.37 1.99-4.37 3.68 0 .63.27 1.22.71 1.75l-1.39-1.39c-.14-.37-.31-.72-.51-1.05L8.26 5.81M12 6.78c.19.22.39.45.59.72h-1.18c.2-.27.4-.5.59-.72"/></svg>
+                          </div>
+                          {/* Vue */}
+                          <div className="absolute h-8 w-8 rounded-full bg-gradient-to-br from-emerald-400/20 to-emerald-600/5 border border-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg hero-float-circle" style={{ animationDelay: '-6s' }}>
+                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none"><path d="M2 3h3.5L12 14.5 18.5 3H22L12 21 2 3z" fill="#41B883"/><path d="M7.5 3H12l-4.5 7.5L7.5 3zM16.5 3H12l4.5 7.5L16.5 3z" fill="#35495E"/></svg>
+                          </div>
+                          {/* TypeScript */}
+                          <div className="absolute h-8 w-8 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-600/5 border border-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg hero-float-circle" style={{ animationDelay: '-9s' }}>
+                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#3178C6"/><path d="M5 12.5v-1h3.5c.3 0 .5.2.5.5v1c0 .3-.2.5-.5.5H7v1.5h1.5c.3 0 .5.2.5.5v1c0 .3-.2.5-.5.5H5v-4.5zm8.5 4.5c.3 0 .5-.2.5-.5v-4h1.5v4c0 .3.2.5.5.5h.5v-6h-4v6h1zm5-3.5c0-.3.2-.5.5-.5s.5.2.5.5v-1.5h1v1.5c0 .8-.5 1.5-1.5 1.5v-1h-.5v-1.5z" fill="white"/></svg>
+                          </div>
+                          {/* Node.js */}
+                          <div className="absolute h-8 w-8 rounded-full bg-gradient-to-br from-green-400/20 to-green-600/5 border border-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg hero-float-circle" style={{ animationDelay: '-12s' }}>
+                            <svg className="h-4 w-4 text-green-400" viewBox="0 0 24 24" fill="currentColor"><path d="M11.998 24c-.321 0-.641-.084-.922-.247l-2.936-1.737c-.438-.245-.224-.332-.08-.383.585-.203.703-.25 1.328-.604.065-.037.151-.023.218.017l2.256 1.339a.29.29 0 00.272 0l8.795-5.076a.277.277 0 00.134-.238V6.921a.283.283 0 00-.137-.242l-8.791-5.072a.278.278 0 00-.271 0L3.075 6.68a.284.284 0 00-.139.241v10.15c0 .099.053.19.138.239l2.409 1.392c1.307.654 2.108-.116 2.108-.89V7.787c0-.142.114-.253.256-.253h1.115c.139 0 .255.112.255.253v10.021c0 1.745-.95 2.745-2.604 2.745-.508 0-.909 0-2.026-.551L2.28 18.675A1.857 1.857 0 011.026 17.07V6.921c0-.681.363-1.317.953-1.658L10.774.187a1.928 1.928 0 011.849 0l8.794 5.076c.59.34.953.977.953 1.658v10.15c0 .68-.363 1.315-.953 1.656l-8.794 5.076c-.28.163-.602.247-.923.247z"/></svg>
+                          </div>
+                          {/* Tailwind CSS */}
+                          <div className="absolute h-8 w-8 rounded-full bg-gradient-to-br from-teal-400/20 to-teal-600/5 border border-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg hero-float-circle" style={{ animationDelay: '-15s' }}>
+                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none"><path d="M12 6c-2.67 0-4.33 1.33-5 4 1-1.33 2.17-1.83 3.5-1.5.76.19 1.3.74 1.9 1.35.97 1 2.12 2.15 4.6 2.15 2.67 0 4.33-1.33 5-4-1 1.33-2.17 1.83-3.5 1.5-.76-.19-1.3-.74-1.9-1.35C15.63 7.15 14.48 6 12 6zM7 12c-2.67 0-4.33 1.33-5 4 1-1.33 2.17-1.83 3.5-1.5.76.19 1.3.74 1.9 1.35C8.37 16.85 9.52 18 12 18c2.67 0 4.33-1.33 5-4-1 1.33-2.17 1.83-3.5 1.5-.76-.19-1.3-.74-1.9-1.35C10.63 13.15 9.48 12 7 12z" fill="#06B6D4"/></svg>
+                          </div>
                         </div>
                         <p className="mt-1 text-sm text-white/40">Thousands of builders turning ideas into full-stack web apps with Magical AI</p>
                       </div>
