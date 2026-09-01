@@ -849,9 +849,17 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }, [useAgentic, agenticStream.fragment, agenticStream.actions])
 
   // Safety: when agentic streaming ends, ensure an assistant message exists AND persist agentic state
+  const agenticEndedRef = useRef(false)
   useEffect(() => {
-    if (!useAgentic || agenticStream.isStreaming) return
-    // Only run once when streaming just ended
+    if (!useAgentic || agenticStream.isStreaming) {
+      agenticEndedRef.current = false
+      return
+    }
+    // Only run once when streaming just ended — prevent re-runs from actions changing
+    if (agenticEndedRef.current) return
+    agenticEndedRef.current = true
+    // Only run if we have meaningful data from the stream
+    if (agenticStream.actions.length === 0 && !agenticStream.fragment?.code && !(agenticStream.fragment?.files?.length)) return
     const lastMsg = messagesRef.current[messagesRef.current.length - 1]
     const hasAssistantResponse = lastMsg?.role === 'assistant'
 
@@ -1378,6 +1386,23 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
       if (isLoading && lastMessage.role === 'assistant') {
         return
+      }
+
+      // Don't save placeholder assistant messages that have no real content yet.
+      // These get created when the agentic stream starts but before the response arrives.
+      if (lastMessage.role === 'assistant') {
+        const hasAgenticActions = (lastMessage.agenticActions || []).length > 0
+        const hasFragment = Boolean(lastMessage.object)
+        const textContent = lastMessage.content
+          ?.filter((c: any) => c.type === 'text')
+          .map((c: any) => c.text)
+          .join('')
+          .trim() || ''
+        const isPlaceholder = !hasAgenticActions && !hasFragment &&
+          (!textContent || textContent === 'Generation complete.' || textContent.length < 5)
+        if (isPlaceholder) {
+          return
+        }
       }
 
       const saveSignature = `${currentProjectId}:${sequenceNumber}:${lastMessage.role}:${Boolean(lastMessage.object)}:${Boolean(lastMessage.result)}:${(lastMessage.agenticActions || []).length}:${(lastMessage.agenticTodos || []).length}`
