@@ -17,19 +17,17 @@
   },
   "react-developer": {
     "name": "React",
-    "lib": ["react@latest", "react-dom@latest", "typescript", "@types/react", "@types/react-dom", "vite", "@vitejs/plugin-react", "tailwindcss"],
+    "lib": ["react@latest", "react-dom@latest", "typescript", "@types/react", "@types/react-dom", "vite", "@vitejs/plugin-react", "tailwindcss", "tailwind-merge", "clsx", "class-variance-authority", "lucide-react"],
     "file": "src/App.tsx",
-    "instructions": "A React TypeScript app with Vite and Tailwind CSS. Use the official create-vite react-ts starter shape, then edit/create/delete files to build the requested app.",
-    "starterRepository": "https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts",
+    "instructions": "A React TypeScript app with Vite and Tailwind CSS. IMPORTANT: As soon as the sandbox starts, run this exact command first: npm create vite@latest my-app -- --template react-ts. Then sync the generated files into the workspace. After syncing, edit/create/delete files on top of it to build the requested app. Use lucide-react for icons.",
     "cliInit": "npm create vite@latest my-app -- --template react-ts",
     "port": 5173
   },
   "vite-developer": {
     "name": "Vite React",
-    "lib": ["react@latest", "react-dom@latest", "vite", "@vitejs/plugin-react", "typescript", "tailwindcss"],
+    "lib": ["react@latest", "react-dom@latest", "vite", "@vitejs/plugin-react", "typescript", "tailwindcss", "tailwind-merge", "clsx"],
     "file": "src/App.tsx",
-    "instructions": "A Vite-powered React TypeScript app with Tailwind CSS. Use the official create-vite react-ts starter shape, then edit/create/delete files to build the requested app.",
-    "starterRepository": "https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts",
+    "instructions": "A Vite-powered React TypeScript app with Tailwind CSS. IMPORTANT: As soon as the sandbox starts, run this exact command first: npm create vite@latest my-app -- --template react-ts. Then sync the generated files into the workspace. After syncing, edit/create/delete files on top of it to build the requested app.",
     "cliInit": "npm create vite@latest my-app -- --template react-ts",
     "port": 5173
   },
@@ -42,34 +40,36 @@
   },
   "vue-developer": {
     "name": "Vue.js",
-    "lib": ["vue@latest", "vite", "@vitejs/plugin-vue", "typescript", "tailwindcss"],
+    "lib": ["vue@latest", "vite", "@vitejs/plugin-vue", "typescript", "tailwindcss", "tailwind-merge", "clsx", "class-variance-authority", "lucide-vue-next", "radix-vue"],
     "file": "src/App.vue",
-    "instructions": "A Vue 3 TypeScript app using the official create-vue/Vite starter shape with Tailwind CSS. Only use when asked specifically for Vue.",
-    "starterRepository": "https://github.com/vuejs/create-vue",
-    "cliInit": "npm create vue@latest",
+    "instructions": "A Vue 3 TypeScript app with Tailwind CSS and shadcn-vue components. Clone the starter repository https://github.com/unovue/shadcn-vue as the base, then edit/create/delete files on top of it to build the requested app. Use shadcn-vue components from '@/components/ui' instead of raw HTML. Use the cn() utility for className merging. Only use when asked specifically for Vue.",
+    "starterRepository": "https://github.com/unovue/shadcn-vue",
+    "cliInit": "npx shadcn-vue@latest init",
     "port": 5173
   },
   "svelte-developer": {
     "name": "Svelte",
-    "lib": ["@sveltejs/kit", "@sveltejs/adapter-auto", "svelte", "vite", "typescript", "tailwindcss"],
+    "lib": ["@sveltejs/kit", "@sveltejs/adapter-auto", "svelte", "vite", "typescript", "tailwindcss", "tailwind-merge", "clsx", "lucide-svelte"],
     "file": "src/routes/+page.svelte",
-    "instructions": "A SvelteKit TypeScript app with Tailwind CSS. Use the official create-svelte/SvelteKit starter shape, then edit/create/delete files to build the requested app.",
-    "starterRepository": "https://github.com/sveltejs/kit/tree/main/packages/create-svelte",
-    "cliInit": "npm create svelte@latest my-app",
+    "instructions": "A SvelteKit TypeScript app with Tailwind CSS and shadcn-svelte components. Clone the starter repository https://github.com/huntabyte/shadcn-svelte as the base, then edit/create/delete files on top of it to build the requested app. Use shadcn-svelte components from '$lib/components/ui' instead of raw HTML. Use the cn() utility for className merging.",
+    "starterRepository": "https://github.com/huntabyte/shadcn-svelte",
+    "cliInit": "npx shadcn-svelte@latest init",
     "port": 5173
   },
   "expo-mobile": {
     "name": "Mobile App (Expo)",
-    "lib": ["expo@~52.0.0", "react-native@0.76.0", "react@18.3.1", "expo-router", "expo-status-bar", "react-native-safe-area-context", "react-native-screens", "@expo/vector-icons"],
+    "lib": ["expo", "react-native", "react", "expo-router", "expo-status-bar", "react-native-safe-area-context", "react-native-screens", "@expo/vector-icons"],
     "file": "app/(tabs)/index.tsx",
-    "instructions": "A React Native Expo app with expo-router. Generate a complete mobile app with proper navigation, screens, and components. Use React Native components (View, Text, ScrollView, TouchableOpacity, FlatList, Image, etc.) instead of HTML elements. Include proper SafeAreaView, StatusBar, and mobile-specific styling. The app must be installable on phones via Expo Go or EAS Build. Use StyleSheet.create for styling. Support both iOS and Android.",
+    "instructions": "A React Native Expo app. Clone the starter repository https://github.com/EvanBacon/crispy as the base, then edit/create/delete files on top of it to build the requested app. Use React Native components (View, Text, ScrollView, TouchableOpacity, FlatList, Image, etc.) instead of HTML elements. Include proper SafeAreaView, StatusBar, and mobile-specific styling. The app must be installable on phones via Expo Go or EAS Build. Use StyleSheet.create for styling. Support both iOS and Android.",
+    "starterRepository": "https://github.com/EvanBacon/crispy",
     "port": 8081
   },
   "pwa-mobile": {
     "name": "Mobile PWA",
-    "lib": ["react@latest", "react-dom@latest", "vite", "@vitejs/plugin-react", "typescript", "tailwindcss", "vite-plugin-pwa"],
+    "lib": ["react@latest", "react-dom@latest", "vite", "@vitejs/plugin-react", "typescript", "tailwindcss", "vite-plugin-pwa", "tailwind-merge", "clsx", "lucide-react"],
     "file": "src/App.tsx",
-    "instructions": "A Progressive Web App (PWA) that can be installed on mobile devices. Generate a complete mobile-first web app with installable PWA manifest, service worker, offline support, and app-like UI. Include proper viewport meta tags, apple-touch-icon, theme-color, and a web manifest. Use touch-friendly UI (44px touch targets, swipe gestures, bottom navigation). The app should feel native when installed on a phone.",
+    "instructions": "A Progressive Web App (PWA) that can be installed on mobile devices. Clone the starter repository https://github.com/vite-pwa/vite-plugin-pwa as the base, then edit/create/delete files on top of it to build the requested app. Include installable PWA manifest, service worker, offline support, and app-like UI. Include proper viewport meta tags, apple-touch-icon, theme-color, and a web manifest. Use touch-friendly UI (44px touch targets, swipe gestures, bottom navigation). The app should feel native when installed on a phone.",
+    "starterRepository": "https://github.com/vite-pwa/vite-plugin-pwa",
     "port": 5173
   },
   "streamlit-developer": {
@@ -99,7 +99,8 @@
       "plotly"
     ],
     "file": "app.py",
-    "instructions": "A gradio app. Gradio Blocks/Interface should be called demo.",
+    "instructions": "A Gradio app. Clone the starter repository https://github.com/gradio-app/gradio as the base, then edit/create/delete files on top of it to build the requested app. Gradio Blocks/Interface should be called demo. Use gr.Blocks() or gr.Interface() for the main app structure.",
+    "starterRepository": "https://github.com/gradio-app/gradio",
     "port": 7860
   }
 }
