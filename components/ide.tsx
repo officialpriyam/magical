@@ -52,6 +52,7 @@ export function IDE({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [storageSlow, setStorageSlow] = useState(false)
   const [storageStatus, setStorageStatus] = useState<StorageStatus>('idle')
+  const rustfsLoadedRef = useRef(false)
   const isSandboxMode = !!sandboxId
   const isGitHubSaveBlocked = githubSaveRequired && !githubWorkspaceConnected
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -150,11 +151,12 @@ export function IDE({
               setLoadError(null)
               setStorageSlow(Boolean(storageData.slow))
               setStorageStatus('ok')
+              rustfsLoadedRef.current = true
               return
             }
 
-            // Fallback: use fragmentFiles if RustFS returned empty
-            if (fragmentFiles.length > 0) {
+            // RustFS returned empty — only use fragmentFiles on first load if RustFS has never loaded
+            if (!rustfsLoadedRef.current && fragmentFiles.length > 0) {
               setFiles(fragmentFilesToNodes())
               setStorageStatus('ok')
               setLoadError(null)
@@ -185,8 +187,8 @@ export function IDE({
         if (error?.name === 'AbortError') {
           setLoadError('RustFS took too long to respond. Check the storage server and retry.')
         } else {
-          // Fallback to fragmentFiles if RustFS is unreachable
-          if (fragmentFiles.length > 0) {
+          // Only use fragmentFiles fallback if RustFS has never successfully loaded
+          if (!rustfsLoadedRef.current && fragmentFiles.length > 0) {
             setFiles(fragmentFilesToNodes())
             setStorageStatus('ok')
             setLoadError(null)
@@ -390,9 +392,9 @@ export function IDE({
     }
   }, [persistFile])
 
-  // Auto-load fragmentFiles when they arrive and IDE has no files yet
+  // Auto-load fragmentFiles when they arrive and IDE has no files yet — only if RustFS hasn't loaded
   useEffect(() => {
-    if (fragmentFiles.length > 0 && files.length === 0 && storageStatus !== 'loading') {
+    if (!rustfsLoadedRef.current && fragmentFiles.length > 0 && files.length === 0 && storageStatus !== 'loading') {
       setFiles(fragmentFilesToNodes())
       setStorageStatus('ok')
       setLoadError(null)
