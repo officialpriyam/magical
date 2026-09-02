@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { njtTemplates, njtCategories, type NJTTemplate } from '@/lib/nextjstemplates-data'
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser'
-import { createProject, saveMessage } from '@/lib/database'
 import { ExternalLink, GitFork, Loader2, X, Search, Rocket, GitBranch } from 'lucide-react'
 
 export default function TemplatesPage() {
@@ -15,6 +14,7 @@ export default function TemplatesPage() {
   const [cloningTemplate, setCloningTemplate] = useState<NJTTemplate | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [authChecked, setAuthChecked] = useState(false)
+  const [cloningProgress, setCloningProgress] = useState('')
 
   const supabase = createSupabaseBrowserClient()
 
@@ -48,40 +48,45 @@ export default function TemplatesPage() {
     setCloningTemplate(template)
     setCloning(true)
     setSelectedTemplate(null)
+    setCloningProgress('Starting sandbox...')
 
     try {
-      // Create a new project
-      const project = await createProject(
-        supabase!,
-        template.name,
-        'nextjs-developer',
-        template.description,
-      )
+      setCloningProgress('Cloning repository...')
 
-      if (!project) {
-        throw new Error('Failed to create project')
+      // Call the clone API — this starts a sandbox, clones the repo, saves files to RustFS
+      const response = await fetch('/api/templates/clone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateId: 'nextjs-developer',
+          githubRepo: template.githubRepo,
+          templateName: template.name,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Clone failed')
       }
 
-      // Save the clone message to the project
-      const cloneMessage = `Clone this GitHub repository into the project: ${template.githubRepo}\n\nSet up the project, install dependencies, and make sure it runs. Template: ${template.name}`
-      const userMsg = { role: 'user' as const, content: [{ type: 'text' as const, text: cloneMessage }] }
-      await saveMessage(supabase!, project.id, userMsg, 0)
+      setCloningProgress(`Installing dependencies...`)
 
-      // Set flags so chat page auto-submits the message
-      try {
-        sessionStorage.setItem('isLandingPagePrompt', 'true')
-        sessionStorage.setItem('landingPageProjectId', project.id)
-      } catch {}
-
-      // Show cloning animation for 2.5s then redirect
+      // Show completion for a moment
       setTimeout(() => {
-        router.push(`/chat/${project.id}`)
-      }, 2500)
+        setCloningProgress(`Cloned! ${data.fileCount || 0} files ready`)
+      }, 1000)
+
+      // Redirect to chat — files are already in RustFS storage, sandbox will hydrate from there
+      setTimeout(() => {
+        router.push(`/chat/${data.projectId}`)
+      }, 2000)
     } catch (error) {
-      console.error('Failed to create project:', error)
+      console.error('Failed to clone template:', error)
       setCloning(false)
       setCloningTemplate(null)
-      alert('Failed to start cloning. Please try again.')
+      setCloningProgress('')
+      alert('Failed to clone template. Please try again.')
     }
   }
 
@@ -110,7 +115,7 @@ export default function TemplatesPage() {
                 Cloning {cloningTemplate.name}
               </h2>
               <p className="text-sm text-white/50">
-                Setting up your project with {cloningTemplate.name} template...
+                {cloningProgress || `Setting up your project with ${cloningTemplate.name} template...`}
               </p>
             </div>
 
