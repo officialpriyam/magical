@@ -256,7 +256,7 @@ export async function POST(req: Request) {
   let enrichedMessages = [...messages]
 
   // Detect mobile app request and fetch Expo/React Native docs
-  const isMobileAppRequest = /\b(mobile\s*app|react\s*native|expo|ios|android|installable|install.*phone|pwa|progressive)\b/i.test(promptText)
+  const isMobileAppRequest = /(mobile\s*app|react\s*native|expo|ios|android|installable|install.*phone|pwa|progressive)/i.test(promptText)
   if (isMobileAppRequest) {
     try {
       console.log('[Mobile] Detected mobile app request, fetching Expo docs...')
@@ -792,7 +792,8 @@ async function runPipeline({
         }
       } catch (fallbackError) {
         console.error('[Agentic] Fallback also failed:', fallbackError)
-        emitError(`All agents failed and fallback generation also failed: ${(fallbackError as Error).message || 'Unknown error'}`)
+        // Template fallback should always succeed now, but if it somehow fails, show a helpful message
+        emitError(`Code generation failed: ${(fallbackError as Error).message || 'Unknown error'}. Please try again or check your API keys in settings.`)
       }
     }
 
@@ -842,9 +843,25 @@ async function runPipeline({
       const fallbackFragment = await generateFallback(
         messages, model, config, template, supabaseContext
       )
-      emitFragment(fallbackFragment as Record<string, any>)
+      if (fallbackFragment) {
+        emitFragment(fallbackFragment as Record<string, any>)
+      }
     } catch (fallbackError) {
       console.error('[Agentic] Fallback also failed:', fallbackError)
+      // If even template fallback fails, emit a minimal HTML file
+      emitFragment({
+        commentary: 'Generated a minimal HTML starter due to errors.',
+        template: 'html-developer',
+        title: 'Minimal Starter',
+        description: 'A basic HTML page',
+        additional_dependencies: [],
+        has_additional_dependencies: false,
+        install_dependencies_command: '',
+        port: 3000,
+        file_path: 'index.html',
+        code: '<!DOCTYPE html><html><head><title>My App</title></head><body><h1>Welcome!</h1></body></html>',
+        files: [{ path: 'index.html', content: '<!DOCTYPE html><html><head><title>My App</title></head><body><h1>Welcome!</h1></body></html>', purpose: 'Main HTML file' }]
+      })
     }
   }
 }
@@ -1053,7 +1070,7 @@ Rules:
     const todos: { id: string; text: string; completed: boolean }[] = []
 
     // Parse JSON array from response
-    const jsonMatch = text.match(/\[[\s\S]*\]/)
+    const jsonMatch = text.match(/[[\s\S]*]/)
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0])
@@ -1279,7 +1296,414 @@ async function generateFallback(
     }
   }
 
-  throw new Error('All fallback models failed')
+  // All AI models failed — use template-based fallback
+  // Generate a simple starter project based on the template configuration
+  console.log('[Fallback] All AI models failed, using template-based fallback')
+  return generateTemplateFallback(template)
+}
+
+// ─── Template-based fallback when all AI models fail ────────
+function generateTemplateFallback(template: Templates): Record<string, any> {
+  const templateEntries = Object.entries(template)
+  
+  if (templateEntries.length === 0) {
+    // Absolute fallback: simple HTML page
+    return {
+      commentary: 'All AI models failed. Generated a basic HTML starter as fallback.',
+      template: 'html-developer',
+      title: 'Basic Starter',
+      description: 'A simple HTML/CSS/JS starter page',
+      additional_dependencies: [],
+      has_additional_dependencies: false,
+      install_dependencies_command: '',
+      port: 3000,
+      file_path: 'index.html',
+      code: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0a0a0b; color: white; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .container { text-align: center; padding: 2rem; }
+    h1 { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, #8b5cf6, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    p { color: #a1a1aa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to My App</h1>
+    <p>Your project is ready! Edit this file to start building.</p>
+  </div>
+</body>
+</html>`,
+      files: [
+        { path: 'index.html', content: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0a0a0b; color: white; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .container { text-align: center; padding: 2rem; }
+    h1 { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, #8b5cf6, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    p { color: #a1a1aa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to My App</h1>
+    <p>Your project is ready! Edit this file to start building.</p>
+  </div>
+</body>
+</html>`, purpose: 'Main HTML file' }
+      ]
+    }
+  }
+
+  // Pick the first available template as fallback
+  const [firstTemplateId, firstTemplateConfig] = templateEntries[0]
+  const port = firstTemplateConfig.port || 3000
+  const starterRepo = 'starterRepository' in firstTemplateConfig ? firstTemplateConfig.starterRepository : undefined
+  const cliInit = 'cliInit' in firstTemplateConfig ? firstTemplateConfig.cliInit : undefined
+  const libs = firstTemplateConfig.lib || []
+  const file = firstTemplateConfig.file || 'index.html'
+  const instructions = firstTemplateConfig.instructions || 'A starter project.'
+
+  // Build a simple starter based on the template type
+  let code = ''
+  let files: Array<{ path: string; content: string; purpose?: string }> = []
+  
+  if (firstTemplateId === 'nextjs-developer') {
+    code = `import { useState } from 'react'
+
+export default function Home() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0b] text-white flex flex-col items-center justify-center">
+      <h1 className="text-4xl font-bold mb-4">
+        <span className="bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+          Welcome to Next.js
+        </span>
+      </h1>
+      <p className="text-gray-400 mb-8">
+        Your project is ready! Start editing to see changes.
+      </p>
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => setCount(c => c + 1)}
+          className="px-6 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition-all"
+        >
+          Count: {count\}
+        <\/button>
+      </div>
+    </div>
+  \)
+}`
+    files = [
+      { path: 'app/page.tsx', content: code, purpose: 'Main page component' },
+      { path: 'app/layout.tsx', content: `import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'My App',
+  description: 'Generated with Magical AI',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>{children}</body>
+    </html>
+  )
+}`, purpose: 'Root layout' },
+      { path: 'app/globals.css', content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 4%;
+  --foreground: 38 14% 90%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}`, purpose: 'Global styles' }
+    ]
+  } else if (firstTemplateId === 'react-developer' || firstTemplateId === 'vite-developer') {
+    code = `import { useState } from 'react'
+import './App.css'
+
+function App() {
+  const [count, setCount] = useState(0)
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0b] text-white flex flex-col items-center justify-center">
+      <h1 className="text-4xl font-bold mb-4">
+        <span className="bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+          Welcome to Vite + React
+        </span>
+      </h1>
+      <p className="text-gray-400 mb-8">
+        Your project is ready! Start editing to see changes.
+      </p>
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => setCount(c => c + 1)}
+          className="px-6 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition-all"
+        >
+          Count: {count}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default App`
+    files = [
+      { path: 'src/App.tsx', content: code, purpose: 'Main app component' },
+      { path: 'src/App.css', content: `* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #0a0a0b;
+  color: white;
+}`, purpose: 'App styles' },
+      { path: 'src/main.tsx', content: `import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)`, purpose: 'Entry point' },
+      { path: 'index.html', content: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>`, purpose: 'HTML entry point' }
+    ]
+  } else if (firstTemplateId === 'html-developer') {
+    code = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0a0a0b; color: white; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .container { text-align: center; padding: 2rem; }
+    h1 { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, #8b5cf6, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    p { color: #a1a1aa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to My App</h1>
+    <p>Your project is ready! Edit this file to start building.</p>
+  </div>
+</body>
+</html>`
+    files = [
+      { path: 'index.html', content: code, purpose: 'Main HTML file' }
+    ]
+  } else if (firstTemplateId === 'vue-developer') {
+    code = `<script setup lang="ts">
+import { ref } from 'vue'
+
+const count = ref(0)
+</script>
+
+<template>
+  <div class="min-h-screen bg-[#0a0a0b] text-white flex flex-col items-center justify-center">
+    <h1 class="text-4xl font-bold mb-4">
+      <span class="bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+        Welcome to Vue + Vite
+      </span>
+    </h1>
+    <p class="text-gray-400 mb-8">
+      Your project is ready! Start editing to see changes.
+    </p>
+    <div class="flex items-center gap-4">
+      <button
+        @click="count++"
+        class="px-6 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition-all"
+      >
+        Count: {{ count }}
+      </button>
+    </div>
+  </div>
+</template>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #0a0a0b;
+  color: white;
+}
+</style>`
+    files = [
+      { path: 'src/App.vue', content: code, purpose: 'Main app component' },
+      { path: 'src/main.ts', content: `import { createApp } from 'vue'
+import App from './App.vue'
+import './style.css'
+
+createApp(App).mount('#app')`, purpose: 'Entry point' },
+      { path: 'src/style.css', content: `* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #0a0a0b;
+  color: white;
+}`, purpose: 'Global styles' },
+      { path: 'index.html', content: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>`, purpose: 'HTML entry point' }
+    ]
+  } else if (firstTemplateId === 'svelte-developer') {
+    code = `<script lang="ts">
+  let count: number = 0;
+</script>
+
+<div class="min-h-screen bg-[#0a0a0b] text-white flex flex-col items-center justify-center">
+  <h1 class="text-4xl font-bold mb-4">
+    <span class="bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
+      Welcome to SvelteKit
+    </span>
+  </h1>
+  <p class="text-gray-400 mb-8">
+    Your project is ready! Start editing to see changes.
+  </p>
+  <div class="flex items-center gap-4">
+    <button
+      on:click={() => count++}
+      class="px-6 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition-all"
+    >
+      Count: {count}
+    </button>
+  </div>
+</div>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #0a0a0b;
+  color: white;
+}
+</style>`
+    files = [
+      { path: 'src/routes/+page.svelte', content: code, purpose: 'Main page component' },
+      { path: 'src/routes/+page.ts', content: `import type { PageLoaded } from './$types';
+
+export const load: PageLoaded = () => {
+  return {}
+}`, purpose: 'Page load function' },
+      { path: 'src/app.html', content: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="My SvelteKit App" />
+    <title>My App</title>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>`, purpose: 'HTML template' }
+    ]
+  } else {
+    // Generic fallback for any other template
+    code = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0a0a0b; color: white; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .container { text-align: center; padding: 2rem; }
+    h1 { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, #8b5cf6, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    p { color: #a1a1aa; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to My App</h1>
+    <p>Your project is ready! Edit this file to start building.</p>
+  </div>
+</body>
+</html>`
+    files = [
+      { path: file || 'index.html', content: code, purpose: 'Main file' }
+    ]
+  }
+
+  return {
+    commentary: `All AI models failed. Generated a ${firstTemplateId} starter project as fallback. ${instructions}`,
+    template: firstTemplateId,
+    title: 'Starter Project',
+    description: `A ${firstTemplateId} starter project with basic counter example`,
+    additional_dependencies: libs,
+    has_additional_dependencies: libs.length > 0,
+    install_dependencies_command: cliInit || (libs.length > 0 ? `npm install ${libs.join(' ')}` : ''),
+    port: port,
+    file_path: file || 'index.html',
+    code: code,
+    files: files
+  }
 }
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -1377,15 +1801,15 @@ function shouldAutoSearch(query: string): boolean {
   if (/^\[Search:/i.test(query)) return true
   if (/https?:\/\//.test(query)) return true
   // Questions
-  const isQuestion = /^\b(what is|what are|who is|who are|when did|when was|where is|how do I find|tell me about|which|compare|best|recommended|popular)\b/i.test(query)
+  const isQuestion = /^(what is|what are|who is|who are|when did|when was|where is|how do I find|tell me about|which|compare|best|recommended|popular)/i.test(query)
   if (isQuestion) return true
-  if (/\b(what is the price|how much does|is .* down|is .* available|how do I|how to)\b/i.test(query)) return true
+  if (/(what is the price|how much does|is .* down|is .* available|how do I|how to)/i.test(query)) return true
   // Search-related keywords
-  if (/\b(search|find|look up|research|compare|alternative|vs\.?|versus|review)\b/i.test(query)) return true
+  if (/(search|find|look up|research|compare|alternative|vs\.?|versus|review)/i.test(query)) return true
   // Web/app building keywords — these benefit from seeing real examples
-  if (/\b(landing page|website|blog|portfolio|resume|document|documentation|article|tutorial|guide|template|design|UI|UX|brand|logo|color scheme|web app|webpage|page|site|app|build|create|make|generate|write)\b/i.test(query)) return true
+  if (/(landing page|website|blog|portfolio|resume|document|documentation|article|tutorial|guide|template|design|UI|UX|brand|logo|color scheme|web app|webpage|page|site|app|build|create|make|generate|write)/i.test(query)) return true
   // Time references
-  const hasTimeRef = /\b(current|latest|today|yesterday|this week|right now|news|outage|down|2024|2025|2026)\b/i.test(query)
+  const hasTimeRef = /(current|latest|today|yesterday|this week|right now|news|outage|down|2024|2025|2026)/i.test(query)
   if (hasTimeRef) return true
   return false
 }
@@ -1396,7 +1820,7 @@ function detectAgentFromMessage(messages: ModelMessage[]): string | null {
     const msg = messages[i]
     if (msg.role !== 'user') continue
     const content = typeof msg.content === 'string' ? msg.content : ''
-    const agentMatch = content.match(/^\[Agent:\s*(\w+)\]/i)
+    const agentMatch = content.match(/^[Agent:\s*(\w+)]/i)
     if (agentMatch) return agentMatch[1].toLowerCase()
     break
   }
@@ -1406,10 +1830,10 @@ function detectAgentFromMessage(messages: ModelMessage[]): string | null {
 // Strip agent/search/think/canvas prefixes from message content
 function stripMessagePrefixes(content: string): string {
   return content
-    .replace(/^\[Agent:\s*\w+\]\s*/i, '')
-    .replace(/^\[Search:\s*[^\]]*\]\s*/i, '')
-    .replace(/^\[Think:\s*[^\]]*\]\s*/i, '')
-    .replace(/^\[Canvas:\s*[^\]]*\]\s*/i, '')
+    .replace(/^[Agent:\s*\w+]\s*/i, '')
+    .replace(/^[Search:\s*[^]]*]\s*/i, '')
+    .replace(/^[Think:\s*[^]]*]\s*/i, '')
+    .replace(/^[Canvas:\s*[^]]*]\s*/i, '')
     .trim()
 }
 
@@ -1418,13 +1842,13 @@ function detectAutoSearchQuery(messages: ModelMessage[]): string | null {
     const msg = messages[i]
     if (msg.role !== 'user') continue
     const content = typeof msg.content === 'string' ? msg.content : ''
-    const searchMatch = content.match(/^\[Search:\s*(.+?)\]\s*$/)
+    const searchMatch = content.match(/^[Search:\s*(.+?)]\s*$/)
     if (searchMatch) return searchMatch[1]
     // Agent prefix handling
-    const agentMatch = content.match(/^\[Agent:\s*(\w+)\]/i)
+    const agentMatch = content.match(/^[Agent:\s*(\w+)]/i)
     if (agentMatch) {
       const agent = agentMatch[1].toLowerCase()
-      const cleaned = content.replace(/^\[Agent:\s*\w+\]\s*/i, '').trim()
+      const cleaned = content.replace(/^[Agent:\s*\w+]\s*/i, '').trim()
       // 'search' agent always triggers search
       if (agent === 'search') {
         return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
@@ -1435,7 +1859,7 @@ function detectAutoSearchQuery(messages: ModelMessage[]): string | null {
       }
     }
     // No agent prefix: strip other prefixes and check
-    const cleaned = content.replace(/^\[\w+:\s*.+?\]\s*/, '').trim()
+    const cleaned = content.replace(/^[\w+:\s*.+?]\s*/, '').trim()
     if (!cleaned) continue
     if (!shouldAutoSearch(cleaned)) continue
     return cleaned.length > 200 ? cleaned.slice(0, 200) : cleaned
@@ -1444,7 +1868,7 @@ function detectAutoSearchQuery(messages: ModelMessage[]): string | null {
 }
 
 function stripAgentPrefix(text: string): string {
-  return text.replace(/^\[Agent:\s*\w+\]\s*/, '').trim()
+  return text.replace(/^[Agent:\s*\w+]\s*/, '').trim()
 }
 
 async function fetchWebSearch(query: string): Promise<{ title: string; url: string; snippet: string }[]> {
@@ -1707,7 +2131,7 @@ async function fetchOpenWebSearchUrl(url: string): Promise<{ url: string; title:
 }
 
 // ─── URL auto-fetch ────────────────────────────────────────
-const URL_REGEX = /https?:\/\/[^\s<>")\]]+/gi
+const URL_REGEX = /https?:\/\/[^\s<>")]]+/gi
 
 function extractUrlsFromMessages(messages: ModelMessage[]): string[] {
   const urls: string[] = []
