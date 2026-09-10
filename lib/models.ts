@@ -14,6 +14,10 @@ export type LLMModel = {
   provider: string
   providerId: string
   isBeta?: boolean
+  multiModal?: boolean
+  capabilities?: string[]
+  contextLength?: number
+  description?: string
 }
 
 export type LLMModelConfig = {
@@ -30,16 +34,71 @@ export type LLMModelConfig = {
 
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
 
+// Curated order of proven, coding-capable models for Auto mode.
+// Auto mode picks the FIRST one with provider credentials instead of
+// blindly choosing the first bundled model (which may be a retired
+// preview model that returns empty responses).
+const AUTO_MODEL_PRIORITY = [
+  'claude-sonnet-4-5-20250929',
+  'claude-sonnet-4-20250514',
+  'gpt-5',
+  'gpt-5-mini',
+  'gpt-4.1',
+  'gpt-4o',
+  'gemini-2.5-flash',
+  'models/gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'models/gemini-2.5-pro',
+  'deepseek-chat',
+  'grok-code-fast-1',
+  'gpt-4o-mini',
+  'claude-3-5-haiku-latest',
+]
+
 export function getAutoModel(config: LLMModelConfig): LLMModel | null {
   const allModels = bundledModels.models as LLMModel[]
 
+  // Prefer proven coding models in priority order
+  for (const preferredId of AUTO_MODEL_PRIORITY) {
+    const model = allModels.find((m) => m.id === preferredId)
+    if (model && hasProviderCredentials(model.providerId, config)) {
+      return model
+    }
+  }
+
+  // Fall back to the first configured model that can actually produce text
   for (const model of allModels) {
-    if (hasProviderCredentials(model.providerId, config)) {
+    if (hasProviderCredentials(model.providerId, config) && isCodingCapableModel(model)) {
       return model
     }
   }
 
   return null
+}
+
+// Model IDs that cannot do code generation (image gen, audio, safety
+// classifiers, research agents) — never used for Auto or fallback.
+const NON_CODING_MODEL_PATTERNS = [
+  'image',
+  'audio',
+  'voxtral',
+  'safeguard',
+  'llama-guard',
+  'deep-research',
+  'search-preview',
+  'transcribe',
+  'tts',
+  'whisper',
+  'dall-e',
+  'sora',
+]
+
+export function isCodingCapableModel(model: LLMModel): boolean {
+  const id = model.id.toLowerCase()
+  const name = (model.name || '').toLowerCase()
+  return !NON_CODING_MODEL_PATTERNS.some(
+    (pattern) => id.includes(pattern) || name.includes(pattern),
+  )
 }
 
 export function getAllConfiguredModels(config: LLMModelConfig): LLMModel[] {
@@ -74,10 +133,10 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
   //    (like qwen3-vl-8b) return empty responses on code generation tasks
   const fallbackIds = [
     'gpt-4o-mini',
-    'anthropic/claude-3-5-haiku-latest',
-    'models/gemini-2.5-flash-preview-05-20',
-    'deepseek-chat',
+    'gemini-2.5-flash',
+    'models/gemini-2.5-flash',
     'claude-3-5-haiku-latest',
+    'deepseek-chat',
   ]
 
   for (const fallbackId of fallbackIds) {

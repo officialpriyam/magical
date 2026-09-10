@@ -5,14 +5,16 @@
       "provider": "OpenAI",
       "providerId": "openai",
       "name": "GPT-5",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
       "id": "gpt-5-mini",
       "provider": "OpenAI",
       "providerId": "openai",
       "name": "GPT-5 Mini",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
       "id": "gpt-5-nano",
@@ -47,7 +49,8 @@
       "provider": "OpenAI",
       "providerId": "openai",
       "name": "GPT-4.1",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image"]
     },
     {
       "id": "gpt-4.1-mini",
@@ -75,14 +78,16 @@
       "provider": "OpenAI",
       "providerId": "openai",
       "name": "GPT-4o",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image"]
     },
     {
       "id": "gpt-4o-mini",
       "provider": "OpenAI",
       "providerId": "openai",
       "name": "GPT-4o mini",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image"]
     },
     {
       "id": "o1",
@@ -110,14 +115,16 @@
       "provider": "Anthropic",
       "providerId": "anthropic",
       "name": "Claude Sonnet 4.5",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
       "id": "claude-opus-4-1-20250805",
       "provider": "Anthropic",
       "providerId": "anthropic",
       "name": "Claude Opus 4.1",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
       "id": "claude-opus-4-20250514",
@@ -131,7 +138,8 @@
       "provider": "Anthropic",
       "providerId": "anthropic",
       "name": "Claude Sonnet 4",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
       "id": "claude-3-7-sonnet-latest",
@@ -155,88 +163,44 @@
       "multiModal": true
     },
     {
-      "id": "gemini-2.5-flash-preview-05-20",
+      "id": "gemini-2.5-flash",
       "provider": "Google Vertex AI",
       "providerId": "vertex",
-      "name": "Gemini 2.5 Flash Preview 05-20",
-      "multiModal": true
+      "name": "Gemini 2.5 Flash",
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
-      "id": "gemini-2.5-pro-preview-05-06",
+      "id": "gemini-2.5-pro",
       "provider": "Google Vertex AI",
       "providerId": "vertex",
-      "name": "Gemini 2.5 Pro Preview 05-06",
-      "multiModal": true
+      "name": "Gemini 2.5 Pro",
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
-      "id": "gemini-2.0-flash-001",
+      "id": "gemini-2.0-flash",
       "provider": "Google Vertex AI",
       "providerId": "vertex",
       "name": "Gemini 2.0 Flash",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image"]
     },
     {
-      "id": "gemini-2.0-flash-lite-001",
-      "provider": "Google Vertex AI",
-      "providerId": "vertex",
-      "name": "Gemini 2.0 Flash Lite",
-      "multiModal": true
-    },
-    {
-      "id": "gemini-1.5-pro-002",
-      "provider": "Google Vertex AI",
-      "providerId": "vertex",
-      "name": "Gemini 1.5 Pro",
-      "multiModal": true
-    },
-    {
-      "id": "gemini-1.5-flash-002",
-      "provider": "Google Vertex AI",
-      "providerId": "vertex",
-      "name": "Gemini 1.5 Flash",
-      "multiModal": true
-    },
-    {
-      "id": "models/gemini-2.5-flash-preview-05-20",
+      "id": "models/gemini-2.5-flash",
       "provider": "Google Generative AI",
       "providerId": "google",
-      "name": "Gemini 2.5 Flash Preview 05-20",
-      "multiModal": true
+      "name": "Gemini 2.5 Flash",
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
-      "id": "models/gemini-2.5-pro-preview-05-06",
+      "id": "models/gemini-2.5-pro",
       "provider": "Google Generative AI",
       "providerId": "google",
-      "name": "Gemini 2.5 Pro Preview 05-06",
-      "multiModal": true
-    },
-    {
-      "id": "models/gemini-2.0-flash",
-      "provider": "Google Generative AI",
-      "providerId": "google",
-      "name": "Gemini 2.0 Flash",
-      "multiModal": true
-    },
-    {
-      "id": "models/gemini-2.0-flash-lite",
-      "provider": "Google Generative AI",
-      "providerId": "google",
-      "name": "Gemini 2.0 Flash Lite",
-      "multiModal": true
-    },
-    {
-      "id": "models/gemini-1.5-pro",
-      "provider": "Google Generative AI",
-      "providerId": "google",
-      "name": "Gemini 1.5 Pro",
-      "multiModal": true
-    },
-    {
-      "id": "models/gemini-1.5-flash",
-      "provider": "Google Generative AI",
-      "providerId": "google",
-      "name": "Gemini 1.5 Flash",
-      "multiModal": true
+      "name": "Gemini 2.5 Pro",
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
       "id": "magistral-medium-latest",
@@ -299,14 +263,16 @@
       "provider": "Mistral",
       "providerId": "mistral",
       "name": "Codestral 25.01",
-      "multiModal": false
+      "multiModal": false,
+      "capabilities": ["text"]
     },
     {
       "id": "openai/gpt-oss-120b",
       "provider": "Groq",
       "providerId": "groq",
       "name": "GPT OSS 120B",
-      "multiModal": false
+      "multiModal": false,
+      "capabilities": ["text"]
     },
     {
       "id": "moonshotai/kimi-k2-instruct",
@@ -411,7 +377,8 @@
       "provider": "xAI",
       "providerId": "xai",
       "name": "Grok 4",
-      "multiModal": true
+      "multiModal": true,
+      "capabilities": ["text", "image", "reasoning"]
     },
     {
       "id": "grok-3",
@@ -446,14 +413,16 @@
       "provider": "xAI",
       "providerId": "xai",
       "name": "Grok Code Fast 1",
-      "multiModal": false
+      "multiModal": false,
+      "capabilities": ["text"]
     },
     {
       "id": "deepseek-chat",
       "provider": "DeepSeek",
       "providerId": "deepseek",
       "name": "DeepSeek V3",
-      "multiModal": false
+      "multiModal": false,
+      "capabilities": ["text"]
     },
     {
       "id": "llama3.1",

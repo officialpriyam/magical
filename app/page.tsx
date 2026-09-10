@@ -1156,7 +1156,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to start project sandbox.')
+        const baseMessage =
+          typeof data.error === 'string' && data.error.trim()
+            ? data.error.trim()
+            : 'Failed to start project sandbox.'
+        const details =
+          typeof data.details === 'string' && data.details.trim() && !baseMessage.includes(data.details.trim())
+            ? ` ${data.details.trim()}`
+            : ''
+        throw new Error(`${baseMessage}${details}`)
       }
 
       if (currentProjectRef.current?.id === project.id) {
@@ -1166,7 +1174,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       warmingSandboxKeyRef.current = ''
       const msg = error instanceof Error ? error.message : 'Failed to start sandbox'
       console.warn('Project sandbox warm start failed:', error)
-      setErrorMessage(`Sandbox failed: ${msg}. Check your sandbox provider settings.`)
+      setErrorMessage(`Sandbox failed: ${msg.replace(/\.?\s*$/, '')}. Check your sandbox provider settings.`)
     }
   }, [sandboxProvider, selectedTemplate, session?.access_token, session?.user?.id, userTeam?.id])
 

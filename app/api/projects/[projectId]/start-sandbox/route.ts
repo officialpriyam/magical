@@ -21,11 +21,19 @@ import {
   listModalSandboxFiles,
   writeModalProjectFiles,
 } from '@/lib/modal-sandbox'
+import {
+  createDaytonaSandbox,
+  hasDaytonaSandboxConfig,
+  listDaytonaSandboxFiles,
+  writeDaytonaProjectFiles,
+} from '@/lib/daytona-sandbox'
 import type { Sandbox as ModalSandbox } from 'modal'
+import type { Sandbox as DaytonaSandbox } from '@daytona/sdk'
 import { getProjectFilesFromSandboxStorage } from '@/lib/sandbox-storage'
 import templates, { type TemplateId } from '@/lib/templates'
 import type { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types'
 import type { FileSystemNode } from '@/components/file-tree'
+import type { GeneratedFile } from '@/lib/fragment-files'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -34,12 +42,26 @@ export const dynamic = 'force-dynamic'
 const sandboxTimeout = 10 * 60 * 1000
 const DEFAULT_WARM_TEMPLATE: TemplateId = 'nextjs-developer'
 
+type VercelSandboxInstance = Awaited<ReturnType<typeof createVercelSandbox>>
+type AnySandbox = SandboxInstance | VercelSandboxInstance | ModalSandbox | DaytonaSandbox
+
+type WarmStartContext = {
+  template: TemplateId
+  port: number
+  userId: string
+  projectId: string
+  teamId: string
+  accessToken: string
+  storedFiles: GeneratedFile[]
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
-  let selectedProvider: SandboxProvider | null = null
-  let sbx: SandboxInstance | Awaited<ReturnType<typeof createVercelSandbox>> | ModalSandbox | null = null
+  let providerMode: SandboxProviderMode = 'auto'
+  let attemptedProviders: SandboxProvider[] = []
+  let lastError: unknown = null
 
   try {
     const { projectId } = await params
@@ -72,15 +94,9 @@ export async function POST(
     }
 
     const template = resolveWarmTemplate(body.template, project.template_id)
-    const providerMode = normalizeSandboxProviderMode(body.sandboxProvider)
-    selectedProvider = resolveSandboxProvider(providerMode, template)
-    const storedFiles = await getProjectFilesFromSandboxStorage({
-      userId: user.id,
-      projectId,
-    }).catch((error) => {
-      console.warn('RustFS warm start hydrate failed:', error)
-      return []
-    })
+    providerMode = normalizeSandboxProviderMode(body.sandboxProvider)
+    const availableProviders = getAvailableSandboxProviders(template)
+    const selectedProvider = chooseSandboxProvider({ mode: providerMode, available: availableProviders })
 
     if (!selectedProvider) {
       return NextResponse.json(
@@ -89,121 +105,221 @@ export async function POST(
       )
     }
 
-    const templateConfig = templates[template]
-    const port = templateConfig ? templateConfig.port : 3000
-
-    if (selectedProvider === 'vercel') {
-      sbx = await createVercelSandbox({
-        template,
-        userId: user.id,
-        teamId: typeof body.teamID === 'string' ? body.teamID : '',
-        projectId,
-        port,
-        timeoutMs: sandboxTimeout,
-      })
-
-      await writeVercelProjectFiles(sbx as Awaited<ReturnType<typeof createVercelSandbox>>, storedFiles, template)
-
-      const files = await listVercelSandboxFiles(sbx as Awaited<ReturnType<typeof createVercelSandbox>>)
-
-      return NextResponse.json({
-        sbxId: encodeSandboxId('vercel', (sbx as Awaited<ReturnType<typeof createVercelSandbox>>).name),
-        sandboxProvider: selectedProvider,
-        template,
-        url: '',
-        files,
-      } as ExecutionResultWeb)
-    }
-
-    if (selectedProvider === 'modal') {
-      sbx = await createModalSandbox({
-        template,
-        userId: user.id,
-        teamId: typeof body.teamID === 'string' ? body.teamID : '',
-        projectId,
-        port,
-        timeoutMs: sandboxTimeout,
-      })
-
-      await writeModalProjectFiles(sbx as ModalSandbox, storedFiles, template)
-
-      const files = await listModalSandboxFiles(sbx as ModalSandbox)
-
-      return NextResponse.json({
-        sbxId: encodeSandboxId('modal', (sbx as ModalSandbox).sandboxId),
-        sandboxProvider: selectedProvider,
-        template,
-        url: '',
-        files,
-      } as ExecutionResultWeb)
-    }
-
-    sbx = await createE2BSandbox(template, {
-      metadata: {
-        template,
-        userID: user.id,
-        teamID: typeof body.teamID === 'string' ? body.teamID : '',
-        warm: 'true',
-      },
-      timeoutMs: sandboxTimeout,
-      ...(body.teamID && body.accessToken
-        ? {
-            headers: {
-              'X-Supabase-Team': body.teamID,
-              'X-Supabase-Token': body.accessToken,
-            },
-          }
-        : {}),
+    const storedFiles = await getProjectFilesFromSandboxStorage({
+      userId: user.id,
+      projectId,
+    }).catch((error) => {
+      console.warn('RustFS warm start hydrate failed:', error)
+      return [] as GeneratedFile[]
     })
 
-    await Promise.all(
-      storedFiles.map((file) =>
-        (sbx as SandboxInstance).files.write(file.path, file.content),
-      ),
-    )
+    const templateConfig = templates[template]
+    const port = typeof templateConfig?.port === 'number' ? templateConfig.port : 3000
 
-    const files = await fetchSandboxFiles(sbx as SandboxInstance)
-
-    if (template === 'code-interpreter-v1') {
-      return NextResponse.json({
-        sbxId: encodeSandboxId('e2b', (sbx as SandboxInstance).sandboxId),
-        sandboxProvider: selectedProvider,
-        template,
-        stdout: [],
-        stderr: [],
-        cellResults: [],
-        files,
-      } as ExecutionResultInterpreter)
+    const context: WarmStartContext = {
+      template,
+      port,
+      userId: user.id,
+      projectId,
+      teamId: typeof body.teamID === 'string' ? body.teamID : '',
+      accessToken: typeof body.accessToken === 'string' ? body.accessToken : '',
+      storedFiles,
     }
 
-    return NextResponse.json({
-      sbxId: encodeSandboxId('e2b', (sbx as SandboxInstance).sandboxId),
-      sandboxProvider: selectedProvider,
-      template,
-      url: '',
-      files,
-    } as ExecutionResultWeb)
+    // In "auto" mode, try the chosen provider first and fall back to any other
+    // configured provider so a single misconfigured provider does not block the user.
+    const providerQueue: SandboxProvider[] =
+      providerMode === 'auto'
+        ? [selectedProvider, ...availableProviders.filter((p) => p !== selectedProvider)]
+        : [selectedProvider]
+
+    for (const provider of providerQueue) {
+      attemptedProviders.push(provider)
+
+      try {
+        const result = await startSandboxWithProvider(provider, context)
+        return NextResponse.json(result)
+      } catch (error) {
+        lastError = error
+        console.error(`Warm start with ${provider} sandbox failed:`, error)
+      }
+    }
+
+    throw lastError ?? new Error('All configured sandbox providers failed.')
   } catch (error) {
     console.error('Failed to warm start project sandbox:', error)
 
-    try {
-      if (selectedProvider === 'vercel') {
-        await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
-      } else if (selectedProvider === 'modal') {
-        await (sbx as ModalSandbox | null)?.terminate()
-      } else {
-        await (sbx as SandboxInstance | null)?.kill()
-      }
-    } catch {}
+    const details = getErrorMessage(error)
+    const providerLabel = attemptedProviders.length
+      ? ` (tried: ${attemptedProviders.join(', ')})`
+      : ''
 
     return NextResponse.json(
       {
-        error: 'Failed to start a project sandbox.',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        error: `Failed to start a project sandbox${providerLabel}. ${details}`.trim(),
+        details,
+        providers: attemptedProviders,
+        sandboxProvider: providerMode,
       },
       { status: 500 },
     )
   }
+}
+
+async function startSandboxWithProvider(
+  provider: SandboxProvider,
+  ctx: WarmStartContext,
+): Promise<ExecutionResultWeb | ExecutionResultInterpreter> {
+  let sbx: AnySandbox | null = null
+
+  try {
+    if (provider === 'vercel') {
+      const vercelSandbox = await createVercelSandbox({
+        template: ctx.template,
+        userId: ctx.userId,
+        teamId: ctx.teamId,
+        projectId: ctx.projectId,
+        port: ctx.port,
+        timeoutMs: sandboxTimeout,
+      })
+      sbx = vercelSandbox
+
+      await writeVercelProjectFiles(vercelSandbox, ctx.storedFiles, ctx.template)
+      const files = await listVercelSandboxFiles(vercelSandbox)
+
+      return {
+        sbxId: encodeSandboxId('vercel', vercelSandbox.name),
+        sandboxProvider: provider,
+        template: ctx.template,
+        url: '',
+        files,
+      } as ExecutionResultWeb
+    }
+
+    if (provider === 'modal') {
+      const modalSandbox = await createModalSandbox({
+        template: ctx.template,
+        userId: ctx.userId,
+        teamId: ctx.teamId,
+        projectId: ctx.projectId,
+        port: ctx.port,
+        timeoutMs: sandboxTimeout,
+      })
+      sbx = modalSandbox
+
+      await writeModalProjectFiles(modalSandbox, ctx.storedFiles, ctx.template)
+      const files = await listModalSandboxFiles(modalSandbox)
+
+      return {
+        sbxId: encodeSandboxId('modal', modalSandbox.sandboxId),
+        sandboxProvider: provider,
+        template: ctx.template,
+        url: '',
+        files,
+      } as ExecutionResultWeb
+    }
+
+    if (provider === 'daytona') {
+      const daytonaSandbox = await createDaytonaSandbox({
+        template: ctx.template,
+        userId: ctx.userId,
+        teamId: ctx.teamId,
+        projectId: ctx.projectId,
+        port: ctx.port,
+        timeoutMs: sandboxTimeout,
+      })
+      sbx = daytonaSandbox
+
+      await writeDaytonaProjectFiles(daytonaSandbox, ctx.storedFiles, ctx.template)
+      const files = await listDaytonaSandboxFiles(daytonaSandbox)
+
+      return {
+        sbxId: encodeSandboxId('daytona', daytonaSandbox.id),
+        sandboxProvider: provider,
+        template: ctx.template,
+        url: '',
+        files,
+      } as ExecutionResultWeb
+    }
+
+    const e2bSandbox = await createE2BSandbox(ctx.template, {
+      metadata: {
+        template: ctx.template,
+        userID: ctx.userId,
+        teamID: ctx.teamId,
+        warm: 'true',
+      },
+      timeoutMs: sandboxTimeout,
+      ...(ctx.teamId && ctx.accessToken
+        ? {
+            headers: {
+              'X-Supabase-Team': ctx.teamId,
+              'X-Supabase-Token': ctx.accessToken,
+            },
+          }
+        : {}),
+    })
+    sbx = e2bSandbox
+
+    await Promise.all(
+      ctx.storedFiles.map((file) => e2bSandbox.files.write(file.path, file.content)),
+    )
+
+    const files = await fetchSandboxFiles(e2bSandbox)
+
+    if (ctx.template === 'code-interpreter-v1') {
+      return {
+        sbxId: encodeSandboxId('e2b', e2bSandbox.sandboxId),
+        sandboxProvider: provider,
+        template: ctx.template,
+        stdout: [],
+        stderr: [],
+        cellResults: [],
+        files,
+      } as ExecutionResultInterpreter
+    }
+
+    return {
+      sbxId: encodeSandboxId('e2b', e2bSandbox.sandboxId),
+      sandboxProvider: provider,
+      template: ctx.template,
+      url: '',
+      files,
+    } as ExecutionResultWeb
+  } catch (error) {
+    await cleanupSandbox(provider, sbx)
+    throw error
+  }
+}
+
+async function cleanupSandbox(provider: SandboxProvider, sbx: AnySandbox | null) {
+  if (!sbx) return
+
+  try {
+    if (provider === 'vercel') {
+      await (sbx as VercelSandboxInstance).stop()
+    } else if (provider === 'modal') {
+      await (sbx as ModalSandbox).terminate()
+    } else if (provider === 'daytona') {
+      await (sbx as DaytonaSandbox).delete()
+    } else {
+      await (sbx as SandboxInstance).kill()
+    }
+  } catch (cleanupError) {
+    console.warn(`Failed to clean up ${provider} sandbox after error:`, cleanupError)
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message || error.name || 'Unknown error'
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return error
+  }
+
+  return 'Unknown error'
 }
 
 function resolveWarmTemplate(value: unknown, projectTemplate: unknown): TemplateId {
@@ -222,10 +338,10 @@ function isTemplateId(value: unknown): value is TemplateId {
   return typeof value === 'string' && value in templates
 }
 
-function resolveSandboxProvider(mode: SandboxProviderMode, template: TemplateId) {
+function getAvailableSandboxProviders(template: TemplateId): SandboxProvider[] {
   const available: SandboxProvider[] = []
 
-  if (process.env.E2B_API_KEY) {
+  if (process.env.E2B_API_KEY?.trim()) {
     available.push('e2b')
   }
 
@@ -237,12 +353,16 @@ function resolveSandboxProvider(mode: SandboxProviderMode, template: TemplateId)
     available.push('vercel')
   }
 
-  return chooseSandboxProvider({ mode, available })
+  if (hasDaytonaSandboxConfig()) {
+    available.push('daytona')
+  }
+
+  return available
 }
 
 function getNoSandboxProviderMessage(mode: SandboxProviderMode, template: TemplateId) {
   if (mode === 'vercel' && template === 'code-interpreter-v1') {
-    return 'Vercel Sandbox is only available for app previews. Python code interpreter requires E2B_API_KEY or Modal Sandbox.'
+    return 'Vercel Sandbox is only available for app previews. Python code interpreter requires E2B_API_KEY, Modal, or Daytona.'
   }
 
   if (mode === 'modal') {
@@ -254,10 +374,14 @@ function getNoSandboxProviderMessage(mode: SandboxProviderMode, template: Templa
   }
 
   if (mode === 'e2b') {
-    return 'E2B is not configured. Set E2B_API_KEY or choose Modal or Vercel Sandbox.'
+    return 'E2B is not configured. Set E2B_API_KEY or choose Modal, Vercel, or Daytona.'
   }
 
-  return 'No sandbox provider is configured. Set E2B_API_KEY, MODAL_TOKEN_ID/SECRET, or configure Vercel Sandbox.'
+  if (mode === 'daytona') {
+    return 'Daytona is not configured. Set DAYTONA_API_KEY.'
+  }
+
+  return 'No sandbox provider is configured. Set E2B_API_KEY, MODAL_TOKEN_ID/SECRET, DAYTONA_API_KEY, or configure Vercel Sandbox.'
 }
 
 async function fetchSandboxFiles(sbx: SandboxInstance): Promise<FileSystemNode[]> {

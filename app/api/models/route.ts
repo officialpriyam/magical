@@ -25,7 +25,61 @@ type OpenAICompatibleModel = {
   owned_by?: string
 }
 
+// Model IDs/names that cannot do code generation — hidden from the picker
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
+
+const NON_CODING_MODEL_PATTERNS = [
+  'image',
+  'audio',
+  'voxtral',
+  'safeguard',
+  'llama-guard',
+  'deep-research',
+  'search-preview',
+  'transcribe',
+  'tts',
+  'whisper',
+  'dall-e',
+  'sora',
+]
+
+function isCodingCapableModel(model: LLMModel): boolean {
+  const id = model.id.toLowerCase()
+  const name = (model.name || '').toLowerCase()
+  return !NON_CODING_MODEL_PATTERNS.some(
+    (pattern) => id.includes(pattern) || name.includes(pattern),
+  )
+}
+
+// Derive capability badges from the model id/name when not explicitly set
+function deriveCapabilities(model: LLMModel): string[] {
+  if (Array.isArray(model.capabilities) && model.capabilities.length > 0) {
+    return model.capabilities
+  }
+
+  const id = model.id.toLowerCase()
+  const caps: string[] = ['text']
+
+  const isReasoning =
+    /(^|\/)(o[134](-|$)|qwq|thinking|reason|gpt-5|deepseek-r1|magistral)/.test(id) ||
+    id.includes('sonnet') ||
+    id.includes('opus') ||
+    id.includes('grok-4')
+  if (isReasoning) caps.push('reasoning')
+
+  const isVision =
+    model.multiModal === true ||
+    id.includes('vision') ||
+    id.includes('-vl-') ||
+    id.includes('gemini') ||
+    id.includes('gpt-4o') ||
+    id.includes('gpt-5') ||
+    id.includes('pixtral') ||
+    id.includes('grok-4')
+  if (isVision) caps.push('image')
+
+  return caps
+}
 const NVIDIA_NON_CHAT_MODEL_PARTS = [
   'alphafold',
   'bevformer',
@@ -59,7 +113,7 @@ export async function GET() {
   const models = new Map<string, LLMModel>()
 
   for (const model of staticModels.models as LLMModel[]) {
-    if (model.providerId !== 'nvidia') {
+    if (model.providerId !== 'nvidia' && isCodingCapableModel(model)) {
       models.set(model.id, model)
     }
   }
@@ -71,11 +125,17 @@ export async function GET() {
   ])
 
   for (const model of [...googleModels, ...nvidiaModels, ...openRouterModels]) {
-    models.set(model.id, model)
+    if (!isCodingCapableModel(model)) continue
+    const existing = models.get(model.id)
+    // Preserve bundled capability metadata when the remote list overrides
+    models.set(model.id, existing ? { ...model, capabilities: existing.capabilities } : model)
   }
 
+  const list = Array.from(models.values())
+    .map((model) => ({ ...model, capabilities: deriveCapabilities(model) }))
+
   return NextResponse.json({
-    models: Array.from(models.values()).sort((a, b) => {
+    models: list.sort((a, b) => {
       if (a.providerId !== b.providerId) return a.providerId.localeCompare(b.providerId)
       return a.name.localeCompare(b.name)
     }),

@@ -23,14 +23,16 @@ const DEFAULT_PYTHON_RUNTIME = 'python3.13'
 const SKIP_PATH_RE = /(^|\/)(\.git|node_modules|\.next|\.nuxt|dist|build|coverage|__pycache__|\.cache)(\/|$)/
 
 export function hasVercelSandboxConfig() {
+  // Only report Vercel Sandbox as available when real credentials exist.
+  // `VERCEL` / `VERCEL_URL` are set automatically on every Vercel deployment
+  // and do NOT grant Sandbox API access, so checking them caused the provider
+  // to be selected without credentials and fail with "Failed to start a project sandbox."
   return Boolean(
-    process.env.VERCEL_OIDC_TOKEN ||
-      process.env.VERCEL ||
-      process.env.VERCEL_URL ||
+    process.env.VERCEL_OIDC_TOKEN?.trim() ||
       (
-        process.env.VERCEL_TEAM_ID &&
-        process.env.VERCEL_PROJECT_ID &&
-        process.env.VERCEL_TOKEN
+        process.env.VERCEL_TEAM_ID?.trim() &&
+        process.env.VERCEL_PROJECT_ID?.trim() &&
+        process.env.VERCEL_TOKEN?.trim()
       ),
   )
 }

@@ -10,11 +10,60 @@ import {
 import type { LLMModel, LLMModelConfig } from '@/lib/models'
 import type { TemplateId, Templates } from '@/lib/templates'
 import 'core-js/actual/object/group-by'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Info } from 'lucide-react'
 import Image from 'next/image'
 import { useMemo } from 'react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 const ETC_PROVIDER_IDS = new Set(['orcarouter', 'requesty', 'llm_gateway', 'novita', 'poolside'])
+
+const CAPABILITY_META: Record<string, { label: string; icon: string }> = {
+  text: { label: 'Text', icon: '💬' },
+  image: { label: 'Image input', icon: '🖼️' },
+  video: { label: 'Video input', icon: '🎬' },
+  audio: { label: 'Audio input', icon: '🎙️' },
+  reasoning: { label: 'Reasoning', icon: '🧠' },
+}
+
+function ModelCapabilities({ model }: { model: LLMModel }) {
+  const caps = (model.capabilities || []).filter((c) => CAPABILITY_META[c])
+  if (caps.length === 0) return null
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => e.preventDefault()}
+            className="pointer-events-auto ml-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-amber-400/80 hover:text-amber-400"
+          >
+            !
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="p-2">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-white/50">
+            Supported input
+          </p>
+          <div className="flex flex-col gap-0.5">
+            {caps.map((cap) => (
+              <span key={cap} className="flex items-center gap-1.5 text-xs text-white/90">
+                <span>{CAPABILITY_META[cap].icon}</span>
+                {CAPABILITY_META[cap].label}
+              </span>
+            ))}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 
 export function ChatPicker({
   templates,
@@ -157,15 +206,16 @@ export function ChatPicker({
                   </SelectLabel>
                   {groupModels?.map((model) => (
                     <SelectItem key={model.id} value={model.id}>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex w-full items-center space-x-2">
                         <Image
-                          className="flex"
+                          className="flex shrink-0"
                           src={`/thirdparty/logos/${model.providerId}.svg`}
                           alt={model.provider}
                           width={14}
                           height={14}
                         />
-                        <span>{model.name}</span>
+                        <span className="truncate">{model.name}</span>
+                        <ModelCapabilities model={model} />
                       </div>
                     </SelectItem>
                   ))}

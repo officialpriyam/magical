@@ -39,7 +39,16 @@ import {
   listModalSandboxFiles,
   writeModalProjectFiles,
 } from '@/lib/modal-sandbox'
+import {
+  createDaytonaSandbox,
+  getDaytonaSandboxUrl,
+  hasDaytonaSandboxConfig,
+  installAndStartDaytonaProject,
+  listDaytonaSandboxFiles,
+  writeDaytonaProjectFiles,
+} from '@/lib/daytona-sandbox'
 import type { Sandbox as ModalSandbox } from 'modal'
+import type { Sandbox as DaytonaSandbox } from '@daytona/sdk'
 import { validateGitHubIdentifier } from '@/lib/security'
 import type { FileSystemNode } from '@/components/file-tree'
 import type { TemplateId } from '@/lib/templates'
@@ -69,7 +78,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
-  let sbx: SandboxInstance | Awaited<ReturnType<typeof createVercelSandbox>> | ModalSandbox | null = null
+  let sbx: SandboxInstance | Awaited<ReturnType<typeof createVercelSandbox>> | ModalSandbox | DaytonaSandbox | null = null
   let selectedProvider: SandboxProvider | null = null
 
   try {
@@ -260,6 +269,21 @@ export async function POST(
         files,
         fragment.template as TemplateId,
       )
+    } else if (selectedProvider === 'daytona') {
+      sbx = await createDaytonaSandbox({
+        template: fragment.template as TemplateId,
+        userId: user.id,
+        teamId: typeof body.teamID === 'string' ? body.teamID : '',
+        projectId,
+        port: fragment.port,
+        env: supabaseRuntimeEnv,
+        timeoutMs: sandboxTimeout,
+      })
+      await writeDaytonaProjectFiles(
+        sbx as DaytonaSandbox,
+        files,
+        fragment.template as TemplateId,
+      )
     } else {
       sbx = await createE2BSandbox(fragment.template, {
         metadata: {
@@ -344,6 +368,27 @@ export async function POST(
       } as ExecutionResultWeb)
     }
 
+    if (selectedProvider === 'daytona') {
+      const daytonaSandbox = sbx as DaytonaSandbox
+
+      await installAndStartDaytonaProject({
+        sandbox: daytonaSandbox,
+        fragment,
+        env: supabaseRuntimeEnv,
+      })
+
+      const tree = await listDaytonaSandboxFiles(daytonaSandbox)
+      const url = getDaytonaSandboxUrl(daytonaSandbox, fragment.port || 3000)
+
+      return NextResponse.json({
+        sbxId: encodeSandboxId('daytona', daytonaSandbox.id),
+        sandboxProvider: selectedProvider,
+        template: fragment.template,
+        url,
+        files: tree,
+      } as ExecutionResultWeb)
+    }
+
     if (installCommand) {
       await (sbx as SandboxInstance).commands.run(installCommand, {
         envs: {
@@ -370,15 +415,20 @@ export async function POST(
         await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
       } else if (selectedProvider === 'modal') {
         await (sbx as ModalSandbox | null)?.terminate()
+      } else if (selectedProvider === 'daytona') {
+        await (sbx as DaytonaSandbox | null)?.delete()
       } else {
         await (sbx as SandboxInstance | null)?.kill()
       }
     } catch {}
 
+    const details = error?.message || 'Unknown error'
+
     return NextResponse.json(
       {
-        error: 'Failed to restore project sandbox from saved workspace.',
-        details: error?.message || 'Unknown error',
+        error: `Failed to restore project sandbox from saved workspace${selectedProvider ? ` (${selectedProvider})` : ''}. ${details}`,
+        details,
+        sandboxProvider: selectedProvider,
         stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
       },
       { status: 500 },
@@ -404,6 +454,10 @@ function resolveSandboxProviderForFragment(
     available.push('vercel')
   }
 
+  if (hasDaytonaSandboxConfig()) {
+    available.push('daytona')
+  }
+
   return chooseSandboxProvider({ mode, available })
 }
 
@@ -412,7 +466,11 @@ function getNoSandboxProviderMessage(
   fragment: FragmentSchema,
 ) {
   if (mode === 'vercel' && fragment.template === 'code-interpreter-v1') {
-    return 'Vercel Sandbox is only available for app previews. Python code interpreter requires E2B_API_KEY.'
+    return 'Vercel Sandbox is only available for app previews. Python code interpreter requires E2B_API_KEY, Modal, or Daytona.'
+  }
+
+  if (mode === 'modal') {
+    return 'Modal Sandbox is not configured. Set MODAL_TOKEN_ID and MODAL_TOKEN_SECRET.'
   }
 
   if (mode === 'vercel') {
@@ -420,10 +478,14 @@ function getNoSandboxProviderMessage(
   }
 
   if (mode === 'e2b') {
-    return 'E2B is not configured. Set E2B_API_KEY or choose Vercel Sandbox.'
+    return 'E2B is not configured. Set E2B_API_KEY or choose Modal, Vercel, or Daytona.'
   }
 
-  return 'No sandbox provider is configured. Set E2B_API_KEY or configure Vercel Sandbox.'
+  if (mode === 'daytona') {
+    return 'Daytona is not configured. Set DAYTONA_API_KEY.'
+  }
+
+  return 'No sandbox provider is configured. Set E2B_API_KEY, MODAL_TOKEN_ID/SECRET, DAYTONA_API_KEY, or configure Vercel Sandbox.'
 }
 
 async function fetchGitHubFiles({
