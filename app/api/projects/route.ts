@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { supabaseServiceRoleKey } from '@/lib/supabase-credentials'
-import { ensureProjectSandboxStorage } from '@/lib/sandbox-storage'
+import { ensureProjectSandboxStorage, saveProjectFilesToSandboxStorage } from '@/lib/sandbox-storage'
+import { getTemplateFiles } from '@/lib/fragment-files'
+import templates from '@/lib/templates'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -83,6 +85,25 @@ export async function POST(request: NextRequest) {
       })
     } catch (storageError) {
       console.warn('Failed to create RustFS storage workspace:', storageError)
+    }
+
+    // Seed the persona's starter template files so the sandbox starts from a
+    // real scaffold (Next.js, Vue, Vite, etc.) instead of an empty workspace.
+    // AI generation then edits/extends these files.
+    if (templateId && templateId in templates) {
+      try {
+        const starterFiles = getTemplateFiles(templateId)
+        if (starterFiles.length > 0) {
+          await saveProjectFilesToSandboxStorage({
+            userId: user.id,
+            projectId: project.id,
+            files: starterFiles,
+          })
+          console.log(`Seeded ${starterFiles.length} starter files for persona ${templateId}`)
+        }
+      } catch (seedError) {
+        console.warn('Failed to seed persona starter files:', seedError)
+      }
     }
 
     return NextResponse.json({ project })

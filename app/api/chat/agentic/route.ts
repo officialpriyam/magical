@@ -1,7 +1,9 @@
 import { handleAPIError, createRateLimitResponse } from '@/lib/api-errors'
 import {
   getFallbackChain,
+  firstNonThinkingModel,
   getModelClient,
+  withModelDefaults,
   LLMModel,
   LLMModelConfig,
 } from '@/lib/models'
@@ -1028,9 +1030,14 @@ async function generateTodosFromPrompt(
       console.log('[Todos] No fallback chain, skipping')
       return []
     }
-    const candidate = fallbackChain[0]
+    // Prefer a fast, reliable model for todo generation in auto mode.
+    const candidate =
+      model.id === 'auto'
+        ? firstNonThinkingModel(fallbackChain) ?? fallbackChain[0]
+        : fallbackChain[0]
+
     const modelClient = getModelClient(candidate, config)
-    const modelParams = { ...config }
+    const modelParams = withModelDefaults(candidate, config)
     delete modelParams.model
     delete modelParams.apiKey
     delete modelParams.baseURL
@@ -1143,11 +1150,18 @@ async function analyzeComplexity(
     const fallbackChain = getFallbackChain(model, config)
     if (fallbackChain.length === 0) return 'moderate'
 
-    const candidate = fallbackChain[0]
+    // Prefer a fast, reliable model for the lightweight complexity analysis
+    // step instead of defaulting to the chain head, which in auto mode can be
+    // a thinking model that returns empty output on short prompts.
+    const candidate =
+      model.id === 'auto'
+        ? firstNonThinkingModel(fallbackChain) ?? fallbackChain[0]
+        : fallbackChain[0]
+
     const modelClient = getModelClient(candidate, config)
     const useFallback = STREAM_TEXT_PROVIDER_IDS.has(candidate.providerId)
 
-    const modelParams = { ...config }
+    const modelParams = withModelDefaults(candidate, config)
     delete modelParams.model
     delete modelParams.apiKey
     delete modelParams.baseURL
@@ -1254,7 +1268,7 @@ async function generateFallback(
         messages,
         maxRetries: 0,
         abortSignal: fallbackAbort,
-        ...modelParams,
+        ...withModelDefaults(candidate, modelParams),
       })
       text = await readStream(result.textStream)
 

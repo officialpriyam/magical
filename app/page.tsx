@@ -1937,6 +1937,12 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setWarmSandboxResult(undefined)
     warmingSandboxKeyRef.current = ''
     setChatHistoryRefreshKey((key) => key + 1)
+
+    // Start the persona sandbox immediately so the IDE/preview is ready
+    // before the user sends their first prompt. Seed files were persisted by
+    // /api/projects so the warm start hydrates a real starter scaffold.
+    void warmProjectSandbox(newProject)
+
     if (navigate) {
       router.replace(`/chat/${newProject.id}`)
     }

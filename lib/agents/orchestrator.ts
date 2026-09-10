@@ -25,7 +25,9 @@ import {
 } from './agent-runner'
 import {
   getFallbackChain,
+  firstNonThinkingModel,
   getModelClient,
+  withModelDefaults,
   LLMModel,
   LLMModelConfig,
 } from '@/lib/models'
@@ -121,12 +123,19 @@ export class Orchestrator {
         return 'moderate' // Default to moderate
       }
 
-      const candidate = fallbackChain[0]
+      // Prefer a fast, reliable model for the lightweight complexity analysis
+      // step instead of defaulting to the chain head, which in auto mode can be
+      // a thinking model that returns empty output on short prompts.
+      const candidate =
+        this.config.model.id === 'auto'
+          ? firstNonThinkingModel(fallbackChain) ?? fallbackChain[0]
+          : fallbackChain[0]
+
       const modelClient = getModelClient(candidate, this.config.config)
       const useFallback = STREAM_TEXT_PROVIDER_IDS.has(candidate.providerId)
 
       const systemPrompt = COMPLEXITY_ANALYSIS_PROMPT
-      const modelParams = { ...this.config.config }
+      const modelParams = withModelDefaults(candidate, this.config.config)
       delete modelParams.model
       delete modelParams.apiKey
       delete modelParams.baseURL

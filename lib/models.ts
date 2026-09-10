@@ -38,6 +38,13 @@ const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
 // Auto mode picks the FIRST one with provider credentials instead of
 // blindly choosing the first bundled model (which may be a retired
 // preview model that returns empty responses).
+//
+// Gemini 2.5 Pro and other thinking/deep-reasoning models are deliberately
+// held out of the primary auto run order. On code generation they spend the
+// output budget on reasoning tokens and frequently return truncated or empty
+// responses ("Empty response from models/gemini-2.5-pro"). They remain in the
+// chain as true last-resort fallbacks via FALLBACK_THINKING_IDS when nothing
+// faster and more reliable is configured.
 const AUTO_MODEL_PRIORITY = [
   'claude-sonnet-4-5-20250929',
   'claude-sonnet-4-20250514',
@@ -47,12 +54,20 @@ const AUTO_MODEL_PRIORITY = [
   'gpt-4o',
   'gemini-2.5-flash',
   'models/gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'models/gemini-2.5-pro',
   'deepseek-chat',
   'grok-code-fast-1',
   'gpt-4o-mini',
   'claude-3-5-haiku-latest',
+]
+
+// Thinking-heavy models that are still acceptable as deep fallbacks but are
+// not chosen as the first auto candidate for code generation.
+const FALLBACK_THINKING_IDS = [
+  'gemini-2.5-pro',
+  'models/gemini-2.5-pro',
+  'deepseek-reasoner',
+  'o1',
+  'o3',
 ]
 
 export function getAutoModel(config: LLMModelConfig): LLMModel | null {
@@ -116,14 +131,35 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
     seenIds.add(model.id)
   }
 
-  // 2. If model is 'auto', add configured models from the same provider first
+  // 2. If model is 'auto', add configured models in curated priority order.
+  //    Fast, reliable coding models come first. Thinking-heavy models (Gemini 2.5
+  //    Pro, DeepSeek Reasoner, o1/o3) are held back and only appended as true
+  //    last-resort fallbacks. This avoids the old behaviour where the chain
+  //    collapsed to all-Gemini with Gemini 2.5 Pro as the default and returning
+  //    empty responses on code tasks.
   if (model.id === 'auto') {
-    const allModels = getAllConfiguredModels(config)
-    for (const candidate of allModels) {
+    const allModels = bundledModels.models as LLMModel[]
+    for (const preferredId of AUTO_MODEL_PRIORITY) {
       if (chain.length >= 5) break
-      if (!seenIds.has(candidate.id)) {
+      if (seenIds.has(preferredId)) continue
+      const candidate = allModels.find((m) => m.id === preferredId)
+      if (candidate && hasProviderCredentials(candidate.providerId, config)) {
         chain.push(candidate)
         seenIds.add(candidate.id)
+      }
+    }
+
+    // Append held-out thinking models only if the chain is still hungry and
+    // nothing non-thinking is configured for that provider anyway.
+    if (chain.length < 10) {
+      for (const thinkingId of FALLBACK_THINKING_IDS) {
+        if (chain.length >= 10) break
+        if (seenIds.has(thinkingId)) continue
+        const candidate = allModels.find((m) => m.id === thinkingId)
+        if (candidate && hasProviderCredentials(candidate.providerId, config)) {
+          chain.push(candidate)
+          seenIds.add(candidate.id)
+        }
       }
     }
   }
@@ -153,6 +189,48 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
   }
 
   return chain
+}
+
+// Return the first model in a chain that is not a thinking/deep-reasoning
+// model. Used by the auto path for quick classification/analysis steps so the
+// request does not unnecessarily hit Gemini 2.5 Pro / DeepSeek Reasoner / o1 / o3.
+// If every model in the chain is a thinking model, fall back to the first model.
+export function firstNonThinkingModel(chain: LLMModel[]): LLMModel | undefined {
+  for (const candidate of chain) {
+    const id = candidate.id.toLowerCase()
+    if (
+      !THINKING_MODEL_PATTERNS.some((pattern) => id.includes(pattern))
+    ) {
+      return candidate
+    }
+  }
+  return chain[0]
+}
+
+// Thinking-style models (Gemini 2.5 etc.) spend their output budget on
+// reasoning tokens. When no explicit limit is configured, raise the ceiling so
+// they do not return truncated or completely empty responses on long code
+// generation tasks ("Empty response from models/gemini-2.5-pro").
+const THINKING_MODEL_PATTERNS = [
+  'gemini-2.5',
+  'deepseek-reasoner',
+  'o1',
+  'o3',
+]
+
+export function withModelDefaults(
+  model: LLMModel,
+  params: Record<string, any>,
+): Record<string, any> {
+  const id = model.id.toLowerCase()
+  const isThinkingModel = THINKING_MODEL_PATTERNS.some((pattern) => id.includes(pattern))
+  if (!isThinkingModel) return params
+
+  const next = { ...params }
+  if (!next.maxOutputTokens && !next.maxTokens) {
+    next.maxOutputTokens = 65536
+  }
+  return next
 }
 
 export function hasProviderEnvironmentCredentials(providerId: string) {

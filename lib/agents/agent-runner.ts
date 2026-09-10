@@ -12,6 +12,7 @@ import {
 import {
   getModelClient,
   getFallbackChain,
+  withModelDefaults,
 } from '@/lib/models'
 import { fragmentSchema as schema } from '@/lib/schema'
 import { streamObject, streamText, isStepCount, type LanguageModel } from 'ai'
@@ -73,11 +74,6 @@ export async function runAgent(
     ? `${basePrompt}\n\n${systemPrompt}`
     : systemPrompt
 
-  const modelParams = { ...config.config }
-  delete modelParams.model
-  delete modelParams.apiKey
-  delete modelParams.baseURL
-
   let lastError: any = null
 
   for (const candidate of fallbackChain) {
@@ -89,6 +85,10 @@ export async function runAgent(
       })
 
       const modelClient = getModelClient(candidate, config.config)
+      const modelParams = withModelDefaults(candidate, config.config)
+      delete modelParams.model
+      delete modelParams.apiKey
+      delete modelParams.baseURL
       const useFallback = STREAM_TEXT_PROVIDER_IDS.has(candidate.providerId)
 
       let text: string
