@@ -719,11 +719,6 @@ export function ActivityFeed({
           return null
         })()}
       </div>
-
-      {/* Todos */}
-      {todos.length > 0 && (
-        <TodoList todos={todos} isStreaming={isStreaming} />
-      )}
     </motion.div>
   )
 }

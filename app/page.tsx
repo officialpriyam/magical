@@ -15,6 +15,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import templates, { TemplateId } from '@/lib/templates';
 import { ExecutionResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { getFragmentFiles } from '@/lib/fragment-files';
 import type { SandboxProviderMode } from '@/lib/sandbox-provider';
 import { DeepPartial } from 'ai';
 import { experimental_useObject as useObject } from '@ai-sdk/react';
@@ -891,9 +892,14 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       const commentaryActions = agenticStream.actions.filter((a: any) => a.type === 'commentary' || a.type === 'commentary_chunk')
       const latestCommentary = commentaryActions.length > 0 ? commentaryActions[commentaryActions.length - 1].content : ''
       const fragWithCommentary = latestCommentary ? { ...frag, commentary: frag?.commentary || latestCommentary } : frag
-      // Create assistant message even with minimal data — agentic actions are the important part
+      const finalTitle = fragWithCommentary?.title || 'Project'
+      const finalFiles = getFragmentFiles(fragWithCommentary)
+      const assistantText = fragWithCommentary?.description?.trim()
+        || latestCommentary
+        || fragWithCommentary?.commentary
+        || (finalFiles.length > 0 ? `I've created **${finalTitle}** with ${finalFiles.length} file${finalFiles.length === 1 ? '' : 's'}. You can explore the code and preview the live application below.` : 'Project generation complete.')
       const assistantContent: Message['content'] = [
-        { type: 'text', text: latestCommentary || fragWithCommentary?.commentary || 'Generation complete.' },
+        { type: 'text', text: assistantText },
       ]
       const assistantMsg: Message = {
         role: 'assistant',
@@ -1002,14 +1008,17 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     assistantFragment: DeepPartial<FragmentSchema>,
     executionResult?: ExecutionResult,
   ) {
-    // Use description as the conversational chat response
-    // commentary is internal planning text — clean it up if used as fallback
-    let chatText = assistantFragment.description || ''
+    const title = assistantFragment.title || 'Project'
+    const files = getFragmentFiles(assistantFragment)
+    let chatText = assistantFragment.description?.trim() || ''
     if (!chatText && assistantFragment.commentary) {
       // Strip agent name prefixes like "Planner: ..." or "Frontend: ..."
       chatText = assistantFragment.commentary
         .replace(/^(?:Planner|Architect|Frontend|Backend|Reviewer|Optimizer|Orchestrator):\s*/gmi, '')
         .trim()
+    }
+    if (!chatText && files.length > 0) {
+      chatText = `I've created **${title}** with ${files.length} file${files.length === 1 ? '' : 's'}. You can explore the code and preview the live application below.`
     }
     const assistantMessage: Message = {
       role: 'assistant',
@@ -1167,9 +1176,11 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         throw new Error(`${baseMessage}${details}`)
       }
 
+      const execResult = data as ExecutionResult
       if (currentProjectRef.current?.id === project.id) {
-        setWarmSandboxResult(data as ExecutionResult)
+        setWarmSandboxResult(execResult)
       }
+      return execResult
     } catch (error) {
       warmingSandboxKeyRef.current = ''
       const msg = error instanceof Error ? error.message : 'Failed to start sandbox'
@@ -1256,11 +1267,15 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
     async function loadProjectMessages() {
       if (!currentProjectId) {
-        skipNextProjectMessagesLoadRef.current = ''
-        isHydratingProjectMessagesRef.current = false
-        messagesRef.current = []
-        setMessages([])
-        setWarmSandboxResult(undefined)
+        // Only wipe messages if there's truly no project (navigated home).
+        // If activeProjectId exists, currentProject just hasn't loaded yet — don't wipe.
+        if (!activeProjectId) {
+          skipNextProjectMessagesLoadRef.current = ''
+          isHydratingProjectMessagesRef.current = false
+          messagesRef.current = []
+          setMessages([])
+          setWarmSandboxResult(undefined)
+        }
         return
       }
 
@@ -1379,7 +1394,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     return () => {
       isMounted = false
     }
-  }, [currentProject, currentProjectId, projectMessagesRefreshKey, restoreProjectWorkspace, supabase, warmProjectSandbox, currentModel, session, userTeam, languageModel])
+  }, [currentProject, currentProjectId, activeProjectId, projectMessagesRefreshKey, restoreProjectWorkspace, supabase, warmProjectSandbox, currentModel, session, userTeam, languageModel])
 
   useEffect(() => {
     async function saveMessagesToDb() {
@@ -1790,6 +1805,25 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
 
     try {
       if (useAgentic) {
+        // Ensure sandbox is available before starting AI generation
+        // so agents can execute commands during the generation pipeline
+        let sandboxId = result?.sbxId || warmSandboxResult?.sbxId
+        if (!sandboxId && projectForPrompt) {
+          try {
+            const warmRes = await Promise.race([
+              warmProjectSandbox(projectForPrompt),
+              new Promise<null>(r => setTimeout(() => r(null), 8000)),
+            ])
+            if (warmRes && (warmRes as ExecutionResult).sbxId) {
+              sandboxId = (warmRes as ExecutionResult).sbxId
+            } else {
+              sandboxId = warmSandboxResult?.sbxId
+            }
+          } catch {
+            // Continue without sandbox — commands will be skipped
+          }
+        }
+
         // Use real-time agentic streaming
         agenticStream.reset()
         agenticStream.submit({
@@ -1797,7 +1831,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
           teamID: userTeam?.id,
           accessToken: session?.access_token,
           projectID: projectForPrompt.id,
-          sandboxID: result?.sbxId || warmSandboxResult?.sbxId,
+          sandboxID: sandboxId,
           messages: toAISDKMessages(updatedMessages),
           template: getTemplateForSubmission(),
           model: currentModel,

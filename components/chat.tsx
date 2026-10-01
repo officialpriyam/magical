@@ -7,7 +7,7 @@ import { AGENT_DISPLAY_NAMES } from '@/lib/agents/prompts'
 import type { AgentRole } from '@/lib/agents/types'
 import type { ToolAction, TodoItem } from '@/lib/hooks/use-agentic-stream'
 import { DeepPartial } from 'ai'
-import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil, Cpu, Activity, Braces, Palette, Server, Shield, Zap, Wrench, ChevronRight, ChevronDown, Circle, FileEdit, Search, Brain, ListTodo, MessageSquare } from 'lucide-react'
+import { Check, Database, FileCode2, LoaderIcon, Terminal, Sparkles, Square, Globe, Eye, Plus, Pencil, Cpu, Activity, Braces, Palette, Server, Shield, Zap, Wrench, ChevronRight, ChevronDown, Circle, FileEdit, Search, Brain, ListTodo, MessageSquare, ExternalLink, Play } from 'lucide-react'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -991,98 +991,108 @@ function GeneratedArtifactCard({
     : []
   const agentMeta = (message.object as any)?.agent_metadata
   const description = typeof message.object?.description === 'string' ? message.object.description : ''
+  const title = message.object?.title || 'Generated project'
+  const template = typeof message.object?.template === 'string' ? message.object.template : ''
+  const previewUrl = message.result && 'url' in message.result ? (message.result as any).url : ''
+
+  const handleOpenPreview = () => {
+    setCurrentPreview({
+      fragment: message.object,
+      result: message.result,
+    })
+  }
 
   return (
     <div className="w-full max-w-[28rem]">
       {/* Description text above the card */}
       {description && (
-        <p className="mb-2 text-[13px] leading-relaxed text-white/85 pl-1">{description}</p>
+        <p className="mb-2.5 text-[13.5px] leading-[1.7] text-white/85 pl-0.5">{description}</p>
       )}
 
-      {/* Card with project info */}
+      {/* Card with preview + project info */}
       <div
-        onClick={() =>
-          setCurrentPreview({
-            fragment: message.object,
-            result: message.result,
-          })
-        }
-        className="rounded-xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.06] hover:border-white/15 cursor-pointer"
+        onClick={handleOpenPreview}
+        className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden transition hover:bg-white/[0.05] hover:border-white/15 cursor-pointer group"
       >
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-white">
-              {message.object?.title || 'Generated project'}
+        {/* Visual preview area */}
+        <div className="relative h-32 overflow-hidden">
+          {previewUrl ? (
+            <iframe
+              title={`${title} preview`}
+              src={previewUrl}
+              loading="lazy"
+              sandbox="allow-forms allow-scripts allow-same-origin"
+              tabIndex={-1}
+              className="pointer-events-none absolute left-0 top-0 h-[200%] w-[200%] origin-top-left scale-50 border-0 opacity-70 transition duration-300 group-hover:opacity-90"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(84,198,139,0.18),transparent_40%),linear-gradient(135deg,#121814,#0b0d0b_60%,#10100c)]" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0c0e0c] via-transparent to-transparent" />
+          <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.08] border border-white/[0.08]">
+                <Sparkles className="h-3.5 w-3.5 text-emerald-400/80" />
+              </div>
+              <div>
+                <div className="text-[13px] font-semibold text-white/95 leading-tight">{title}</div>
+                <div className="text-[10.5px] text-white/45 leading-tight mt-0.5">
+                  {template || (files.length > 0 ? `${files.length} file${files.length === 1 ? '' : 's'}` : 'Artifact ready')}
+                </div>
+              </div>
             </div>
-            <div className="mt-1 text-xs text-white/50">
-              {files.length > 0
-                ? `${files.length} file${files.length === 1 ? '' : 's'} generated`
-                : message.object?.template || 'Artifact ready'}
-            </div>
+            {agentMeta?.total_duration && (
+              <span className="rounded-full bg-black/40 border border-white/[0.06] px-2 py-0.5 text-[10px] text-white/50 tabular-nums">
+                {(agentMeta.total_duration / 1000).toFixed(1)}s
+              </span>
+            )}
           </div>
         </div>
 
-        {/* File list */}
-        {files.length > 0 && (
-          <div className="mb-3 space-y-1">
-            {files.slice(0, 5).map((file) => (
-              <div key={file.path} className="flex min-w-0 items-center gap-2 text-xs text-white/60">
-                <FileCode2 className="h-3.5 w-3.5 shrink-0 text-white/40" />
-                <span className="truncate font-mono">{file.path}</span>
-              </div>
-            ))}
-            {files.length > 5 && (
-              <div className="text-xs text-white/40">+{files.length - 5} more files</div>
-            )}
-          </div>
-        )}
-
-        {/* Migrations */}
-        {migrations.length > 0 && (
-          <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-200">
-            <Database className="h-3.5 w-3.5" />
-            {migrations.length} Supabase migration{migrations.length === 1 ? '' : 's'} ready
-          </div>
-        )}
-
-        {/* Agent metadata */}
-        {agentMeta && (
-          <div className="mb-3 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2">
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-white/50 mb-1">
-              <Cpu className="h-3 w-3" />
-              Agentic Generation Info
+        {/* Details section */}
+        <div className="px-4 py-3 space-y-2.5">
+          {/* File list */}
+          {files.length > 0 && (
+            <div className="space-y-1">
+              {files.slice(0, 4).map((file) => (
+                <div key={file.path} className="flex min-w-0 items-center gap-2 text-xs text-white/55">
+                  <FileCode2 className="h-3 w-3 shrink-0 text-white/30" />
+                  <span className="truncate font-mono text-[11px]">{file.path}</span>
+                </div>
+              ))}
+              {files.length > 4 && (
+                <div className="text-[11px] text-white/35 pl-5">+{files.length - 4} more files</div>
+              )}
             </div>
-            <div className="grid grid-cols-3 gap-2 text-[11px]">
-              <div>
-                <span className="text-white/35">Complexity:</span>
-                <span className="ml-1 text-white/60">{agentMeta.complexity || 'moderate'}</span>
-              </div>
-              <div>
-                <span className="text-white/35">Agents:</span>
-                <span className="ml-1 text-white/60">{(agentMeta.agents_used || []).length}</span>
-              </div>
-              <div>
-                <span className="text-white/35">Time:</span>
-                <span className="ml-1 text-white/60">{agentMeta.total_duration ? `${(agentMeta.total_duration / 1000).toFixed(1)}s` : '—'}</span>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            className="h-9 rounded-lg border border-white/15 bg-white/[0.04] text-xs font-medium text-white/80 transition hover:bg-white/[0.08]"
-          >
-            Details
-          </button>
-          <button
-            type="button"
-            className="h-9 rounded-lg border border-white/10 bg-white/[0.08] text-xs font-medium text-white/90 transition hover:bg-white/[0.12]"
-          >
-            Preview
-          </button>
+          {/* Migrations */}
+          {migrations.length > 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/8 px-2.5 py-1.5 text-[11px] text-emerald-300/80">
+              <Database className="h-3.5 w-3.5" />
+              {migrations.length} Supabase migration{migrations.length === 1 ? '' : 's'} ready
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleOpenPreview() }}
+              className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-white/[0.08] border border-white/[0.08] text-[12px] font-medium text-white/85 transition hover:bg-white/[0.12]"
+            >
+              <Eye className="h-3 w-3" />
+              Preview
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleOpenPreview() }}
+              className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-white/[0.08] text-[12px] font-medium text-white/60 transition hover:bg-white/[0.06] hover:text-white/80"
+            >
+              <FileCode2 className="h-3 w-3" />
+              Code
+            </button>
+          </div>
         </div>
       </div>
     </div>

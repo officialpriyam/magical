@@ -316,6 +316,36 @@ export async function getProjectMessages(
   supabase: SupabaseClient<any, "public", any> | null = browserSupabase,
   projectId: string
 ): Promise<Message[]> {
+  // First, try loading via server API which bypasses RLS and handles auth timing gracefully
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/messages/load?projectId=${encodeURIComponent(projectId)}`)
+      if (res.ok) {
+        const json = await res.json()
+        if (Array.isArray(json.messages) && json.messages.length > 0) {
+          const messages = json.messages.map((msg: DbMessage): Message => {
+            const obj = msg.object_data as Record<string, any> | null
+            const cleanedObj = obj ? Object.fromEntries(
+              Object.entries(obj).filter(([k]) => !k.startsWith('_'))
+            ) : undefined
+            return {
+              role: msg.role,
+              content: msg.content,
+              object: cleanedObj as any || undefined,
+              result: msg.result_data,
+              agenticActions: (obj?._agenticActions || []) as any,
+              agenticTodos: (obj?._agenticTodos || []) as any,
+              agenticElapsed: (obj?._agenticElapsed || 0) as any,
+            }
+          })
+          return messages
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[getProjectMessages] Server load failed, falling back to direct query:', apiErr)
+    }
+  }
+
   const { data: { user } } = await supabase!.auth.getUser()
   if (!user) return []
 
