@@ -1077,7 +1077,7 @@ Rules:
     const todos: { id: string; text: string; completed: boolean }[] = []
 
     // Parse JSON array from response
-    const jsonMatch = text.match(/[[\s\S]*]/)
+    const jsonMatch = text.match(/\[[\s\S]*\]/)
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0])

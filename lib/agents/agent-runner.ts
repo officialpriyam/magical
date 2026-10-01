@@ -318,7 +318,7 @@ async function readStreamWithEvents(
             })
             const cleanText = cleanLines.join('\n').trim()
             if (cleanText.length > 5) {
-              emitter.emitCommentary(cleanText.slice(0, 600))
+              emitter.emitCommentary(cleanText.slice(0, 1500))
             }
             lastCommentaryEmitLen = decoded.length
           }
@@ -341,7 +341,7 @@ async function readStreamWithEvents(
             || trimmed.startsWith('```') || trimmed.match(/^"[\w_]+":/)
             || trimmed.match(/^\s*"[\w_]+"\s*:/)
           if (lastLine && !isJsonOrCode && trimmed !== lastEmittedLine && trimmed.split(' ').length > 3) {
-            emitter.emitCommentary(trimmed.slice(0, 400))
+            emitter.emitCommentary(trimmed.slice(0, 1200))
             lastEmittedLine = lastLine
           }
         }
@@ -350,7 +350,7 @@ async function readStreamWithEvents(
         // For streamObject: extract reasoning from commentary field
         // For streamText: extract natural language paragraphs
         // Emit up to 3 thinking entries per agent (enough for real reasoning)
-        if (thinkingEmittedCount < 3 && text.length > 50) {
+        if (thinkingEmittedCount < 6 && text.length > 50) {
           // For streamObject: emit commentary text as thinking (it IS the reasoning)
           if (commentaryFieldFound && commentaryStartIdx >= 0 && commentaryStartIdx < text.length) {
             const raw = text.slice(commentaryStartIdx)
@@ -361,7 +361,7 @@ async function readStreamWithEvents(
               if (raw[i] === '\\') { escaped = true; continue }
               if (raw[i] === '"') { endIdx = i; break }
             }
-            const commentaryText = (endIdx >= 0 ? raw.slice(0, endIdx) : raw.slice(0, 800))
+            const commentaryText = (endIdx >= 0 ? raw.slice(0, endIdx) : raw.slice(0, 1500))
               .replace(/\\n/g, '\n')
               .replace(/\\"/g, '"')
               .trim()
@@ -370,7 +370,7 @@ async function readStreamWithEvents(
               const paragraphs = commentaryText.split(/\n\n+/).filter(p => p.trim().length > 20)
               for (const para of paragraphs) {
                 const clean = para.replace(/\s+/g, ' ').trim()
-                if (clean.length > 20 && clean.length < 600 && thinkingEmittedCount < 3) {
+                if (clean.length > 20 && clean.length < 1200 && thinkingEmittedCount < 6) {
                   const isNaturalLanguage = !clean.startsWith('/')
                     && !clean.startsWith('{')
                     && !clean.match(/^[A-Z]:\\/)
@@ -406,7 +406,7 @@ async function readStreamWithEvents(
                 })
               for (const para of paragraphs) {
                 const clean = para.replace(/\s+/g, ' ').trim()
-                if (clean.length > 30 && clean.length < 500 && !emittedThinkingTexts.has(clean)) {
+                if (clean.length > 30 && clean.length < 1200 && !emittedThinkingTexts.has(clean)) {
                   emittedThinkingTexts.add(clean)
                   emitter.emitThinking(clean)
                   thinkingEmittedCount++

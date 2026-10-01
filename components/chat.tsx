@@ -213,7 +213,7 @@ export function Chat({
             <ActivityFeed
               key={`persisted-${index}`}
               actions={message.agenticActions}
-              todos={[]}
+              todos={message.agenticTodos || []}
               isStreaming={false}
               elapsed={message.agenticElapsed}
               onFileClick={onFileClick}
@@ -242,7 +242,7 @@ export function Chat({
         <ActivityFeed
           key="live-stream"
           actions={agenticActions}
-          todos={[]}
+          todos={agenticTodos}
           isStreaming={true}
           onStop={onStop}
           onFileClick={onFileClick}

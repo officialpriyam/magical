@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronRight,
@@ -85,9 +85,9 @@ function ThinkingBlock({
           <Check className="h-3 w-3 shrink-0 text-emerald-400/70 ml-auto" />
         )}
         {!isExpanded && hasContent && (
-          <span className="text-[11px] text-white/30 truncate max-w-[280px] ml-1">
-            — {thinkingText.slice(0, 60)}
-            {thinkingText.length > 60 ? '...' : ''}
+          <span className="text-[11px] text-white/30 truncate max-w-[400px] ml-1">
+            — {thinkingText.slice(0, 120)}
+            {thinkingText.length > 120 ? '...' : ''}
           </span>
         )}
       </button>
@@ -351,14 +351,52 @@ function CommentaryBubble({ text, isStreaming }: { text: string; isStreaming: bo
   }
   if (!text) return null
 
+  // Render paragraphs with proper spacing and basic inline formatting
+  const paragraphs = text.split(/\n\n+/).filter(p => p.trim())
+
   return (
-    <div className="text-[14px] leading-[1.7] text-white/75 whitespace-pre-wrap py-1">
-      {text}
+    <div className="text-[14px] leading-[1.7] text-white/75 py-1 space-y-2">
+      {paragraphs.map((para, i) => (
+        <p key={i} className="whitespace-pre-wrap">
+          {renderCommentaryInline(para)}
+        </p>
+      ))}
       {isStreaming && (
         <span className="inline-block h-[13px] w-[1.5px] bg-blue-400/50 animate-pulse -ml-0.5 align-middle" />
       )}
     </div>
   )
+}
+
+/** Render basic inline markdown (bold, italic, code) inside commentary */
+function renderCommentaryInline(text: string): React.ReactNode[] {
+  if (!text) return []
+  const parts: React.ReactNode[] = []
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  let key = 0
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(<span key={key++}>{text.slice(lastIndex, match.index)}</span>)
+    }
+    const token = match[1]
+    if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(<strong key={key++} className="font-semibold text-white/90">{token.slice(2, -2)}</strong>)
+    } else if (token.startsWith('*') && token.endsWith('*')) {
+      parts.push(<em key={key++} className="italic text-white/65">{token.slice(1, -1)}</em>)
+    } else if (token.startsWith('`') && token.endsWith('`')) {
+      parts.push(
+        <code key={key++} className="rounded bg-white/[0.08] px-1 py-0.5 font-mono text-[12px] text-blue-300/80">{token.slice(1, -1)}</code>
+      )
+    }
+    lastIndex = match.index + token.length
+  }
+  if (lastIndex < text.length) {
+    parts.push(<span key={key++}>{text.slice(lastIndex)}</span>)
+  }
+  return parts.length > 0 ? parts : [<span key={0}>{text}</span>]
 }
 
 // ─── Todo List ──────────────────────────────────────────────
