@@ -23,7 +23,7 @@ import {
   COMPLEXITY_ANALYSIS_PROMPT,
   AGENT_DISPLAY_NAMES,
 } from '@/lib/agents/prompts'
-import { runAgent, type AgentEventEmitter } from '@/lib/agents/agent-runner'
+import { runAgent, extractThinkingParagraphs, type AgentEventEmitter } from '@/lib/agents/agent-runner'
 import { runSandboxCommand } from '@/lib/sandbox-command'
 import { detectSkillsFromPrompt, buildSkillPrompt, getSkillById, type Skill } from '@/lib/skills/registry'
 import {
@@ -584,7 +584,7 @@ async function runPipeline({
 
         // Create event emitter for live streaming (with deduplication)
         const agentEmitter: AgentEventEmitter = {
-          emitThinking: (content) => emitAction('thinking', content),
+          emitThinking: (content, id) => emitAction('thinking', content, id),
           emitFileRead: (path) => {
             if (!emittedFilePaths.has(`read:${path}`)) {
               emittedFilePaths.add(`read:${path}`)
@@ -639,8 +639,11 @@ async function runPipeline({
             emitAction('commentary', agentCommentary)
           }
 
-          // NOTE: Thinking is already emitted by agent-runner during streaming.
-          // Do NOT re-emit thinking here — it causes duplicates.
+          // Finalize thinking blocks with complete, full paragraphs (using stable IDs to update in place)
+          const completeThinking = extractThinkingParagraphs(result.output || '')
+          for (let ti = 0; ti < completeThinking.length && ti < 3; ti++) {
+            emitAction('thinking', completeThinking[ti], `${role}-think-${ti}`)
+          }
 
           // Emit REAL file paths from the agent's fragment (deduplicated)
           // Distinguish edits from new writes based on whether the file already existed
@@ -883,14 +886,14 @@ function extractCommentary(result: AgentResult): string {
   if (fragment?.commentary) {
     // Return full commentary — the user should see the AI's reasoning
     const text = fragment.commentary.replace(/\s+/g, ' ').trim()
-    return text.length > 600 ? `${text.slice(0, 597)}...` : text
+    return text.length > 2500 ? `${text.slice(0, 2497)}...` : text
   }
   // Fallback to output text (first meaningful paragraph)
   if (result.output) {
     const firstParagraph = result.output.split('\n').find(l => l.trim().length > 20)
     if (firstParagraph) {
       const text = firstParagraph.replace(/\s+/g, ' ').trim()
-      return text.length > 600 ? `${text.slice(0, 597)}...` : text
+      return text.length > 2500 ? `${text.slice(0, 2497)}...` : text
     }
   }
   return ''
@@ -927,7 +930,7 @@ function extractThinking(result: AgentResult): string {
   if (thinkingLines.length === 0) return ''
   // Join all thinking lines as a full reasoning block
   const thinking = thinkingLines.join(' ').replace(/\s+/g, ' ').trim()
-  return thinking.length > 500 ? `${thinking.slice(0, 497)}...` : thinking
+  return thinking.length > 2500 ? `${thinking.slice(0, 2497)}...` : thinking
 }
 
 // ─── Extract real todos from planner output ─────────────────

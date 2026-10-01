@@ -56,8 +56,8 @@ function ThinkingBlock({
   isStreaming: boolean
   duration: number
 }) {
-  const thinkingText = action.content.replace(/^[\w]+:\s*/i, '').trim()
-  const hasContent = thinkingText.length > 10
+  const thinkingText = action.content.replace(/^(Thinking|Thought|Reasoning|Plan):\s*/i, '').trim()
+  const hasContent = thinkingText.length > 5
 
   return (
     <div className="group">

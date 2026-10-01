@@ -38,7 +38,7 @@ export type StatusCallback = (status: AgentStatus) => void
 
 // ─── Event Emitter Type (for live streaming) ─────────────────────
 export type AgentEventEmitter = {
-  emitThinking: (content: string) => void
+  emitThinking: (content: string, id?: string) => void
   emitFileRead: (path: string) => void
   emitFileWrite: (path: string, purpose?: string) => void
   emitCommand: (command: string, detail?: string) => void
@@ -246,6 +246,82 @@ async function readStreamToText(stream: ReadableStream<string>): Promise<string>
   return text
 }
 
+// ─── Thinking Extraction Helper ─────────────────────────────────
+/**
+ * Extract up to 3 clean, complete natural-language thinking paragraphs from text/output.
+ * Works with JSON commentary fields or raw model output text.
+ */
+export function extractThinkingParagraphs(rawText: string): string[] {
+  if (!rawText) return []
+
+  let commentary = ''
+
+  // 1. Try to find the "commentary" value inside JSON
+  const commentaryMatch = rawText.match(/"commentary"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"|"\s*})/i)
+  if (commentaryMatch) {
+    commentary = commentaryMatch[1]
+  } else {
+    const cIdx = rawText.indexOf('"commentary"')
+    if (cIdx >= 0) {
+      const quoteStart = rawText.indexOf('"', cIdx + 12)
+      if (quoteStart >= 0) {
+        let escaped = false
+        let end = -1
+        for (let i = quoteStart + 1; i < rawText.length; i++) {
+          if (escaped) { escaped = false; continue }
+          if (rawText[i] === '\\') { escaped = true; continue }
+          if (rawText[i] === '"') { end = i; break }
+        }
+        commentary = end >= 0 ? rawText.slice(quoteStart + 1, end) : rawText.slice(quoteStart + 1)
+      }
+    }
+  }
+
+  // Decode JSON escapes if commentary found
+  if (commentary) {
+    commentary = commentary
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+      .trim()
+  }
+
+  // 2. Fallback: if no commentary field in JSON, look for reasoning in markdown/text
+  if (!commentary) {
+    const cleaned = rawText
+      .replace(/```[\s\S]*?```/g, '') // remove code blocks
+      .replace(/\{[\s\S]*?\}/g, '') // remove JSON blocks
+    const lines = cleaned.split(/\n\n+/).filter(p => {
+      const t = p.trim()
+      return t.length > 25
+        && !t.startsWith('{')
+        && !t.startsWith('[')
+        && !t.startsWith('"')
+        && !t.startsWith('import ')
+        && !t.startsWith('export ')
+        && !t.startsWith('const ')
+        && !t.startsWith('function ')
+        && !t.match(/^[A-Z]:\\/)
+    })
+    return lines.slice(0, 3).map(p => p.replace(/\s+/g, ' ').trim())
+  }
+
+  // 3. Split commentary into paragraphs
+  const rawParagraphs = commentary
+    .split(/\n\n+/)
+    .map(p => p.replace(/\s+/g, ' ').trim())
+    .filter(p => {
+      return p.length > 20
+        && !p.startsWith('{')
+        && !p.startsWith('[')
+        && !p.startsWith('/')
+        && p.split(' ').length >= 4
+    })
+
+  // Return up to 3 complete thinking paragraphs
+  return rawParagraphs.slice(0, 3)
+}
+
 // Read stream and emit live events as patterns are detected in the text
 async function readStreamWithEvents(
   stream: ReadableStream<string>,
@@ -258,8 +334,6 @@ async function readStreamWithEvents(
   let text = ''
   let lastEmitTime = Date.now()
   let lastCommentaryEmitLen = 0
-  let thinkingEmittedCount = 0
-  const emittedThinkingTexts = new Set<string>()
   const EMIT_INTERVAL = 250 // Emit commentary every 250ms for live streaming feel
 
   // Track commentary extraction state across chunks
@@ -346,74 +420,19 @@ async function readStreamWithEvents(
           }
         }
 
-        // ── Emit real thinking from the stream ──
-        // For streamObject: extract reasoning from commentary field
-        // For streamText: extract natural language paragraphs
-        // Emit up to 3 thinking entries per agent (enough for real reasoning)
-        if (thinkingEmittedCount < 6 && text.length > 50) {
-          // For streamObject: emit commentary text as thinking (it IS the reasoning)
-          if (commentaryFieldFound && commentaryStartIdx >= 0 && commentaryStartIdx < text.length) {
-            const raw = text.slice(commentaryStartIdx)
-            let endIdx = -1
-            let escaped = false
-            for (let i = 0; i < Math.min(raw.length, 600); i++) {
-              if (escaped) { escaped = false; continue }
-              if (raw[i] === '\\') { escaped = true; continue }
-              if (raw[i] === '"') { endIdx = i; break }
-            }
-            const commentaryText = (endIdx >= 0 ? raw.slice(0, endIdx) : raw.slice(0, 1500))
-              .replace(/\\n/g, '\n')
-              .replace(/\\"/g, '"')
-              .trim()
-            if (commentaryText.length > 30) {
-              // Split into paragraphs and emit each as a thinking block
-              const paragraphs = commentaryText.split(/\n\n+/).filter(p => p.trim().length > 20)
-              for (const para of paragraphs) {
-                const clean = para.replace(/\s+/g, ' ').trim()
-                if (clean.length > 20 && clean.length < 1200 && thinkingEmittedCount < 6) {
-                  const isNaturalLanguage = !clean.startsWith('/')
-                    && !clean.startsWith('{')
-                    && !clean.match(/^[A-Z]:\\/)
-                    && clean.split(' ').length > 3
-                  if (isNaturalLanguage && !emittedThinkingTexts.has(clean)) {
-                    emittedThinkingTexts.add(clean)
-                    emitter.emitThinking(clean)
-                    thinkingEmittedCount++
-                  }
-                }
-              }
-            }
-          }
+        // ── Emit real thinking from the stream with stable IDs ──
+        if (text.length > 50) {
+          const rolePrefix = role || 'agent'
+          const thinkingParas = extractThinkingParagraphs(text)
 
-          // For streamText: extract meaningful paragraphs as thinking
-          if (!commentaryFieldFound && lastCommentaryEmitLen === 0) {
-            const trimmedText = text.trim()
-            const isPureJson = trimmedText.startsWith('{') && trimmedText.includes('"commentary"')
-            if (!isPureJson && trimmedText.length > 100) {
-              const paragraphs = trimmedText
-                .split(/\n\n+/)
-                .filter(p => {
-                  const t = p.trim()
-                  return t.length > 30
-                    && !t.startsWith('{')
-                    && !t.startsWith('[')
-                    && !t.startsWith('"')
-                    && !t.startsWith('```')
-                    && !t.startsWith('import ')
-                    && !t.startsWith('export ')
-                    && !t.startsWith('const ')
-                    && !t.startsWith('function ')
-                })
-              for (const para of paragraphs) {
-                const clean = para.replace(/\s+/g, ' ').trim()
-                if (clean.length > 30 && clean.length < 1200 && !emittedThinkingTexts.has(clean)) {
-                  emittedThinkingTexts.add(clean)
-                  emitter.emitThinking(clean)
-                  thinkingEmittedCount++
-                  break
-                }
-              }
+          for (let i = 0; i < thinkingParas.length && i < 3; i++) {
+            const para = thinkingParas[i]
+            // If it's the last paragraph currently extracted and we haven't seen field end yet,
+            // make sure it has substantial text (> 40 chars) before emitting so it's not a tiny fragment
+            if (i === thinkingParas.length - 1 && !commentaryFieldFound && para.length < 40) {
+              continue
             }
+            emitter.emitThinking(para, `${rolePrefix}-think-${i}`)
           }
         }
 
@@ -434,6 +453,15 @@ async function readStreamWithEvents(
         }
 
         lastEmitTime = now
+      }
+    }
+
+    // Final pass after stream completes: ensure all 3 thinking paragraphs are emitted with 100% complete text
+    if (emitter) {
+      const rolePrefix = role || 'agent'
+      const finalThinking = extractThinkingParagraphs(text)
+      for (let i = 0; i < finalThinking.length && i < 3; i++) {
+        emitter.emitThinking(finalThinking[i], `${rolePrefix}-think-${i}`)
       }
     }
   } finally {

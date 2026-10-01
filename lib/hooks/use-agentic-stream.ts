@@ -270,8 +270,42 @@ export function useAgenticStream(storageKey?: string) {
                     ],
                   }
                 })
+              } else if (actionType === 'thinking') {
+                setState(prev => {
+                  const actions = [...prev.actions]
+                  const existingIdx = event.detail
+                    ? actions.findIndex(a => a.type === 'thinking' && a.detail === event.detail)
+                    : -1
+
+                  if (existingIdx >= 0) {
+                    // Update existing thinking block in place with complete/latest content
+                    actions[existingIdx] = {
+                      ...actions[existingIdx],
+                      content: event.content || '',
+                    }
+                    return { ...prev, actions }
+                  }
+
+                  const exists = actions.some(
+                    a => a.type === 'thinking' && a.content === (event.content || '')
+                  )
+                  if (exists) return prev
+
+                  return {
+                    ...prev,
+                    actions: [
+                      ...actions,
+                      {
+                        type: 'thinking',
+                        content: event.content || '',
+                        detail: event.detail || '',
+                        timestamp: Date.now(),
+                      },
+                    ],
+                  }
+                })
               } else {
-                // Regular action: thinking, web_search, status, etc.
+                // Regular action: web_search, status, etc.
                 setState(prev => ({
                   ...prev,
                   actions: [
