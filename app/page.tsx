@@ -13,7 +13,7 @@ import type { LLMModel, LLMModelConfig } from '@/lib/models';
 import { FragmentSchema, fragmentSchema as schema } from '@/lib/schema';
 import { createSupabaseBrowserClient } from '@/lib/supabase-browser';
 import templates, { TemplateId } from '@/lib/templates';
-import { ExecutionResult } from '@/lib/types';
+import { ExecutionResult, ExecutionResultWeb } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { getFragmentFiles } from '@/lib/fragment-files';
 import type { SandboxProviderMode } from '@/lib/sandbox-provider';
@@ -33,7 +33,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { invalidateCache } from '@/lib/caching';
 import type { GitHubWorkspace } from '@/components/github-save';
 import type { PreviewTab } from '@/components/preview';
-import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, Undo, Cpu, Zap, LoaderIcon, ChevronDown, ArrowLeft, Settings, Star, ExternalLink, Database } from 'lucide-react';
+import { Clock3, FolderOpen, GitBranch, Globe2, Lock, PanelRightClose, PanelRightOpen, Trash, History, Cpu, Zap, LoaderIcon, ChevronDown, ArrowLeft, Settings, Star, ExternalLink, Database, LayoutGrid } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 const DEFAULT_MODEL_ID = 'auto'
 const DEFAULT_NEW_CHAT_TITLE = 'New Chat'
@@ -110,7 +111,7 @@ function buildAutoFixPrompt({
 }) {
   return `Automatic error fix request.
 
-The generated artifact failed when Magical AI tried to run it in the sandbox. Fix the current artifact and return a corrected complete artifact in the required response format.
+The generated artifact failed Magical AI's sandbox verification — it was built and started in the sandbox, but the app did not run properly. Fix the current artifact and return a corrected complete artifact in the required response format.
 
 Keep the user's original request and the current template unless the error requires a template change. If dependencies, install commands, ports, file paths, or code are wrong, update those fields too.
 
@@ -224,6 +225,91 @@ function ProjectDropdownMenu({ projectTitle, projectSubtitle, isPublic, onToggle
   )
 }
 
+function ChatHistoryMenu({ chats, currentProjectId, onSelectChat, onNewChat, onViewAll }: {
+  chats: Project[]
+  currentProjectId?: string
+  onSelectChat: (chatId: string) => void
+  onNewChat: () => void
+  onViewAll: () => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setIsOpen(false)
+    }
+    function handleEscape(e: KeyboardEvent) { if (e.key === 'Escape') setIsOpen(false) }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', handleEscape) }
+  }, [isOpen])
+
+  const recentChats = chats.filter((chat) => chat.id !== currentProjectId).slice(0, 8)
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "inline-flex h-8 w-8 items-center justify-center rounded-full border transition",
+          isOpen
+            ? "border-white/20 bg-white/10 text-white"
+            : "border-white/10 bg-white/[0.04] text-white/65 hover:bg-white/[0.08] hover:text-white"
+        )}
+        title="Chat history"
+      >
+        <History className="h-4 w-4" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-xl border border-white/10 bg-[#1a1b1d] p-2 shadow-2xl">
+          <div className="px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-wider text-white/35">Chat history</div>
+          {recentChats.length === 0 ? (
+            <div className="px-2.5 py-3 text-xs text-white/40">No other chats yet.</div>
+          ) : (
+            <div className="max-h-80 space-y-0.5 overflow-y-auto">
+              {recentChats.map((chat) => (
+                <button
+                  key={chat.id}
+                  type="button"
+                  onClick={() => { setIsOpen(false); onSelectChat(chat.id) }}
+                  className="flex w-full flex-col items-start gap-0.5 rounded-lg px-2.5 py-2 text-left transition hover:bg-white/[0.06]"
+                >
+                  <span className="w-full truncate text-sm text-white/80">{chat.title || 'Untitled chat'}</span>
+                  <span className="text-[11px] text-white/35">
+                    {formatDistanceToNow(new Date(chat.updated_at), { addSuffix: true })}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="mt-1 space-y-0.5 border-t border-white/[0.06] pt-1">
+            <button
+              type="button"
+              onClick={() => { setIsOpen(false); onNewChat() }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white"
+            >
+              <Zap className="h-4 w-4 text-white/40" />
+              New chat
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsOpen(false); onViewAll() }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-white/70 transition hover:bg-white/[0.06] hover:text-white"
+            >
+              <LayoutGrid className="h-4 w-4 text-white/40" />
+              All chats
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TodoBar({ todos }: { todos: { id: string; text: string; completed: boolean }[] }) {
   const [isOpen, setIsOpen] = useState(true)
   const completedCount = todos.filter(t => t.completed).length
@@ -298,7 +384,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   const [customStylePrompt, setCustomStylePrompt] = useLocalStorage<string>('customStylePrompt', '')
   const [showStyleSelector, setShowStyleSelector] = useState(false)
   const [chatMode, setChatMode] = useLocalStorage<ChatMode>('chatMode', 'plan')
-  const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'auto')
+  const [sandboxProvider, setSandboxProvider] = useLocalStorage<SandboxProviderMode>('sandboxProvider', 'vercel')
 
   const posthog = usePostHog()
 
@@ -361,6 +447,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   }, [setAuthView])
   const [errorMessage, setErrorMessage] = useState('')
   const [autoFixMessage, setAutoFixMessage] = useState('')
+  const [runVerifiedNotice, setRunVerifiedNotice] = useState('')
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const [projectPreviews, setProjectPreviews] = useState<Record<string, ProjectPreviewCard>>({})
@@ -789,6 +876,10 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
         setResult(executionResult);
         setCurrentPreview({ fragment, result: executionResult });
 
+        if ((executionResult as ExecutionResultWeb).verified) {
+          setRunVerifiedNotice('Preview verified — the app is running properly.')
+        }
+
         const executionErrorDetails = getExecutionErrorDetails(executionResult)
         if (executionErrorDetails) {
           if (startAutoFix(fragment, executionErrorDetails, executionResult)) {
@@ -826,6 +917,16 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
       setErrorMessage(agenticStream.error)
     }
   }, [agenticStream.error])
+
+  // Auto-dismiss the "preview verified" notice after a few seconds
+  useEffect(() => {
+    if (!runVerifiedNotice) {
+      return
+    }
+
+    const timer = setTimeout(() => setRunVerifiedNotice(''), 6000)
+    return () => clearTimeout(timer)
+  }, [runVerifiedNotice])
 
   // Sync agentic stream fragment to existing state + update message object
   useEffect(() => {
@@ -2117,6 +2218,7 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     setCurrentTab('code')
     setIsPreviewLoading(false)
     setAutoFixMessage('')
+    setRunVerifiedNotice('')
     setCurrentProject(null)
     currentProjectRef.current = null
     setIsPreviewPanelOpen(false)
@@ -2347,18 +2449,6 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
     }
   }
 
-  function handleUndo() {
-    autoFixAttemptsRef.current = 0
-    lastAutoFixSignatureRef.current = ''
-    setAutoFixMessage('')
-    setMessages((previousMessages) => {
-      const nextMessages = [...previousMessages.slice(0, -2)]
-      messagesRef.current = nextMessages
-      return nextMessages
-    })
-    setCurrentPreview({ fragment: undefined, result: undefined })
-  }
-
   async function handleStartNewChat() {
     resetChatState()
     const newProject = await createNewChatProject()
@@ -2476,6 +2566,23 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
   ) : null
   const statusNotices = (
     <>
+      {runVerifiedNotice && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 4 }}
+          className="flex items-center gap-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-sm"
+        >
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+          <span className="flex-1 min-w-0">{runVerifiedNotice}</span>
+          <button
+            onClick={() => setRunVerifiedNotice('')}
+            className="text-xs text-emerald-400/60 hover:text-emerald-400 transition-colors shrink-0"
+          >
+            Dismiss
+          </button>
+        </motion.div>
+      )}
       {autoFixMessage && (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
@@ -2628,15 +2735,13 @@ export default function Home({ initialProjectId }: HomeProps = {}) {
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  onClick={handleUndo}
-                  disabled={messages.length <= 1 || isPromptLoading}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/65 transition hover:bg-white/[0.08] hover:text-white disabled:pointer-events-none disabled:opacity-35"
-                  title="Undo"
-                >
-                  <Undo className="h-4 w-4" />
-                </button>
+                <ChatHistoryMenu
+                  chats={recentProjects}
+                  currentProjectId={currentProject?.id}
+                  onSelectChat={(chatId) => { void handleChatSelected(chatId) }}
+                  onNewChat={() => { void handleStartNewChat() }}
+                  onViewAll={() => router.push('/')}
+                />
                 <button
                   type="button"
                   onClick={handleClearChat}

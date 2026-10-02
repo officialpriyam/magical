@@ -20,6 +20,7 @@ export type ExecutionResultInterpreter = ExecutionResultBase & {
 export type ExecutionResultWeb = ExecutionResultBase & {
   template: Exclude<TemplateId, 'code-interpreter-v1'>
   url: string
+  verified?: boolean
 }
 
 export type ExecutionResult = ExecutionResultInterpreter | ExecutionResultWeb

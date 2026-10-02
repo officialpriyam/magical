@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { createE2BSandbox } from '@/lib/e2b-sandbox'
-import { normalizeSandboxProviderMode, chooseSandboxProvider, type SandboxProvider } from '@/lib/sandbox-provider'
+import { SANDBOX_TIMEOUT_MS, normalizeSandboxProviderMode, chooseSandboxProvider, type SandboxProvider } from '@/lib/sandbox-provider'
 import { createVercelSandbox, hasVercelSandboxConfig, runVercelShellCommand } from '@/lib/vercel-sandbox'
 import { createModalSandbox, hasModalSandboxConfig, runModalShellCommand } from '@/lib/modal-sandbox'
 import { saveProjectFilesToSandboxStorage } from '@/lib/sandbox-storage'
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No sandbox provider configured' }, { status: 503 })
     }
 
-    const sandboxTimeout = 10 * 60 * 1000
+    const sandboxTimeout = SANDBOX_TIMEOUT_MS
     const metadata = {
       template: resolvedTemplate,
       userID: user.id,

@@ -1,6 +1,12 @@
 export type SandboxProvider = 'e2b' | 'vercel' | 'modal' | 'daytona'
 export type SandboxProviderMode = 'auto' | SandboxProvider
 
+// 45 minutes keeps every provider inside its plan limits (Vercel Hobby caps at
+// 45 minutes; Pro plans can raise this via VERCEL_SANDBOX_TIMEOUT_MS).
+export const SANDBOX_TIMEOUT_MS = 45 * 60 * 1000
+
+const PROVIDER_PREFERENCE: SandboxProvider[] = ['vercel', 'modal', 'daytona', 'e2b']
+
 export const SANDBOX_PROVIDER_OPTIONS: {
   value: SandboxProviderMode
   label: string
@@ -9,7 +15,7 @@ export const SANDBOX_PROVIDER_OPTIONS: {
   {
     value: 'auto',
     label: 'Let AI choose',
-    description: 'Randomly uses one configured sandbox provider.',
+    description: 'Uses Vercel Sandbox when available, otherwise the next configured provider.',
   },
   {
     value: 'modal',
@@ -73,15 +79,20 @@ export function chooseSandboxProvider({
   mode: SandboxProviderMode
   available: SandboxProvider[]
 }): SandboxProvider | null {
-  if (mode !== 'auto') {
-    return available.includes(mode) ? mode : null
-  }
-
   if (available.length === 0) {
     return null
   }
 
-  return available[Math.floor(Math.random() * available.length)]
+  if (mode !== 'auto' && available.includes(mode)) {
+    return mode
+  }
+
+  // Vercel is the default; fall back through the remaining configured
+  // providers so an unconfigured choice (or "auto") never blocks the sandbox.
+  return (
+    PROVIDER_PREFERENCE.find((provider) => available.includes(provider)) ??
+    available[0]
+  )
 }
 
 export function getResolvedSandboxPort(

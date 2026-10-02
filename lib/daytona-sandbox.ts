@@ -8,6 +8,8 @@ import type { FileSystemNode } from '@/components/file-tree'
 
 const SKIP_PATH_RE = /(^|\/)(\.git|node_modules|\.next|\.nuxt|dist|build|coverage|__pycache__|\.cache)(\/|$)/
 
+export const DAYTONA_DEV_LOG_PATH = '/workspace/.magical-dev.log'
+
 export function hasDaytonaSandboxConfig() {
   return Boolean(process.env.DAYTONA_API_KEY?.trim())
 }
@@ -105,10 +107,12 @@ export async function installAndStartDaytonaProject({
     await sandbox.process.executeCommand(`cd ${workdir} && ${installCmd}`)
   }
 
-  // Start the dev server
+  // Start the dev server in the background with output captured for verification
   const startCmd = getStartCommand(template)
   if (startCmd) {
-    await sandbox.process.executeCommand(`cd ${workdir} && ${startCmd}`)
+    await sandbox.process.executeCommand(
+      `cd ${workdir} && nohup ${startCmd} > ${DAYTONA_DEV_LOG_PATH} 2>&1 &`,
+    )
   }
 }
 

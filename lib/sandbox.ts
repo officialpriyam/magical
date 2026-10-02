@@ -1,8 +1,9 @@
 import { Sandbox } from '@e2b/code-interpreter'
 import { createE2BSandbox } from './e2b-sandbox'
+import { SANDBOX_TIMEOUT_MS } from './sandbox-provider'
 
 const E2B_API_KEY = process.env.E2B_API_KEY
-const sandboxTimeout = 10 * 60 * 1000
+const sandboxTimeout = SANDBOX_TIMEOUT_MS
 
 const sandboxes = new Map<string, Sandbox>()
 

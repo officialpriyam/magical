@@ -8,6 +8,7 @@ import type { TemplateId } from '@/lib/templates'
 import type { FileSystemNode } from '@/components/file-tree'
 
 export const MODAL_WORKDIR = '/workspace'
+export const MODAL_DEV_LOG_PATH = '/workspace/server.log'
 
 const DEFAULT_NODE_IMAGE = 'node:20-slim'
 const DEFAULT_PYTHON_IMAGE = 'python:3.11-slim'
@@ -136,7 +137,7 @@ export async function installAndStartModalProject({
   if (startCommand) {
     // Launch start command in background inside container using nohup
     await sandbox.exec(
-      ['bash', '-c', `nohup ${startCommand} > /workspace/server.log 2>&1 &`],
+      ['bash', '-c', `nohup ${startCommand} > ${MODAL_DEV_LOG_PATH} 2>&1 &`],
       {
         workdir: MODAL_WORKDIR,
         env: commandEnv,

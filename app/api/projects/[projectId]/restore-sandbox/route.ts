@@ -17,6 +17,7 @@ import {
   hasSandboxStorageConfig,
 } from '@/lib/sandbox-storage'
 import {
+  SANDBOX_TIMEOUT_MS,
   chooseSandboxProvider,
   encodeSandboxId,
   normalizeSandboxProviderMode,
@@ -57,7 +58,7 @@ export const maxDuration = 60
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const sandboxTimeout = 25 * 1000
+const sandboxTimeout = SANDBOX_TIMEOUT_MS
 const MAX_RESTORE_FILES = 50
 const MAX_RESTORE_FILE_BYTES = 512 * 1024
 

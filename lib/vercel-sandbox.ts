@@ -9,6 +9,7 @@ import type { FileSystemNode } from '@/components/file-tree'
 import { Sandbox } from '@vercel/sandbox'
 
 export const VERCEL_WORKDIR = '/vercel/sandbox'
+export const VERCEL_DEV_LOG_PATH = '/tmp/magical-dev.log'
 
 type VercelSandbox = Sandbox
 
@@ -20,6 +21,10 @@ type CommandResult = {
 
 const DEFAULT_NODE_RUNTIME = 'node24'
 const DEFAULT_PYTHON_RUNTIME = 'python3.13'
+const MAX_VERCEL_TIMEOUT_MS = 24 * 60 * 60 * 1000
+const INSTALL_STAMP_PATH = '/tmp/magical-install.stamp'
+const INSTALL_LOCK_PATH = '/tmp/magical-install.lock'
+const DEPENDENCY_FINGERPRINT_COMMAND = `sha1sum package.json requirements.txt 2>/dev/null | sha1sum | cut -d' ' -f1`
 const SKIP_PATH_RE = /(^|\/)(\.git|node_modules|\.next|\.nuxt|dist|build|coverage|__pycache__|\.cache)(\/|$)/
 
 export function hasVercelSandboxConfig() {
@@ -62,7 +67,7 @@ export async function createVercelSandbox({
     name: buildVercelSandboxName(projectId),
     runtime,
     ports: typeof port === 'number' ? [port] : [],
-    timeout: timeoutMs,
+    timeout: getConfiguredVercelTimeout(timeoutMs),
     resources: {
       vcpus: getVercelVcpus(),
     },
@@ -122,20 +127,13 @@ export async function installAndStartVercelProject({
 }) {
   const template = fragment.template as TemplateId
   const port = fragment.port || getDefaultPort(template)
-  const baseInstallCommand = getVercelBaseInstallCommand(template)
   const extraInstallCommand = cleanCommand(fragment.install_dependencies_command)
   const commandEnv = {
     PORT: String(port),
     ...env,
   }
 
-  if (baseInstallCommand) {
-    await runCheckedVercelCommand(sandbox, baseInstallCommand, {
-      env: commandEnv,
-      timeoutMs: 120_000,
-      label: 'Vercel sandbox dependency install failed',
-    })
-  }
+  await installVercelProjectDependencies(sandbox, template, commandEnv)
 
   if (fragment.has_additional_dependencies && extraInstallCommand) {
     await runCheckedVercelCommand(sandbox, extraInstallCommand, {
@@ -143,16 +141,55 @@ export async function installAndStartVercelProject({
       timeoutMs: 120_000,
       label: 'Vercel sandbox additional dependency install failed',
     })
+
+    await refreshVercelInstallStamp(sandbox)
   }
 
   const startCommand = getVercelStartCommand(template, port)
 
   if (startCommand) {
-    await runVercelShellCommand(sandbox, startCommand, {
+    await runVercelShellCommand(sandbox, `${startCommand} > ${VERCEL_DEV_LOG_PATH} 2>&1`, {
       env: commandEnv,
       detached: true,
     })
   }
+}
+
+export async function installVercelProjectDependencies(
+  sandbox: VercelSandbox,
+  template: TemplateId,
+  env?: Record<string, string>,
+) {
+  const baseInstallCommand = getVercelBaseInstallCommand(template)
+
+  if (!baseInstallCommand) {
+    return
+  }
+
+  await runCheckedVercelCommand(sandbox, buildCachedInstallCommand(baseInstallCommand), {
+    env,
+    timeoutMs: 300_000,
+    label: 'Vercel sandbox dependency install failed',
+  })
+}
+
+function buildCachedInstallCommand(installCommand: string) {
+  // Skip the install when the dependency manifests are unchanged since the last
+  // successful run; the lock keeps warm-start and generation installs from
+  // racing on the same node_modules.
+  return [
+    `i=0; while [ -f ${INSTALL_LOCK_PATH} ] && [ $i -lt 90 ]; do sleep 2; i=$((i+1)); done`,
+    `touch ${INSTALL_LOCK_PATH}`,
+    `FP=$(${DEPENDENCY_FINGERPRINT_COMMAND})`,
+    `if { [ -f package.json ] || [ -f requirements.txt ]; } && [ -n "$FP" ] && [ -f ${INSTALL_STAMP_PATH} ] && [ "$(cat ${INSTALL_STAMP_PATH})" = "$FP" ]; then rm -f ${INSTALL_LOCK_PATH}; echo "Dependencies already installed - skipping install"; else ${installCommand}; STATUS=$?; if [ $STATUS -eq 0 ]; then echo "$FP" > ${INSTALL_STAMP_PATH}; fi; rm -f ${INSTALL_LOCK_PATH}; exit $STATUS; fi`,
+  ].join('; ')
+}
+
+async function refreshVercelInstallStamp(sandbox: VercelSandbox) {
+  await runVercelShellCommand(
+    sandbox,
+    `FP=$(${DEPENDENCY_FINGERPRINT_COMMAND}); if [ -n "$FP" ]; then echo "$FP" > ${INSTALL_STAMP_PATH}; fi`,
+  ).catch(() => {})
 }
 
 export async function runVercelShellCommand(
@@ -287,12 +324,21 @@ function getVercelRuntime(template: TemplateId) {
   return process.env.VERCEL_SANDBOX_NODE_RUNTIME || DEFAULT_NODE_RUNTIME
 }
 
+function getConfiguredVercelTimeout(fallbackMs: number) {
+  const override = Number(process.env.VERCEL_SANDBOX_TIMEOUT_MS)
+
+  return Number.isFinite(override) && override > 0
+    ? Math.min(override, MAX_VERCEL_TIMEOUT_MS)
+    : fallbackMs
+}
+
 function getVercelVcpus() {
   const value = Number(process.env.VERCEL_SANDBOX_VCPUS)
+  const isValid =
+    value === 1 ||
+    (Number.isInteger(value) && value >= 2 && value <= 8 && value % 2 === 0)
 
-  return Number.isFinite(value) && value >= 1 && value <= 8
-    ? value
-    : 2
+  return isValid ? value : 4
 }
 
 function buildVercelSandboxName(projectId?: string) {
@@ -487,7 +533,7 @@ function getVercelBaseInstallCommand(template: TemplateId) {
     template === 'svelte-developer' ||
     template === 'pwa-mobile'
   ) {
-    return 'npm install --no-audit --no-fund'
+    return 'npm install --no-audit --no-fund --prefer-offline'
   }
 
   return ''

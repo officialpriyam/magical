@@ -3,6 +3,7 @@ import { type Sandbox as SandboxInstance } from '@e2b/code-interpreter'
 import { createE2BSandbox } from '@/lib/e2b-sandbox'
 import { createServerClient } from '@/lib/supabase-server'
 import {
+  SANDBOX_TIMEOUT_MS,
   chooseSandboxProvider,
   encodeSandboxId,
   normalizeSandboxProviderMode,
@@ -12,6 +13,7 @@ import {
 import {
   createVercelSandbox,
   hasVercelSandboxConfig,
+  installVercelProjectDependencies,
   listVercelSandboxFiles,
   writeVercelProjectFiles,
 } from '@/lib/vercel-sandbox'
@@ -35,11 +37,11 @@ import type { ExecutionResultInterpreter, ExecutionResultWeb } from '@/lib/types
 import type { FileSystemNode } from '@/components/file-tree'
 import type { GeneratedFile } from '@/lib/fragment-files'
 
-export const maxDuration = 60
+export const maxDuration = 120
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const sandboxTimeout = 10 * 60 * 1000
+const sandboxTimeout = SANDBOX_TIMEOUT_MS
 const DEFAULT_WARM_TEMPLATE: TemplateId = 'nextjs-developer'
 
 type VercelSandboxInstance = Awaited<ReturnType<typeof createVercelSandbox>>
@@ -185,6 +187,10 @@ async function startSandboxWithProvider(
       sbx = vercelSandbox
 
       await writeVercelProjectFiles(vercelSandbox, ctx.storedFiles, ctx.template)
+      // Pre-install dependencies so the first generation reuses a warm project.
+      await installVercelProjectDependencies(vercelSandbox, ctx.template).catch((error) => {
+        console.warn('Vercel warm start dependency install failed (generation will retry):', error)
+      })
       const files = await listVercelSandboxFiles(vercelSandbox)
 
       return {

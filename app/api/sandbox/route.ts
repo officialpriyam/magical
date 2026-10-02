@@ -6,6 +6,7 @@ import { getSupabaseProjectRuntimeEnv } from '@/lib/supabase-integration'
 import { saveProjectFilesToSandboxStorage } from '@/lib/sandbox-storage'
 import { createServerClient } from '@/lib/supabase-server'
 import {
+  SANDBOX_TIMEOUT_MS,
   chooseSandboxProvider,
   decodeSandboxId,
   encodeSandboxId,
@@ -23,6 +24,7 @@ import {
   listVercelSandboxFiles,
   runVercelShellCommand,
   writeVercelProjectFiles,
+  VERCEL_DEV_LOG_PATH,
 } from '@/lib/vercel-sandbox'
 import {
   createDaytonaSandbox,
@@ -33,6 +35,7 @@ import {
   listDaytonaSandboxFiles,
   runDaytonaShellCommand,
   writeDaytonaProjectFiles,
+  DAYTONA_DEV_LOG_PATH,
 } from '@/lib/daytona-sandbox'
 import {
   createModalSandbox,
@@ -43,26 +46,125 @@ import {
   listModalSandboxFiles,
   runModalShellCommand,
   writeModalProjectFiles,
+  MODAL_DEV_LOG_PATH,
 } from '@/lib/modal-sandbox'
+import {
+  verifySandboxApp,
+  type SandboxCommandRunner,
+} from '@/lib/sandbox-verify'
 import { Sandbox } from '@e2b/code-interpreter'
 import type { Sandbox as ModalSandbox } from 'modal'
 import { FileSystemNode } from '@/components/file-tree'
 import type { TemplateId } from '@/lib/templates'
 
-const sandboxTimeout = 10 * 60 * 1000
+const sandboxTimeout = SANDBOX_TIMEOUT_MS
 type VercelSandboxInstance =
   | Awaited<ReturnType<typeof createVercelSandbox>>
   | Awaited<ReturnType<typeof getVercelSandbox>>
 
-async function waitForPortListening(
-  runCommand: (cmd: string, opts?: { timeoutMs?: number }) => Promise<any>,
-  port: number,
-  maxRetries = 30,
-  delayMs = 1000,
-): Promise<void> {
-  const checkCmd = `until (echo > /dev/tcp/localhost/${port}) 2>/dev/null; do sleep 1; done`
+async function verifyAppOrBuildErrorResponse({
+  provider,
+  sbx,
+  port,
+  logPath,
+}: {
+  provider: SandboxProvider
+  sbx: any
+  port: number
+  logPath?: string
+}): Promise<{ errorResponse: Response | null; verified: boolean }> {
+  const verification = await verifySandboxApp({
+    runCommand: createSandboxCommandRunner(provider, sbx),
+    port,
+    logPath,
+  })
+
+  if (verification.ok) {
+    return { errorResponse: null, verified: !verification.skipped }
+  }
+
+  console.warn(`App verification failed (${provider}): ${verification.reason}`)
+
+  // The sandbox is not healthy — release it so the automatic fix starts fresh.
+  await terminateSandbox(provider, sbx)
+
+  const details = [
+    verification.reason,
+    verification.logs ? `Dev server output:\n${verification.logs}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+
+  return {
+    errorResponse: new Response(
+      JSON.stringify({
+        error: `Preview verification failed — the app is not running properly${verification.status ? ` (HTTP ${verification.status})` : ''}.`,
+        type: 'execution_error',
+        details,
+      }),
+      { status: 502, headers: { 'Content-Type': 'application/json' } },
+    ),
+    verified: false,
+  }
+}
+
+function createSandboxCommandRunner(
+  provider: SandboxProvider,
+  sbx: any,
+): SandboxCommandRunner {
+  if (provider === 'vercel') {
+    return async (command, timeoutMs) => {
+      const result = (await runVercelShellCommand(sbx, command, { timeoutMs })) as {
+        exitCode: number
+        stdout(opts?: { signal?: AbortSignal }): Promise<string>
+      }
+
+      return {
+        stdout: await result.stdout().catch(() => ''),
+        exitCode: result.exitCode,
+      }
+    }
+  }
+
+  if (provider === 'modal') {
+    return async (command, timeoutMs) => {
+      const proc = await runModalShellCommand(sbx, command, { timeoutMs })
+      const exitCode = await proc.wait()
+      const stdout = await proc.stdout.readText().catch(() => '')
+
+      return { stdout, exitCode }
+    }
+  }
+
+  if (provider === 'daytona') {
+    return async (command, timeoutMs) => {
+      const result = await runDaytonaShellCommand(sbx, command, { timeoutMs })
+
+      return {
+        stdout: typeof result?.result === 'string' ? result.result : '',
+        exitCode: typeof result?.exitCode === 'number' ? result.exitCode : 0,
+      }
+    }
+  }
+
+  return async (command, timeoutMs) => {
+    const result = await (sbx as Sandbox).commands.run(command, { timeoutMs })
+
+    return { stdout: result.stdout || '', exitCode: result.exitCode ?? 0 }
+  }
+}
+
+async function terminateSandbox(provider: SandboxProvider, sbx: any) {
   try {
-    await runCommand(checkCmd, { timeoutMs: maxRetries * delayMs + 5000 })
+    if (provider === 'vercel') {
+      await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
+    } else if (provider === 'modal') {
+      await (sbx as ModalSandbox | null)?.terminate()
+    } else if (provider === 'daytona') {
+      await (sbx as any)?.delete()
+    } else {
+      await (sbx as Sandbox | null)?.kill()
+    }
   } catch {}
 }
 
@@ -175,6 +277,7 @@ export async function POST(req: Request) {
 
       if (!sbx) {
         createdSandbox = true
+
         if (selectedProvider === 'vercel') {
           sbx = await createVercelSandbox({
             template: fragment.template as TemplateId,
@@ -223,6 +326,8 @@ export async function POST(req: Request) {
               : {}),
           })
         }
+      } else {
+        await refreshReusableSandboxLifetime(selectedProvider, sbx)
       }
     } catch (sandboxError: any) {
       console.error(`${selectedProvider} sandbox creation failed:`, sandboxError)
@@ -305,10 +410,16 @@ export async function POST(req: Request) {
           env: supabaseRuntimeEnv,
         })
 
-        await waitForPortListening(
-          (cmd, opts) => runVercelShellCommand(vercelSandbox, cmd, { timeoutMs: opts?.timeoutMs }),
-          resolvedPort,
-        )
+        const { errorResponse, verified } = await verifyAppOrBuildErrorResponse({
+          provider: selectedProvider,
+          sbx: vercelSandbox,
+          port: resolvedPort,
+          logPath: VERCEL_DEV_LOG_PATH,
+        })
+
+        if (errorResponse) {
+          return errorResponse
+        }
 
         const files = await listVercelSandboxFiles(vercelSandbox)
 
@@ -319,6 +430,7 @@ export async function POST(req: Request) {
             template: fragment.template,
             url: getVercelSandboxUrl(vercelSandbox, resolvedPort),
             files,
+            ...(verified ? { verified: true } : {}),
           } as ExecutionResultWeb),
           { headers: { 'Content-Type': 'application/json' } }
         )
@@ -333,10 +445,16 @@ export async function POST(req: Request) {
           env: supabaseRuntimeEnv,
         })
 
-        await waitForPortListening(
-          (cmd, opts) => runModalShellCommand(modalSandbox, cmd, { timeoutMs: opts?.timeoutMs }),
-          resolvedPort,
-        )
+        const { errorResponse, verified } = await verifyAppOrBuildErrorResponse({
+          provider: selectedProvider,
+          sbx: modalSandbox,
+          port: resolvedPort,
+          logPath: MODAL_DEV_LOG_PATH,
+        })
+
+        if (errorResponse) {
+          return errorResponse
+        }
 
         const files = await listModalSandboxFiles(modalSandbox)
         const url = await getModalSandboxUrl(modalSandbox, resolvedPort)
@@ -348,6 +466,7 @@ export async function POST(req: Request) {
             template: fragment.template,
             url,
             files,
+            ...(verified ? { verified: true } : {}),
           } as ExecutionResultWeb),
           { headers: { 'Content-Type': 'application/json' } }
         )
@@ -362,10 +481,16 @@ export async function POST(req: Request) {
           env: supabaseRuntimeEnv,
         })
 
-        await waitForPortListening(
-          (cmd, opts) => runDaytonaShellCommand(daytonaSandbox, cmd, { timeoutMs: opts?.timeoutMs }),
-          resolvedPort,
-        )
+        const { errorResponse, verified } = await verifyAppOrBuildErrorResponse({
+          provider: selectedProvider,
+          sbx: daytonaSandbox,
+          port: resolvedPort,
+          logPath: DAYTONA_DEV_LOG_PATH,
+        })
+
+        if (errorResponse) {
+          return errorResponse
+        }
 
         const files = await listDaytonaSandboxFiles(daytonaSandbox)
         const url = getDaytonaSandboxUrl(daytonaSandbox, resolvedPort)
@@ -377,6 +502,7 @@ export async function POST(req: Request) {
             template: fragment.template,
             url,
             files,
+            ...(verified ? { verified: true } : {}),
           } as ExecutionResultWeb),
           { headers: { 'Content-Type': 'application/json' } }
         )
@@ -387,10 +513,20 @@ export async function POST(req: Request) {
       if (installCommand) {
         await (sbx as Sandbox).commands.run(installCommand, {
           envs: {
-            PORT: (fragment.port || 80).toString(),
+            PORT: resolvedPort.toString(),
             ...supabaseRuntimeEnv,
           },
         })
+      }
+
+      const { errorResponse, verified } = await verifyAppOrBuildErrorResponse({
+        provider: selectedProvider,
+        sbx,
+        port: resolvedPort,
+      })
+
+      if (errorResponse) {
+        return errorResponse
       }
 
       // Fetch file tree after project setup
@@ -401,28 +537,19 @@ export async function POST(req: Request) {
           sbxId: encodeSandboxId('e2b', (sbx as Sandbox).sandboxId),
           sandboxProvider: selectedProvider,
           template: fragment.template,
-          url: `https://${(sbx as Sandbox).getHost(fragment.port || 80)}`,
+          url: `https://${(sbx as Sandbox).getHost(resolvedPort)}`,
           files,
+          ...(verified ? { verified: true } : {}),
         } as ExecutionResultWeb),
         { headers: { 'Content-Type': 'application/json' } }
       )
     } catch (executionError: any) {
       console.error('Sandbox execution error:', executionError)
-      
+
       // Clean up sandbox on execution error
-      try {
-        if (createdSandbox) {
-          if (selectedProvider === 'vercel') {
-            await (sbx as Awaited<ReturnType<typeof createVercelSandbox>> | null)?.stop()
-          } else if (selectedProvider === 'modal') {
-            await (sbx as ModalSandbox | null)?.terminate()
-          } else if (selectedProvider === 'daytona') {
-            await (sbx as any)?.delete()
-          } else {
-            await (sbx as Sandbox | null)?.kill()
-          }
-        }
-      } catch {}
+      if (createdSandbox) {
+        await terminateSandbox(selectedProvider, sbx)
+      }
 
       return new Response(
         JSON.stringify({ 
@@ -483,6 +610,23 @@ async function connectReusableSandbox(
   } catch (error) {
     console.warn('Could not reuse warm sandbox; creating a new one:', error)
     return null
+  }
+}
+
+async function refreshReusableSandboxLifetime(
+  provider: SandboxProvider,
+  sbx: any,
+) {
+  try {
+    if (provider === 'vercel') {
+      await (sbx as Awaited<ReturnType<typeof createVercelSandbox>>).extendTimeout(
+        sandboxTimeout,
+      )
+    } else if (provider === 'e2b') {
+      await (sbx as Sandbox).setTimeout(sandboxTimeout)
+    }
+  } catch (error) {
+    console.warn(`Could not refresh ${provider} sandbox lifetime:`, error)
   }
 }
 

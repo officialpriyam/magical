@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { FragmentSchema } from '@/lib/schema'
-import { ExecutionResult } from '@/lib/types'
+import { ExecutionResult, ExecutionResultWeb } from '@/lib/types'
 import { getFragmentFiles } from '@/lib/fragment-files'
 import { DeepPartial } from 'ai'
 import { ChevronsRight, LoaderCircle, Terminal, Code, Folder, RotateCcw, Database } from 'lucide-react'
@@ -186,6 +186,19 @@ export function Preview({
             </TabsList>
           </div>
           <div className="flex items-center justify-end gap-2">
+            {(result as ExecutionResultWeb | undefined)?.verified && (
+              <TooltipProvider>
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      Running
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Verified — the app started and responds correctly</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {result?.sbxId && (
               <TooltipProvider>
                 <Tooltip delayDuration={0}>
@@ -234,7 +247,7 @@ export function Preview({
         {isPreviewLoading && !result && (
           <div className="w-full border-b border-blue-500/20 bg-blue-500/10 px-4 py-2 flex items-center gap-2 text-xs text-blue-400">
             <LoaderCircle className="h-3 w-3 animate-spin" />
-            <span>Starting sandbox and deploying preview...</span>
+            <span>Starting sandbox — deploying and verifying the preview...</span>
           </div>
         )}
         <div className="min-h-0 w-full flex-1 overflow-hidden">
