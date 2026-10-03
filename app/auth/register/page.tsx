@@ -20,7 +20,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     supabase?.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
-      if (session) router.push('/')
+      if (session) router.push('/web')
     })
   }, [router, supabase])
 
@@ -35,7 +35,7 @@ export default function RegisterPage() {
         password,
         options: {
           data: { full_name: name },
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/web`,
         },
       })
       if (error) throw error
@@ -53,7 +53,7 @@ export default function RegisterPage() {
     try {
       const { error } = await supabase!.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: `${window.location.origin}/` },
+        options: { redirectTo: `${window.location.origin}/web` },
       })
       if (error) throw error
     } catch (err: any) {

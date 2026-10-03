@@ -23,7 +23,7 @@ export default function TemplatesLayout({
     if (supabase) {
       await supabase.auth.signOut()
     }
-    window.location.assign('/')
+    window.location.assign('/web')
   }, [])
 
   const handleChatSelected = useCallback((chatId: string) => {

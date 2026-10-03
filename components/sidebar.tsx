@@ -59,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSignOut = () => {},
   onChatSelected = () => {},
   onHomeClick = () => {
-    window.location.assign('/');
+    window.location.assign('/web');
   },
   onProjectDeleted = () => {},
   searchQuery: externalSearchQuery = "",
@@ -248,7 +248,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Logo + Workspace Selector */}
             <div className="px-3 py-2 border-b border-white/[0.06]">
               <div className="flex items-center gap-2 mb-2">
-                <Link href="/">
+                <Link href="/web">
                   <img src="/icon.png" alt="Magical AI" className="h-7 w-7 object-contain" />
                 </Link>
                 <span className="text-sm font-semibold text-white/80">Magical AI</span>
@@ -424,7 +424,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <PanelLeft className="h-4 w-4" />
                 </Button>
 
-                <Link href="/" className="shrink-0">
+                <Link href="/web" className="shrink-0">
                   <img src="/icon.png" alt="Logo" className="h-7 w-7 object-contain" />
                 </Link>
 

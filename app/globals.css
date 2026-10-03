@@ -182,6 +182,140 @@
   animation: heroFloat 12s ease-in-out infinite;
 }
 
+/* ─── Landing page motion ───────────────────────────────────────── */
+@keyframes marqueeX {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marqueeX 38s linear infinite;
+}
+
+.animate-marquee-slow {
+  animation: marqueeX 60s linear infinite;
+}
+
+@keyframes gradientPan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-text {
+  background-size: 220% 220%;
+  animation: gradientPan 9s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.08);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 7s ease-in-out infinite;
+}
+
+@keyframes floatSoft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float-soft {
+  animation: floatSoft 5.5s ease-in-out infinite;
+}
+
+@keyframes shimmerSweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(220%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmerSweep 3.4s ease-in-out infinite;
+}
+
+@keyframes orbitSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-orbit {
+  animation: orbitSpin 26s linear infinite;
+}
+
+/* Animated conic border used on landing cards */
+.landing-ring {
+  position: relative;
+}
+
+.landing-ring::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--ring-angle, 0deg),
+    transparent 0deg,
+    rgba(139, 92, 246, 0.55) 60deg,
+    rgba(56, 189, 248, 0.5) 140deg,
+    transparent 220deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+
+.landing-ring:hover::before {
+  opacity: 1;
+  animation: orbitSpin 6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee,
+  .animate-marquee-slow,
+  .animate-gradient-text,
+  .animate-glow-pulse,
+  .animate-float-soft,
+  .animate-shimmer,
+  .animate-orbit,
+  .hero-float-circle {
+    animation: none !important;
+  }
+}
+
 @keyframes heroFloat {
   0%, 100% {
     transform: translate(0px, 0px) scale(1);

@@ -1,4 +1,4 @@
-import Home from '../../page'
+import Home from '../../web/page'
 
 export default async function ChatProjectPage({
   params,

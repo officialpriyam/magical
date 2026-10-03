@@ -11,7 +11,7 @@ export default function GitHubImportPage() {
       <GitHubImport 
         onClose={() => router.back()}
         onImport={() => {
-          router.push('/')
+          router.push('/web')
         }}
       />
     </div>

@@ -28,7 +28,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     supabase?.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
-      if (session) router.push('/')
+      if (session) router.push('/web')
     })
     // Fetch enabled providers
     fetch('/api/auth/providers')
@@ -44,7 +44,7 @@ export default function LoginPage() {
     try {
       const { error } = await supabase!.auth.signInWithPassword({ email, password })
       if (error) throw error
-      router.push('/')
+      router.push('/web')
     } catch (err: any) {
       setError(err.message || 'Failed to sign in')
     } finally {
@@ -58,7 +58,7 @@ export default function LoginPage() {
     try {
       const { error } = await supabase!.auth.signInWithOAuth({
         provider: provider as any,
-        options: { redirectTo: `${window.location.origin}/` },
+        options: { redirectTo: `${window.location.origin}/web` },
       })
       if (error) throw error
     } catch (err: any) {
