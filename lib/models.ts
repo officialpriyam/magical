@@ -35,6 +35,92 @@ export type LLMModelConfig = {
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
 const CLEANAPIS_BASE_URL = 'https://cleanapis.com/v1'
 
+// Providers that are surfaced nowhere in the selector, auto mode, or fallback
+// chains — they either need credentials that are not available here or do not
+// offer models that actually work in this deployment.
+export const DISABLED_PROVIDER_IDS = new Set(['anthropic', 'nvidia'])
+
+// A single selector entry that fans out across every Google AI Studio + Vertex
+// model. The chat routes expand it into a randomly ordered candidate list and
+// switch to the next one whenever a model fails.
+export const GOOGLE_LATEST_ID = 'gemini-latest'
+
+// Google model ids used by the Gemini Latest wrapper when no live list is
+// available at request time. AI Studio ids use the `models/...` form; Vertex
+// ids are the plain model names.
+const GOOGLE_LATEST_STUDIO_IDS = [
+  'models/gemini-2.5-pro',
+  'models/gemini-2.5-flash',
+  'models/gemini-2.5-flash-lite',
+  'models/gemini-2.0-flash',
+  'models/gemini-2.0-flash-lite',
+  'models/gemini-flash-latest',
+  'models/gemini-pro-latest',
+  'models/gemini-2.0-flash-001',
+  'models/gemini-2.5-flash-preview-05-20',
+]
+
+const GOOGLE_LATEST_VERTEX_IDS = [
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-001',
+]
+
+function shuffleModels<T>(items: T[]): T[] {
+  const next = [...items]
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[next[i], next[j]] = [next[j], next[i]]
+  }
+  return next
+}
+
+// A per-provider credential check for the wrapper: a user with only an AI
+// Studio key should not be handed Vertex-only model ids (and vice versa).
+function hasGoogleWrapperCredentials(providerId: string, config: LLMModelConfig): boolean {
+  if (config.apiKey || config.baseURL) return true
+  if (providerId === 'vertex') {
+    return Boolean(process.env.GOOGLE_VERTEX_CREDENTIALS)
+  }
+  return Boolean(process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY)
+}
+
+// Every Google model that can be tried for the "Gemini Latest" entry, in a
+// random order so consecutive requests do not always hit the same model.
+function getGoogleLatestCandidates(config: LLMModelConfig): LLMModel[] {
+  const bundled = (bundledModels.models as LLMModel[]).filter(
+    (model) =>
+      (model.providerId === 'google' || model.providerId === 'vertex') &&
+      hasGoogleWrapperCredentials(model.providerId, config),
+  )
+  const extra: LLMModel[] = [
+    ...GOOGLE_LATEST_STUDIO_IDS.map((id) => ({
+      id,
+      name: id.replace(/^models\//, ''),
+      provider: 'Gemini Latest',
+      providerId: 'google',
+    })),
+    ...GOOGLE_LATEST_VERTEX_IDS.map((id) => ({
+      id,
+      name: id,
+      provider: 'Gemini Latest',
+      providerId: 'vertex',
+    })),
+  ].filter((model) => hasGoogleWrapperCredentials(model.providerId, config))
+
+  const seen = new Set<string>()
+  const candidates = [...bundled, ...extra].filter((model) => {
+    const key = `${model.providerId}:${model.id}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  return shuffleModels(candidates)
+}
+
 // Curated order of proven, coding-capable models for Auto mode.
 // Auto mode picks the FIRST one with provider credentials instead of
 // blindly choosing the first bundled model (which may be a retired
@@ -76,14 +162,30 @@ export function getAutoModel(config: LLMModelConfig): LLMModel | null {
 
   // Prefer proven coding models in priority order
   for (const preferredId of AUTO_MODEL_PRIORITY) {
+    // Substitute the Google entries with the "Gemini Latest" wrapper, which
+    // fans out across every Google model and fails over between them.
+    if (preferredId === 'gemini-2.5-flash' && hasProviderCredentials('google', config)) {
+      return {
+        id: GOOGLE_LATEST_ID,
+        name: 'Gemini Latest',
+        provider: 'Gemini Latest',
+        providerId: 'google',
+      }
+    }
+
     const model = allModels.find((m) => m.id === preferredId)
-    if (model && hasProviderCredentials(model.providerId, config)) {
+    if (
+      model &&
+      !DISABLED_PROVIDER_IDS.has(model.providerId) &&
+      hasProviderCredentials(model.providerId, config)
+    ) {
       return model
     }
   }
 
   // Fall back to the first configured model that can actually produce text
   for (const model of allModels) {
+    if (DISABLED_PROVIDER_IDS.has(model.providerId)) continue
     if (hasProviderCredentials(model.providerId, config) && isCodingCapableModel(model)) {
       return model
     }
@@ -119,15 +221,35 @@ export function isCodingCapableModel(model: LLMModel): boolean {
 
 export function getAllConfiguredModels(config: LLMModelConfig): LLMModel[] {
   const allModels = bundledModels.models as LLMModel[]
-  return allModels.filter((m) => hasProviderCredentials(m.providerId, config))
+  return allModels.filter(
+    (m) => !DISABLED_PROVIDER_IDS.has(m.providerId) && hasProviderCredentials(m.providerId, config),
+  )
 }
 
 export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMModel[] {
   const chain: LLMModel[] = []
   const seenIds = new Set<string>()
 
+  // 0. "Gemini Latest" is a wrapper: expand it into every Google AI Studio +
+  //    Vertex model in a random order so each request starts on a different
+  //    model and switches to the next one whenever a model fails.
+  if (model.id === GOOGLE_LATEST_ID) {
+    for (const candidate of getGoogleLatestCandidates(config)) {
+      const key = `${candidate.providerId}:${candidate.id}`
+      if (seenIds.has(key)) continue
+      chain.push(candidate)
+      seenIds.add(key)
+    }
+    if (chain.length > 0) return chain
+  }
+
   // 1. Always start with the user's selected model
-  if (model.id !== 'auto' && hasProviderCredentials(model.providerId, config)) {
+  if (
+    model.id !== 'auto' &&
+    model.id !== GOOGLE_LATEST_ID &&
+    !DISABLED_PROVIDER_IDS.has(model.providerId) &&
+    hasProviderCredentials(model.providerId, config)
+  ) {
     chain.push(model)
     seenIds.add(model.id)
   }
@@ -144,7 +266,11 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
       if (chain.length >= 5) break
       if (seenIds.has(preferredId)) continue
       const candidate = allModels.find((m) => m.id === preferredId)
-      if (candidate && hasProviderCredentials(candidate.providerId, config)) {
+      if (
+        candidate &&
+        !DISABLED_PROVIDER_IDS.has(candidate.providerId) &&
+        hasProviderCredentials(candidate.providerId, config)
+      ) {
         chain.push(candidate)
         seenIds.add(candidate.id)
       }
@@ -157,7 +283,11 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
         if (chain.length >= 10) break
         if (seenIds.has(thinkingId)) continue
         const candidate = allModels.find((m) => m.id === thinkingId)
-        if (candidate && hasProviderCredentials(candidate.providerId, config)) {
+        if (
+          candidate &&
+          !DISABLED_PROVIDER_IDS.has(candidate.providerId) &&
+          hasProviderCredentials(candidate.providerId, config)
+        ) {
           chain.push(candidate)
           seenIds.add(candidate.id)
         }
@@ -182,7 +312,11 @@ export function getFallbackChain(model: LLMModel, config: LLMModelConfig): LLMMo
       const fallbackModel = (bundledModels.models as LLMModel[]).find(
         (candidate) => candidate.id === fallbackId,
       )
-      if (fallbackModel && hasProviderCredentials(fallbackModel.providerId, config)) {
+      if (
+        fallbackModel &&
+        !DISABLED_PROVIDER_IDS.has(fallbackModel.providerId) &&
+        hasProviderCredentials(fallbackModel.providerId, config)
+      ) {
         chain.push(fallbackModel)
         seenIds.add(fallbackId)
       }
@@ -241,9 +375,14 @@ export function hasProviderEnvironmentCredentials(providerId: string) {
     case 'openai':
       return Boolean(process.env.OPENAI_API_KEY)
     case 'google':
-      return Boolean(process.env.GOOGLE_AI_API_KEY)
     case 'vertex':
-      return Boolean(process.env.GOOGLE_VERTEX_CREDENTIALS || process.env.GOOGLE_AI_API_KEY)
+      // Accept both the AI Studio key and the Vertex credentials so either
+      // setup enables the Google models and the "Gemini Latest" wrapper.
+      return Boolean(
+        process.env.GOOGLE_AI_API_KEY ||
+          process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+          process.env.GOOGLE_VERTEX_CREDENTIALS,
+      )
     case 'mistral':
       return Boolean(process.env.MISTRAL_API_KEY)
     case 'groq':
@@ -281,9 +420,19 @@ export function hasProviderCredentials(providerId: string, config: LLMModelConfi
 }
 
 export function getModelClient(model: LLMModel, config: LLMModelConfig) {
-  const { providerId } = model
-  const modelNameString = getProviderModelName(model)
+  let providerId = model.providerId
+  let modelNameString = getProviderModelName(model)
   const { apiKey, baseURL } = config
+
+  // "Gemini Latest" is a wrapper entry — resolve it to a concrete Google model
+  // before creating a client.
+  if (model.id === GOOGLE_LATEST_ID) {
+    const candidate = getGoogleLatestCandidates(config)[0]
+    if (candidate) {
+      providerId = candidate.providerId
+      modelNameString = getProviderModelName(candidate)
+    }
+  }
 
   const providerConfigs = {
     anthropic: () =>
@@ -298,7 +447,7 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       }).chat(modelNameString),
     google: () =>
       createGoogleGenerativeAI({
-        apiKey: apiKey || process.env.GOOGLE_AI_API_KEY,
+        apiKey: apiKey || process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
         baseURL,
       })(modelNameString),
     mistral: () =>

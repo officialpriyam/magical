@@ -21,6 +21,8 @@ const STREAM_TEXT_PROVIDER_IDS = new Set([
   'llm_gateway',
   'deepseek',
   'nvidia',
+  'cleanapis',
+  'gemini-latest',
 ])
 
 

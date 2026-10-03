@@ -32,8 +32,57 @@ type OpenAICompatibleModel = {
 }
 
 // Model IDs/names that cannot do code generation — hidden from the picker
-const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
 const CLEANAPIS_BASE_URL = 'https://cleanapis.com/v1'
+
+// The single selector entry that wraps every Google AI Studio + Vertex model.
+const GOOGLE_LATEST_ID = 'gemini-latest'
+const GOOGLE_LATEST_NAME = 'Gemini Latest'
+
+// Providers that are never surfaced — they need credentials that are not
+// available here or do not offer working models in this deployment.
+const DISABLED_PROVIDER_IDS = new Set(['anthropic', 'nvidia'])
+
+// Snapshot of the CleanAPIs chat catalog, used only until a CLEANAPIS_API_KEY
+// is configured. The live list from /v1/models replaces it automatically.
+const CLEANAPIS_FALLBACK_MODELS: LLMModel[] = [
+  { id: 'muse-spark-1.1', name: 'Muse Spark 1.1' },
+  { id: 'gemma-2-2b', name: 'Gemma 2 2B' },
+  { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' },
+  { id: 'claude-opus-5', name: 'Claude Opus 5' },
+  { id: 'claude-fable-5', name: 'Claude Fable 5' },
+  { id: 'claude-mythos-preview', name: 'Claude Mythos Preview' },
+  { id: 'kimi-k3', name: 'Kimi K3' },
+  { id: 'glm-5.3', name: 'GLM-5.3' },
+  { id: 'deepseek-v4-pro-0813', name: 'DeepSeek-V4-Pro-0813' },
+  { id: 'qwen3.8-max', name: 'Qwen3.8 Max' },
+  { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra' },
+  { id: 'claude-opus-4.8', name: 'Claude Opus 4.8' },
+  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5' },
+  { id: 'gpt-5.5', name: 'GPT-5.5' },
+  { id: 'grok-4.5', name: 'Grok 4.5' },
+  { id: 'deepseek-v4-flash-0731', name: 'DeepSeek-V4-Flash-0731' },
+  { id: 'grok-4.6', name: 'Grok 4.6' },
+  { id: 'seed-2.1-pro', name: 'Seed 2.1 Pro' },
+  { id: 'glm-5.2', name: 'GLM-5.2' },
+  { id: 'qwen3.8-27b', name: 'Qwen3.8-27B' },
+  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna' },
+  { id: 'qwen3.7-max', name: 'Qwen3.7 Max' },
+  { id: 'claude-opus-4.6', name: 'Claude Opus 4.6' },
+  { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro' },
+  { id: 'claude-opus-4.7', name: 'Claude Opus 4.7' },
+  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
+  { id: 'kimi-k2.6', name: 'Kimi K2.6' },
+  { id: 'seed-2.1-turbo', name: 'Seed 2.1 Turbo' },
+  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro' },
+  { id: 'deepseek-v4-pro-max', name: 'DeepSeek-V4-Pro-Max' },
+  { id: 'claude-fable-5.1', name: 'Claude Fable 5.1' },
+  { id: 'claude-opus-5.5', name: 'Claude Opus 5.5' },
+].map((model) => ({
+  ...model,
+  provider: 'CleanAPIs',
+  providerId: 'cleanapis',
+}))
 
 const NON_CODING_MODEL_PATTERNS = [
   'image',
@@ -103,40 +152,19 @@ function deriveCapabilities(model: LLMModel): string[] {
 
   return caps
 }
-const NVIDIA_NON_CHAT_MODEL_PARTS = [
-  'alphafold',
-  'bevformer',
-  'bge',
-  'content-safety',
-  'cuopt',
-  'diffusion',
-  'dino',
-  'embed',
-  'genmol',
-  'gliner-pii',
-  'grounding',
-  'image',
-  'jailbreak',
-  'molmim',
-  'nvclip',
-  'parse',
-  'protein',
-  'rerank',
-  'retriever',
-  'safety-guard',
-  'sparsedrive',
-  'stable-video',
-  'streampetr',
-  'topic-control',
-  'translate',
-  'vista3d',
-]
-
 export async function GET() {
   const models = new Map<string, LLMModel>()
 
+  // Google AI Studio and Vertex models are all folded into the single
+  // "Gemini Latest" wrapper, so their individual bundled entries are skipped.
+  let hasGoogleModel = false
+
   for (const model of staticModels.models as LLMModel[]) {
-    if (model.providerId === 'nvidia') continue
+    if (DISABLED_PROVIDER_IDS.has(model.providerId)) continue
+    if (model.providerId === 'google' || model.providerId === 'vertex') {
+      hasGoogleModel = true
+      continue
+    }
     if (!isCodingCapableModel(model)) continue
     // Drop paid-only OpenRouter entries so the selector never offers a model
     // that requires paid credit. Direct provider entries are keyed by the
@@ -145,23 +173,29 @@ export async function GET() {
     models.set(model.id, model)
   }
 
-  const [googleModels, nvidiaModels, openRouterModels, cleanApisModels] = await Promise.all([
+  const [googleModels, openRouterModels, cleanApisModels] = await Promise.all([
     fetchGoogleModels(),
-    fetchNvidiaModels(),
     fetchOpenRouterModels(),
     fetchCleanApisModels(),
   ])
 
-  for (const model of [
-    ...googleModels,
-    ...nvidiaModels,
-    ...openRouterModels,
-    ...cleanApisModels,
-  ]) {
+  if (googleModels.length > 0) hasGoogleModel = true
+
+  for (const model of [...openRouterModels, ...cleanApisModels]) {
     if (!isCodingCapableModel(model)) continue
     const existing = models.get(model.id)
     // Preserve bundled capability metadata when the remote list overrides
     models.set(model.id, existing ? { ...model, capabilities: existing.capabilities } : model)
+  }
+
+  if (hasGoogleModel) {
+    models.set(GOOGLE_LATEST_ID, {
+      id: GOOGLE_LATEST_ID,
+      name: GOOGLE_LATEST_NAME,
+      provider: GOOGLE_LATEST_NAME,
+      providerId: 'google',
+      capabilities: ['text', 'reasoning', 'image'],
+    })
   }
 
   const list = Array.from(models.values())
@@ -226,45 +260,6 @@ async function fetchGoogleModels(): Promise<LLMModel[]> {
   }
 }
 
-async function fetchNvidiaModels(): Promise<LLMModel[]> {
-  const apiKey = process.env.NVIDIA_API_KEY
-  if (!apiKey) return []
-
-  const baseURL = (process.env.NVIDIA_BASE_URL || NVIDIA_BASE_URL).replace(/\/$/, '')
-
-  try {
-    const response = await fetch(`${baseURL}/models`, {
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      next: { revalidate: 60 * 60 },
-    })
-
-    if (!response.ok) {
-      throw new Error(`NVIDIA models request failed: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const remoteModels = Array.isArray(data.data) ? (data.data as OpenAICompatibleModel[]) : []
-
-    return remoteModels
-      .filter((model): model is OpenAICompatibleModel & { id: string } => {
-        return typeof model.id === 'string' && model.id.trim().length > 0
-      })
-      .filter((model) => isLikelyNvidiaChatModel(model.id))
-      .map((model) => ({
-        id: model.id,
-        name: formatNvidiaModelName(model.id),
-        provider: 'NVIDIA NIM',
-        providerId: 'nvidia',
-      }))
-  } catch (error) {
-    console.warn('Skipping NVIDIA model list because the live fetch failed:', error)
-    return []
-  }
-}
-
 async function fetchOpenRouterModels(): Promise<LLMModel[]> {
   if (!hasProviderEnvironmentCredentials('openrouter')) return []
 
@@ -305,7 +300,10 @@ async function fetchOpenRouterModels(): Promise<LLMModel[]> {
 
 async function fetchCleanApisModels(): Promise<LLMModel[]> {
   const apiKey = process.env.CLEANAPIS_API_KEY
-  if (!apiKey) return []
+  // Without a key the live list is unavailable, so fall back to the bundled
+  // catalog for this provider. The list is still discovered from the API —
+  // nothing is invented here.
+  if (!apiKey) return CLEANAPIS_FALLBACK_MODELS
 
   const baseURL = (process.env.CLEANAPIS_BASE_URL || CLEANAPIS_BASE_URL).replace(/\/$/, '')
 
@@ -342,7 +340,7 @@ async function fetchCleanApisModels(): Promise<LLMModel[]> {
       }))
   } catch (error) {
     console.warn('Skipping CleanAPIs model list because the live fetch failed:', error)
-    return []
+    return CLEANAPIS_FALLBACK_MODELS
   }
 }
 
@@ -368,21 +366,3 @@ function formatCleanApisModelName(id: string) {
     .join(' ')
 }
 
-function isLikelyNvidiaChatModel(id: string) {
-  const normalizedId = id.toLowerCase()
-
-  return !NVIDIA_NON_CHAT_MODEL_PARTS.some((part) => normalizedId.includes(part))
-}
-
-function formatNvidiaModelName(id: string) {
-  const modelName = id.includes('/') ? id.split('/').slice(1).join('/') : id
-
-  return modelName
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((word) => {
-      if (/^\d+(\.\d+)?[a-z]?$/i.test(word)) return word.toUpperCase()
-      return word.charAt(0).toUpperCase() + word.slice(1)
-    })
-    .join(' ')
-}

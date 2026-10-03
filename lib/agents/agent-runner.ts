@@ -30,7 +30,7 @@ const STREAM_OBJECT_PROVIDER_IDS = new Set([
 const STREAM_TEXT_PROVIDER_IDS = new Set([
   'orcarouter', 'requesty', 'llm_gateway', 'deepseek', 'nvidia',
   'openrouter', 'google', 'vertex', 'mistral', 'groq', 'fireworks',
-  'togetherai', 'xai', 'ollama',
+  'togetherai', 'xai', 'ollama', 'cleanapis', 'gemini-latest',
 ])
 
 // ─── Status Callback Type ───────────────────────────────────────

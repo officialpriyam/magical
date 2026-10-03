@@ -38,7 +38,7 @@ export const maxDuration = 300
 const STREAM_TEXT_PROVIDER_IDS = new Set([
   'orcarouter', 'requesty', 'llm_gateway', 'deepseek', 'nvidia',
   'openrouter', 'google', 'vertex', 'mistral', 'groq', 'fireworks',
-  'togetherai', 'xai', 'ollama',
+  'togetherai', 'xai', 'ollama', 'cleanapis', 'gemini-latest',
 ])
 
 // ─── Agent execution plans by complexity ──────────────────────
