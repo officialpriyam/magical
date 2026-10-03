@@ -33,6 +33,7 @@ export type LLMModelConfig = {
 }
 
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
+const CLEANAPIS_BASE_URL = 'https://cleanapis.com/v1'
 
 // Curated order of proven, coding-capable models for Auto mode.
 // Auto mode picks the FIRST one with provider credentials instead of
@@ -265,6 +266,8 @@ export function hasProviderEnvironmentCredentials(providerId: string) {
       return Boolean(process.env.ORCAROUTER_API_KEY)
     case 'requesty':
       return Boolean(process.env.REQUESTY_API_KEY)
+    case 'cleanapis':
+      return Boolean(process.env.CLEANAPIS_API_KEY)
     default:
       return false
   }
@@ -377,6 +380,11 @@ export function getModelClient(model: LLMModel, config: LLMModelConfig) {
       createOpenAI({
         apiKey: apiKey || process.env.REQUESTY_API_KEY,
         baseURL: baseURL || 'https://router.requesty.ai/v1',
+      }).chat(modelNameString),
+    cleanapis: () =>
+      createOpenAI({
+        apiKey: apiKey || process.env.CLEANAPIS_API_KEY,
+        baseURL: baseURL || process.env.CLEANAPIS_BASE_URL || CLEANAPIS_BASE_URL,
       }).chat(modelNameString),
   }
 

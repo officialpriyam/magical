@@ -8,6 +8,7 @@ type OpenRouterModel = {
   id: string
   name?: string
   description?: string
+  pricing?: Record<string, string>
   architecture?: {
     input_modalities?: string[]
     output_modalities?: string[]
@@ -22,11 +23,17 @@ type GoogleGenerativeModel = {
 
 type OpenAICompatibleModel = {
   id?: string
+  name?: string
   owned_by?: string
+  type?: string
+  architecture?: {
+    output_modalities?: string[]
+  }
 }
 
 // Model IDs/names that cannot do code generation — hidden from the picker
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
+const CLEANAPIS_BASE_URL = 'https://cleanapis.com/v1'
 
 const NON_CODING_MODEL_PATTERNS = [
   'image',
@@ -42,6 +49,22 @@ const NON_CODING_MODEL_PATTERNS = [
   'dall-e',
   'sora',
 ]
+
+// OpenRouter lists per-token pricing. Keep only free entries (zero prompt and
+// completion price, or an explicit `:free` suffix) so the model picker does not
+// surface paid models. Every other provider is gated by the user's own API key,
+// so those entries are kept as-is.
+function isFreeOrDirectProviderModel(model: LLMModel): boolean {
+  if (model.providerId !== 'openrouter') return true
+  if (model.id.endsWith(':free')) return true
+
+  const pricing = (model as { pricing?: Record<string, string> }).pricing
+  if (!pricing) return false
+
+  const prompt = Number(pricing.prompt ?? '0')
+  const completion = Number(pricing.completion ?? '0')
+  return prompt === 0 && completion === 0
+}
 
 function isCodingCapableModel(model: LLMModel): boolean {
   const id = model.id.toLowerCase()
@@ -113,18 +136,28 @@ export async function GET() {
   const models = new Map<string, LLMModel>()
 
   for (const model of staticModels.models as LLMModel[]) {
-    if (model.providerId !== 'nvidia' && isCodingCapableModel(model)) {
-      models.set(model.id, model)
-    }
+    if (model.providerId === 'nvidia') continue
+    if (!isCodingCapableModel(model)) continue
+    // Drop paid-only OpenRouter entries so the selector never offers a model
+    // that requires paid credit. Direct provider entries are keyed by the
+    // user's own credentials and are always kept.
+    if (!isFreeOrDirectProviderModel(model)) continue
+    models.set(model.id, model)
   }
 
-  const [googleModels, nvidiaModels, openRouterModels] = await Promise.all([
+  const [googleModels, nvidiaModels, openRouterModels, cleanApisModels] = await Promise.all([
     fetchGoogleModels(),
     fetchNvidiaModels(),
     fetchOpenRouterModels(),
+    fetchCleanApisModels(),
   ])
 
-  for (const model of [...googleModels, ...nvidiaModels, ...openRouterModels]) {
+  for (const model of [
+    ...googleModels,
+    ...nvidiaModels,
+    ...openRouterModels,
+    ...cleanApisModels,
+  ]) {
     if (!isCodingCapableModel(model)) continue
     const existing = models.get(model.id)
     // Preserve bundled capability metadata when the remote list overrides
@@ -256,6 +289,8 @@ async function fetchOpenRouterModels(): Promise<LLMModel[]> {
         const outputModalities = model.architecture?.output_modalities || []
         return outputModalities.length === 0 || outputModalities.includes('text')
       })
+      // Only surface free models — skip paid OpenRouter entries.
+      .filter((model) => isFreeOpenRouterEntry(model))
       .map((model) => ({
         id: model.id,
         name: model.name || model.id,
@@ -266,6 +301,71 @@ async function fetchOpenRouterModels(): Promise<LLMModel[]> {
     console.warn('Falling back to bundled model list:', error)
     return []
   }
+}
+
+async function fetchCleanApisModels(): Promise<LLMModel[]> {
+  const apiKey = process.env.CLEANAPIS_API_KEY
+  if (!apiKey) return []
+
+  const baseURL = (process.env.CLEANAPIS_BASE_URL || CLEANAPIS_BASE_URL).replace(/\/$/, '')
+
+  try {
+    const response = await fetch(`${baseURL}/models`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      next: { revalidate: 60 * 60 },
+    })
+
+    if (!response.ok) {
+      throw new Error(`CleanAPIs models request failed: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const remoteModels = Array.isArray(data.data) ? (data.data as OpenAICompatibleModel[]) : []
+
+    return remoteModels
+      .filter((model): model is OpenAICompatibleModel & { id: string } => {
+        if (typeof model.id !== 'string' || model.id.trim().length === 0) return false
+        // Only chat/text models — skip embeddings, image, and audio endpoints.
+        if (model.type && model.type !== 'chat') return false
+        const outputModalities = model.architecture?.output_modalities
+        if (outputModalities && !outputModalities.includes('text')) return false
+        return true
+      })
+      .map((model) => ({
+        id: model.id,
+        name: model.name?.trim() || formatCleanApisModelName(model.id),
+        provider: 'CleanAPIs',
+        providerId: 'cleanapis',
+      }))
+  } catch (error) {
+    console.warn('Skipping CleanAPIs model list because the live fetch failed:', error)
+    return []
+  }
+}
+
+function isFreeOpenRouterEntry(model: OpenRouterModel): boolean {
+  if (model.id.endsWith(':free')) return true
+  if (!model.pricing) return false
+
+  const prompt = Number(model.pricing.prompt ?? '0')
+  const completion = Number(model.pricing.completion ?? '0')
+  return prompt === 0 && completion === 0
+}
+
+function formatCleanApisModelName(id: string) {
+  const modelName = id.includes('/') ? id.split('/').slice(1).join('/') : id
+
+  return modelName
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((word) => {
+      if (/^\d+(\.\d+)?[a-z]?$/i.test(word)) return word.toUpperCase()
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
 }
 
 function isLikelyNvidiaChatModel(id: string) {
